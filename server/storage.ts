@@ -5,9 +5,14 @@ import {
   type InsertStudioProject, type InsertProjectTrack, type InsertMasteringSettings, type InsertTrackComment
 } from "@shared/schema";
 import session from "express-session";
+import { db, pool } from "./db";
+import { eq, and, or, desc, asc } from "drizzle-orm";
+import connectPgSimple from "connect-pg-simple";
 import createMemoryStore from "memorystore";
 
 const MemoryStore = createMemoryStore(session);
+
+const PostgresSessionStore = connectPgSimple(session);
 
 // Define the interface for storage operations
 export interface IStorage {
@@ -41,6 +46,7 @@ export interface IStorage {
   
   // Studio session operations
   createStudioSession(session: InsertStudioSession): Promise<StudioSession>;
+  getStudioSession(id: number): Promise<StudioSession | undefined>;
   getSessionsByUser(userId: number): Promise<StudioSession[]>;
   updateStudioSession(id: number, session: Partial<StudioSession>): Promise<StudioSession | undefined>;
   deleteStudioSession(id: number): Promise<boolean>;
@@ -322,6 +328,10 @@ export class MemStorage implements IStorage {
     this.studioSessions.set(id, newSession);
     return newSession;
   }
+  
+  async getStudioSession(id: number): Promise<StudioSession | undefined> {
+    return this.studioSessions.get(id);
+  }
 
   async getSessionsByUser(userId: number): Promise<StudioSession[]> {
     return Array.from(this.studioSessions.values())
@@ -517,4 +527,491 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  sessionStore: session.SessionStore;
+
+  constructor() {
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true
+    });
+  }
+
+  // User operations
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const now = new Date();
+    const [user] = await db
+      .insert(users)
+      .values({
+        ...insertUser,
+        createdAt: now,
+        updatedAt: now,
+        role: insertUser.role || "fan",
+        verificationStatus: insertUser.verificationStatus || "pending",
+        subscriptionTier: insertUser.subscriptionTier || "none"
+      })
+      .returning();
+    return user;
+  }
+
+  async updateUser(id: number, userData: Partial<User>): Promise<User | undefined> {
+    const [updatedUser] = await db
+      .update(users)
+      .set({
+        ...userData,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return updatedUser || undefined;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(eq(users.role, role as any));
+  }
+
+  // Verification operations
+  async addVerificationDoc(doc: InsertVerificationDoc): Promise<VerificationDoc> {
+    const now = new Date();
+    const [verificationDoc] = await db
+      .insert(verificationDocs)
+      .values({
+        ...doc,
+        createdAt: now,
+        status: doc.status || "pending"
+      })
+      .returning();
+    return verificationDoc;
+  }
+
+  async getVerificationDocsByUserId(userId: number): Promise<VerificationDoc[]> {
+    return await db
+      .select()
+      .from(verificationDocs)
+      .where(eq(verificationDocs.userId, userId));
+  }
+
+  async updateVerificationStatus(userId: number, status: string): Promise<User | undefined> {
+    return this.updateUser(userId, { verificationStatus: status as any });
+  }
+
+  async getAllPendingVerifications(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.role, "athlete"), 
+          eq(users.verificationStatus, "pending")
+        )
+      );
+  }
+
+  // Track operations
+  async createTrack(track: InsertTrack): Promise<Track> {
+    const now = new Date();
+    const [newTrack] = await db
+      .insert(tracks)
+      .values({
+        ...track,
+        releaseDate: now,
+        plays: 0,
+        isPublished: track.isPublished ?? false
+      })
+      .returning();
+    return newTrack;
+  }
+
+  async getTrack(id: number): Promise<Track | undefined> {
+    const [track] = await db
+      .select()
+      .from(tracks)
+      .where(eq(tracks.id, id));
+    return track || undefined;
+  }
+
+  async getTracksByArtist(artistId: number): Promise<Track[]> {
+    return await db
+      .select()
+      .from(tracks)
+      .where(eq(tracks.artistId, artistId));
+  }
+
+  async getAllTracks(): Promise<Track[]> {
+    return await db
+      .select()
+      .from(tracks)
+      .where(eq(tracks.isPublished, true));
+  }
+
+  async updateTrack(id: number, trackData: Partial<Track>): Promise<Track | undefined> {
+    const [updatedTrack] = await db
+      .update(tracks)
+      .set(trackData)
+      .where(eq(tracks.id, id))
+      .returning();
+    return updatedTrack || undefined;
+  }
+
+  async incrementTrackPlays(id: number): Promise<Track | undefined> {
+    const track = await this.getTrack(id);
+    if (!track) return undefined;
+    
+    const [updatedTrack] = await db
+      .update(tracks)
+      .set({
+        plays: (track.plays || 0) + 1
+      })
+      .where(eq(tracks.id, id))
+      .returning();
+    return updatedTrack || undefined;
+  }
+
+  // Message operations
+  async createMessage(message: InsertMessage): Promise<Message> {
+    const now = new Date();
+    const [newMessage] = await db
+      .insert(messages)
+      .values({
+        ...message,
+        isRead: false,
+        createdAt: now
+      })
+      .returning();
+    return newMessage;
+  }
+
+  async getMessagesByUser(userId: number): Promise<Message[]> {
+    return await db
+      .select()
+      .from(messages)
+      .where(
+        or(
+          eq(messages.senderId, userId),
+          eq(messages.receiverId, userId)
+        )
+      )
+      .orderBy(desc(messages.createdAt));
+  }
+
+  async getConversation(user1Id: number, user2Id: number): Promise<Message[]> {
+    return await db
+      .select()
+      .from(messages)
+      .where(
+        or(
+          and(
+            eq(messages.senderId, user1Id),
+            eq(messages.receiverId, user2Id)
+          ),
+          and(
+            eq(messages.senderId, user2Id),
+            eq(messages.receiverId, user1Id)
+          )
+        )
+      )
+      .orderBy(asc(messages.createdAt));
+  }
+
+  async markMessageAsRead(id: number): Promise<Message | undefined> {
+    const [updatedMessage] = await db
+      .update(messages)
+      .set({ isRead: true })
+      .where(eq(messages.id, id))
+      .returning();
+    return updatedMessage || undefined;
+  }
+
+  // Studio session operations
+  async createStudioSession(sessionData: InsertStudioSession): Promise<StudioSession> {
+    const [newSession] = await db
+      .insert(studioSessions)
+      .values({
+        ...sessionData,
+        isLive: sessionData.isLive || false,
+        sessionCode: sessionData.sessionCode || null,
+        description: sessionData.description || null,
+        location: sessionData.location || null,
+        collaborators: sessionData.collaborators || null
+      })
+      .returning();
+    return newSession;
+  }
+  
+  async getStudioSession(id: number): Promise<StudioSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(studioSessions)
+      .where(eq(studioSessions.id, id));
+    return session || undefined;
+  }
+
+  async getSessionsByUser(userId: number): Promise<StudioSession[]> {
+    return await db
+      .select()
+      .from(studioSessions)
+      .where(eq(studioSessions.userId, userId))
+      .orderBy(asc(studioSessions.startTime));
+  }
+
+  async updateStudioSession(id: number, sessionData: Partial<StudioSession>): Promise<StudioSession | undefined> {
+    const [updatedSession] = await db
+      .update(studioSessions)
+      .set(sessionData)
+      .where(eq(studioSessions.id, id))
+      .returning();
+    return updatedSession || undefined;
+  }
+
+  async deleteStudioSession(id: number): Promise<boolean> {
+    const result = await db
+      .delete(studioSessions)
+      .where(eq(studioSessions.id, id));
+    return true; // PostgreSQL doesn't return count in the same way
+  }
+  
+  async startLiveSession(id: number, sessionCode: string): Promise<StudioSession | undefined> {
+    const [updatedSession] = await db
+      .update(studioSessions)
+      .set({
+        isLive: true,
+        sessionCode
+      })
+      .where(eq(studioSessions.id, id))
+      .returning();
+    return updatedSession || undefined;
+  }
+  
+  async endLiveSession(id: number): Promise<StudioSession | undefined> {
+    const [updatedSession] = await db
+      .update(studioSessions)
+      .set({
+        isLive: false,
+        sessionCode: null
+      })
+      .where(eq(studioSessions.id, id))
+      .returning();
+    return updatedSession || undefined;
+  }
+  
+  async getLiveSessionByCode(sessionCode: string): Promise<StudioSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(studioSessions)
+      .where(
+        and(
+          eq(studioSessions.sessionCode, sessionCode),
+          eq(studioSessions.isLive, true)
+        )
+      );
+    return session || undefined;
+  }
+
+  // Studio Project operations
+  async createStudioProject(project: InsertStudioProject): Promise<StudioProject> {
+    const now = new Date();
+    const [newProject] = await db
+      .insert(studioProjects)
+      .values({
+        ...project,
+        createdAt: now,
+        updatedAt: now,
+        key: project.key || null,
+        version: project.version || 1,
+        status: project.status || "draft",
+        sessionId: project.sessionId || null,
+        bpm: project.bpm || 120
+      })
+      .returning();
+    return newProject;
+  }
+  
+  async getStudioProject(id: number): Promise<StudioProject | undefined> {
+    const [project] = await db
+      .select()
+      .from(studioProjects)
+      .where(eq(studioProjects.id, id));
+    return project || undefined;
+  }
+  
+  async getStudioProjectsByUser(userId: number): Promise<StudioProject[]> {
+    return await db
+      .select()
+      .from(studioProjects)
+      .where(eq(studioProjects.userId, userId))
+      .orderBy(desc(studioProjects.updatedAt));
+  }
+  
+  async getStudioProjectsBySession(sessionId: number): Promise<StudioProject[]> {
+    return await db
+      .select()
+      .from(studioProjects)
+      .where(eq(studioProjects.sessionId, sessionId))
+      .orderBy(desc(studioProjects.updatedAt));
+  }
+  
+  async updateStudioProject(id: number, projectData: Partial<StudioProject>): Promise<StudioProject | undefined> {
+    const [updatedProject] = await db
+      .update(studioProjects)
+      .set({
+        ...projectData,
+        updatedAt: new Date()
+      })
+      .where(eq(studioProjects.id, id))
+      .returning();
+    return updatedProject || undefined;
+  }
+  
+  async deleteStudioProject(id: number): Promise<boolean> {
+    await db
+      .delete(studioProjects)
+      .where(eq(studioProjects.id, id));
+    return true;
+  }
+  
+  // Project Track operations
+  async createProjectTrack(track: InsertProjectTrack): Promise<ProjectTrack> {
+    const now = new Date();
+    const [newTrack] = await db
+      .insert(projectTracks)
+      .values({
+        ...track,
+        createdAt: now,
+        updatedAt: now,
+        waveformData: track.waveformData || null,
+        position: track.position || 0,
+        muted: track.muted || false,
+        solo: track.solo || false,
+        volume: track.volume || 1,
+        pan: track.pan || 0
+      })
+      .returning();
+    return newTrack;
+  }
+  
+  async getProjectTrack(id: number): Promise<ProjectTrack | undefined> {
+    const [track] = await db
+      .select()
+      .from(projectTracks)
+      .where(eq(projectTracks.id, id));
+    return track || undefined;
+  }
+  
+  async getProjectTracksByProject(projectId: number): Promise<ProjectTrack[]> {
+    return await db
+      .select()
+      .from(projectTracks)
+      .where(eq(projectTracks.projectId, projectId))
+      .orderBy(asc(projectTracks.position));
+  }
+  
+  async updateProjectTrack(id: number, trackData: Partial<ProjectTrack>): Promise<ProjectTrack | undefined> {
+    const [updatedTrack] = await db
+      .update(projectTracks)
+      .set({
+        ...trackData,
+        updatedAt: new Date()
+      })
+      .where(eq(projectTracks.id, id))
+      .returning();
+    return updatedTrack || undefined;
+  }
+  
+  async deleteProjectTrack(id: number): Promise<boolean> {
+    await db
+      .delete(projectTracks)
+      .where(eq(projectTracks.id, id));
+    return true;
+  }
+  
+  // Mastering operations
+  async saveMasteringSettings(settings: InsertMasteringSettings): Promise<MasteringSettings> {
+    const now = new Date();
+    const [newSettings] = await db
+      .insert(masteringSettings)
+      .values({
+        ...settings,
+        createdAt: now,
+        updatedAt: now,
+        preset: settings.preset || "balanced",
+        eqSettings: settings.eqSettings || null,
+        compressorSettings: settings.compressorSettings || null,
+        limiterSettings: settings.limiterSettings || null,
+        lufsTarget: settings.lufsTarget || -14,
+        referenceTrackUrl: settings.referenceTrackUrl || null
+      })
+      .returning();
+    return newSettings;
+  }
+  
+  async getMasteringSettings(projectId: number): Promise<MasteringSettings | undefined> {
+    const [settings] = await db
+      .select()
+      .from(masteringSettings)
+      .where(eq(masteringSettings.projectId, projectId));
+    return settings || undefined;
+  }
+  
+  async updateMasteringSettings(id: number, settingsData: Partial<MasteringSettings>): Promise<MasteringSettings | undefined> {
+    const [updatedSettings] = await db
+      .update(masteringSettings)
+      .set({
+        ...settingsData,
+        updatedAt: new Date()
+      })
+      .where(eq(masteringSettings.id, id))
+      .returning();
+    return updatedSettings || undefined;
+  }
+  
+  // Track comments
+  async addTrackComment(comment: InsertTrackComment): Promise<TrackComment> {
+    const now = new Date();
+    const [newComment] = await db
+      .insert(trackComments)
+      .values({
+        ...comment,
+        createdAt: now
+      })
+      .returning();
+    return newComment;
+  }
+  
+  async getTrackComments(projectTrackId: number): Promise<TrackComment[]> {
+    return await db
+      .select()
+      .from(trackComments)
+      .where(eq(trackComments.projectTrackId, projectTrackId))
+      .orderBy(asc(trackComments.timestamp));
+  }
+  
+  async deleteTrackComment(id: number): Promise<boolean> {
+    await db
+      .delete(trackComments)
+      .where(eq(trackComments.id, id));
+    return true;
+  }
+}
+
+// Switch from in-memory to database storage
+export const storage = new DatabaseStorage();

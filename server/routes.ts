@@ -533,7 +533,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sessionId = parseInt(id);
       
       // Check ownership before deleting
-      const session = await storage.studioSessions.get(sessionId);
+      const session = await storage.getStudioSession(sessionId);
       if (!session) {
         return res.status(404).json({ message: "Session not found" });
       }
