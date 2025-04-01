@@ -1,0 +1,70 @@
+Here's a condensed, ready-to-use prompt for Replit:
+
+---
+
+```markdown
+# BandLab-Style DAW with Advanced Mastering & Collaboration
+
+## **Core Requirements**
+### Mastering Suite
+- Dynamic EQ: High-pass <30Hz + mid-side processing below 150Hz
+- Multi-Band Compression: 4-band split with transient preservation
+- AI Mastering: Genre presets (Warm/Balanced/Open) + reference track matching
+- Loudness Control: -14 to -8 LUFS limiter with true peak detection
+
+### Real-Time Collaboration
+1. **Live Session Features**:
+   - Shared cursor tracking & waveform annotation tools
+   - Lossless audio chat (48kHz/24-bit) during recording
+   - MIDI input sync with <50ms latency
+
+2. **Track Handoff System**:
+   - Stem export with FX bypass options
+   - Version compare dashboard (LUFS/spectral analysis)
+   - Auto-convert projects to Ableton/FL Studio/Logic templates
+
+3. **Workflow Tools**:
+   - Region-specific timestamped comments
+   - MIDI-to-audio bounce with plugin freeze
+   - Conflict resolution via CRDT merge strategies
+
+## **UI/UX Specs**
+```
+[Mastering Chain Panel]
+FX Chain: EQ → Comp → Saturation → Limiter  
+Preset Browser ← AI Match → Reference Track Upload  
+
+[Collaboration Dashboard]
+User Avatars → Track Ownership Tags  
+Version Tree ←→ LUFS Meter Comparison
+```
+
+## **Implementation Notes**
+```
+# Tech Stack
+Frontend: React + Tone.js + Web Audio API  
+Backend: Node.js + Firebase Realtime DB  
+Audio: TensorFlow.js (AI mastering) + LANDR API  
+Sync: Yjs CRDTs for project state management  
+
+# Key Features to Prioritize
+1. Real-time MIDI/automation sync via WebSockets
+2. Stem export with embedded FX parameters
+3. AI mastering preset generator
+```
+
+## Deployment Reminders
+✅ Test latency with WebRTC vs WebSockets  
+✅ Implement project version snapshots  
+✅ Add cross-browser audio worker fallbacks  
+```
+
+**Paste this into Replit's README.md** and start building with `npm create vite@latest` for the frontend + Node.js backend. Let the DAW-ing begin! 🎛️🚀
+``` 
+
+---
+
+This prompt contains all technical specifications in Replit-friendly formatting with priority markers for implementation. The code blocks and plaintext diagrams are optimized for quick scanning.
+
+---
+Answer from Perplexity: pplx.ai/share
