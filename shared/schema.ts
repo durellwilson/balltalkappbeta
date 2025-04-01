@@ -24,6 +24,8 @@ export const users = pgTable("users", {
   subscriptionTier: subscriptionTierEnum("subscription_tier").default('none'),
   league: text("league"),
   team: text("team"),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
 });
 
 // Verification documents for athletes

@@ -18,23 +18,39 @@ import { ProtectedRoute } from "./lib/protected-route";
 import { useAuth } from "./hooks/use-auth";
 
 function Router() {
+  const { user, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+  
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
-      <Route path="/" component={Dashboard} />
+      <ProtectedRoute path="/" component={Dashboard} />
       <Route path="/discover" component={Discover} />
-      <Route path="/library" component={Library} />
-      <Route path="/profile" component={Profile} />
-      <Route path="/subscriptions" component={Subscriptions} />
-      <Route path="/studio" component={Studio} />
-      <Route path="/studio/join/:code" component={Studio} />
-      <Route path="/studio/:projectId" component={Studio} />
-      <Route path="/uploads" component={Uploads} />
-      <Route path="/earnings" component={Earnings} />
-      <Route path="/athlete-verification" component={AthleteVerification} />
-      <Route path="/admin/verifications" component={VerificationsAdmin} />
-      <Route path="/admin/content-moderation" component={ContentModerationAdmin} />
-      <Route path="/admin/user-management" component={UserManagementAdmin} />
+      <ProtectedRoute path="/library" component={Library} />
+      <ProtectedRoute path="/profile" component={Profile} />
+      <ProtectedRoute path="/subscriptions" component={Subscriptions} />
+      <ProtectedRoute path="/studio" component={Studio} />
+      <ProtectedRoute path="/studio/join/:code" component={Studio} />
+      <ProtectedRoute path="/studio/:projectId" component={Studio} />
+      <ProtectedRoute path="/uploads" component={Uploads} />
+      <ProtectedRoute path="/earnings" component={Earnings} />
+      {user?.role === 'athlete' && (
+        <ProtectedRoute path="/athlete-verification" component={AthleteVerification} />
+      )}
+      {user?.role === 'admin' && (
+        <>
+          <ProtectedRoute path="/admin/verifications" component={VerificationsAdmin} />
+          <ProtectedRoute path="/admin/content-moderation" component={ContentModerationAdmin} />
+          <ProtectedRoute path="/admin/user-management" component={UserManagementAdmin} />
+        </>
+      )}
       <Route component={NotFound} />
     </Switch>
   );
