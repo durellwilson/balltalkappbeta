@@ -630,8 +630,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup WebSocket server for real-time collaboration
   if (process.env.NODE_ENV !== 'test') {
-    const { setupYjs } = await import('./webSocketServer.js');
-    setupYjs(httpServer);
+    const { setupWebSocketServer } = await import('./webSocketServer');
+    setupWebSocketServer(httpServer);
   }
   
   return httpServer;
