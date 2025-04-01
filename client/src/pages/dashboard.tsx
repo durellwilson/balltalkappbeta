@@ -89,23 +89,23 @@ export default function Dashboard() {
   
   return (
     <div className="p-6 space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-black/50 backdrop-blur-lg rounded-xl p-8 border border-zinc-800/60 shadow-xl mb-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">
+          <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-400">
             Welcome, {user?.username || 'User'}
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Here's what's happening on Athlete Sound
+          <p className="text-zinc-400 mt-2 text-lg">
+            Your premium music experience awaits
           </p>
         </div>
         
         {isAthlete && (
-          <div className="flex gap-2">
-            <Button onClick={() => navigate('/uploads')}>
+          <div className="flex gap-3">
+            <Button onClick={() => navigate('/uploads')} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 border-0 shadow-lg hover:shadow-purple-500/30 transition-all">
               <Upload className="mr-2 h-4 w-4" />
               Upload Track
             </Button>
-            <Button variant="outline" onClick={() => navigate('/studio')}>
+            <Button variant="outline" onClick={() => navigate('/studio')} className="border border-zinc-700 bg-black/40 hover:bg-black/60 shadow-lg">
               <Mic className="mr-2 h-4 w-4" />
               Studio
             </Button>
@@ -114,101 +114,145 @@ export default function Dashboard() {
       </div>
       
       {/* Quick access cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-blue-500 to-purple-600 text-white hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/discover')}>
-          <CardContent className="p-6">
-            <Music className="h-8 w-8 mb-4" />
-            <h3 className="font-bold text-xl">Discover</h3>
-            <p className="text-blue-100 text-sm mt-1">Find new music from athletes</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <Card className="relative overflow-hidden border-0 shadow-2xl hover:shadow-blue-500/20 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer" onClick={() => navigate('/discover')}>
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-600/90 to-indigo-900/90 z-0"></div>
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxkZWZzPjxwYXR0ZXJuIGlkPSJncmlkIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiPjxwYXRoIGQ9Ik0gMjAgMCBMIDAgMCAwIDIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYxMCIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIiAvPjwvc3ZnPg==')] opacity-30 z-0"></div>
+          <CardContent className="p-8 relative z-10 text-white">
+            <div className="bg-white/10 backdrop-blur-lg rounded-full p-3 w-14 h-14 flex items-center justify-center mb-6">
+              <Music className="h-8 w-8" />
+            </div>
+            <h3 className="font-bold text-2xl tracking-tight">Discover</h3>
+            <p className="text-blue-100 text-sm mt-2 opacity-80">Explore exclusive tracks from elite athletes worldwide</p>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-purple-500 to-pink-600 text-white hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/library')}>
-          <CardContent className="p-6">
-            <Headphones className="h-8 w-8 mb-4" />
-            <h3 className="font-bold text-xl">Library</h3>
-            <p className="text-purple-100 text-sm mt-1">Your saved tracks and playlists</p>
+        <Card className="relative overflow-hidden border-0 shadow-2xl hover:shadow-purple-500/20 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer" onClick={() => navigate('/library')}>
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-600/90 to-fuchsia-900/90 z-0"></div>
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxkZWZzPjxwYXR0ZXJuIGlkPSJncmlkIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiPjxwYXRoIGQ9Ik0gMjAgMCBMIDAgMCAwIDIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYxMCIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIiAvPjwvc3ZnPg==')] opacity-30 z-0"></div>
+          <CardContent className="p-8 relative z-10 text-white">
+            <div className="bg-white/10 backdrop-blur-lg rounded-full p-3 w-14 h-14 flex items-center justify-center mb-6">
+              <Headphones className="h-8 w-8" />
+            </div>
+            <h3 className="font-bold text-2xl tracking-tight">Library</h3>
+            <p className="text-purple-100 text-sm mt-2 opacity-80">Your curated collection of premium tracks and playlists</p>
           </CardContent>
         </Card>
         
         {isAthlete && (
-          <Card className="bg-gradient-to-br from-amber-500 to-red-600 text-white hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/earnings')}>
-            <CardContent className="p-6">
-              <CreditCard className="h-8 w-8 mb-4" />
-              <h3 className="font-bold text-xl">Earnings</h3>
-              <p className="text-amber-100 text-sm mt-1">Track your revenue and stats</p>
+          <Card className="relative overflow-hidden border-0 shadow-2xl hover:shadow-amber-500/20 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer" onClick={() => navigate('/earnings')}>
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-600/90 to-red-900/90 z-0"></div>
+            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxkZWZzPjxwYXR0ZXJuIGlkPSJncmlkIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiPjxwYXRoIGQ9Ik0gMjAgMCBMIDAgMCAwIDIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYxMCIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIiAvPjwvc3ZnPg==')] opacity-30 z-0"></div>
+            <CardContent className="p-8 relative z-10 text-white">
+              <div className="bg-white/10 backdrop-blur-lg rounded-full p-3 w-14 h-14 flex items-center justify-center mb-6">
+                <CreditCard className="h-8 w-8" />
+              </div>
+              <h3 className="font-bold text-2xl tracking-tight">Earnings</h3>
+              <p className="text-amber-100 text-sm mt-2 opacity-80">Monitor your revenue streams and audience engagement</p>
             </CardContent>
           </Card>
         )}
         
-        <Card className="bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/subscriptions')}>
-          <CardContent className="p-6">
-            <BarChart className="h-8 w-8 mb-4" />
-            <h3 className="font-bold text-xl">Subscriptions</h3>
-            <p className="text-green-100 text-sm mt-1">Manage your subscription plan</p>
+        <Card className="relative overflow-hidden border-0 shadow-2xl hover:shadow-emerald-500/20 transition-all duration-300 transform hover:-translate-y-1 cursor-pointer" onClick={() => navigate('/subscriptions')}>
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/90 to-green-900/90 z-0"></div>
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxkZWZzPjxwYXR0ZXJuIGlkPSJncmlkIiB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHBhdHRlcm5Vbml0cz0idXNlclNwYWNlT25Vc2UiPjxwYXRoIGQ9Ik0gMjAgMCBMIDAgMCAwIDIwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYxMCIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIiAvPjwvc3ZnPg==')] opacity-30 z-0"></div>
+          <CardContent className="p-8 relative z-10 text-white">
+            <div className="bg-white/10 backdrop-blur-lg rounded-full p-3 w-14 h-14 flex items-center justify-center mb-6">
+              <BarChart className="h-8 w-8" />
+            </div>
+            <h3 className="font-bold text-2xl tracking-tight">Subscriptions</h3>
+            <p className="text-green-100 text-sm mt-2 opacity-80">Elevate your experience with elite membership options</p>
           </CardContent>
         </Card>
       </div>
       
       {/* Content section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Recent releases */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Recent Releases</CardTitle>
-            <CardDescription>
-              The latest tracks from athletes
+        <Card className="lg:col-span-2 border-0 shadow-xl bg-zinc-900/50 backdrop-blur-sm">
+          <CardHeader className="border-b border-zinc-800/70">
+            <CardTitle className="text-2xl font-bold">Recent Releases</CardTitle>
+            <CardDescription className="text-zinc-400">
+              Exclusive tracks from top athletes
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-6">
             {tracksLoading ? (
-              <div className="flex justify-center p-6">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              <div className="flex justify-center p-8">
+                <div className="relative h-12 w-12">
+                  <div className="absolute inset-0 rounded-full border-2 border-zinc-700 opacity-20"></div>
+                  <div className="absolute inset-0 rounded-full border-t-2 border-primary animate-spin"></div>
+                </div>
               </div>
             ) : recentTracks && recentTracks.length > 0 ? (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {recentTracks.map((track: any) => (
-                  <div key={track.id} className="flex items-center space-x-4 p-2 rounded-md hover:bg-accent transition-colors group">
-                    {track.coverArt ? (
-                      <img src={track.coverArt} alt={track.title} className="h-16 w-16 rounded-md object-cover" />
-                    ) : (
-                      <div className="h-16 w-16 rounded-md bg-muted flex items-center justify-center">
-                        <Music className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                    )}
+                  <div 
+                    key={track.id} 
+                    className="flex items-center space-x-4 p-3 rounded-xl bg-black/20 hover:bg-black/40 transition-all duration-200 group border border-zinc-800/40 hover:border-zinc-700/80"
+                  >
+                    <div className="relative">
+                      {track.coverArt ? (
+                        <img src={track.coverArt} alt={track.title} className="h-20 w-20 rounded-lg object-cover shadow-lg" />
+                      ) : (
+                        <div className="h-20 w-20 rounded-lg bg-gradient-to-br from-zinc-800 to-zinc-900 flex items-center justify-center shadow-lg">
+                          <Music className="h-10 w-10 text-zinc-600" />
+                        </div>
+                      )}
+                      <button className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="bg-white rounded-full p-2.5 shadow-lg transform group-hover:scale-110 transition-transform">
+                          <Play className="h-4 w-4 text-black" fill="currentColor" />
+                        </div>
+                      </button>
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium truncate">{track.title}</h4>
-                      <p className="text-sm text-muted-foreground truncate">
+                      <h4 className="font-semibold text-lg truncate">{track.title}</h4>
+                      <p className="text-sm text-zinc-400 truncate">
                         {track.artistName || 'Unknown Artist'}
                       </p>
-                      <div className="flex items-center mt-1">
-                        <Badge variant="outline" className="text-xs">
+                      <div className="flex items-center mt-2">
+                        <Badge variant="secondary" className="bg-zinc-800 hover:bg-zinc-700 text-xs font-medium">
                           {track.genre || 'Other'}
                         </Badge>
                         {track.releaseDate && (
-                          <span className="text-xs text-muted-foreground ml-2">
+                          <span className="text-xs text-zinc-500 ml-2">
                             {formatDate(new Date(track.releaseDate))}
                           </span>
                         )}
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
-                      <Play className="h-5 w-5" />
-                    </Button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                        </svg>
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                          <circle cx="12" cy="12" r="1"></circle>
+                          <circle cx="19" cy="12" r="1"></circle>
+                          <circle cx="5" cy="12" r="1"></circle>
+                        </svg>
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center p-6 text-muted-foreground">
-                <Music className="h-10 w-10 mx-auto mb-2 opacity-40" />
-                <p>No tracks available yet</p>
-                <p className="text-sm mt-1">Check back soon for new releases</p>
+              <div className="text-center p-12 bg-black/20 rounded-xl border border-zinc-800/50">
+                <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 mb-4">
+                  <Music className="h-8 w-8 text-zinc-600" />
+                </div>
+                <h3 className="text-lg font-medium">No tracks available yet</h3>
+                <p className="text-sm text-zinc-500 mt-2 max-w-md mx-auto">
+                  We're working with elite athletes to bring you exclusive content. Check back soon for new releases.
+                </p>
               </div>
             )}
           </CardContent>
-          <CardFooter>
-            <Button variant="ghost" className="w-full" onClick={() => navigate('/discover')}>
-              View All Tracks
+          <CardFooter className="pt-0 pb-6 px-6">
+            <Button variant="outline" className="w-full border border-zinc-800 hover:bg-zinc-800 bg-black/30" onClick={() => navigate('/discover')}>
+              Explore All Releases
               <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
           </CardFooter>
@@ -219,91 +263,114 @@ export default function Dashboard() {
           {isAthlete ? (
             <>
               {/* Studio Projects */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Your Studio Projects</CardTitle>
-                  <CardDescription>
+              <Card className="border-0 shadow-xl bg-zinc-900/50 backdrop-blur-sm overflow-hidden">
+                <CardHeader className="border-b border-zinc-800/70">
+                  <CardTitle className="text-xl font-bold">Your Studio Projects</CardTitle>
+                  <CardDescription className="text-zinc-400">
                     Continue where you left off
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-5">
                   {projectsLoading ? (
-                    <div className="flex justify-center p-2">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    <div className="flex justify-center p-6">
+                      <div className="relative h-10 w-10">
+                        <div className="absolute inset-0 rounded-full border-2 border-zinc-700 opacity-20"></div>
+                        <div className="absolute inset-0 rounded-full border-t-2 border-primary animate-spin"></div>
+                      </div>
                     </div>
                   ) : projects && projects.length > 0 ? (
                     <div className="space-y-3">
                       {projects.map((project: any) => (
                         <div 
                           key={project.id} 
-                          className="flex items-center p-2 rounded-md hover:bg-accent cursor-pointer transition-colors"
+                          className="flex items-center p-3 rounded-lg bg-black/20 hover:bg-black/40 cursor-pointer transition-all duration-200 border border-zinc-800/40 hover:border-zinc-700"
                           onClick={() => navigate(`/studio/${project.id}`)}
                         >
-                          <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center mr-3">
-                            <Mic className="h-5 w-5 text-primary" />
+                          <div className="w-12 h-12 rounded-md bg-gradient-to-br from-purple-600/20 to-indigo-600/20 flex items-center justify-center mr-3 border border-zinc-800">
+                            <Mic className="h-5 w-5 text-purple-400" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-sm truncate">{project.title}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              Last updated: {formatDate(new Date(project.updatedAt))}
+                            <h4 className="font-medium text-white truncate">{project.title}</h4>
+                            <p className="text-xs text-zinc-400">
+                              Updated {formatDate(new Date(project.updatedAt))}
                             </p>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center p-4 text-muted-foreground">
-                      <p className="text-sm">No projects yet</p>
+                    <div className="text-center p-6 bg-black/20 rounded-xl border border-zinc-800/50">
+                      <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 mb-3">
+                        <Mic className="h-6 w-6 text-zinc-600" />
+                      </div>
+                      <h3 className="text-base font-medium">No projects yet</h3>
+                      <p className="text-sm text-zinc-500 mt-2 mb-4">
+                        Start creating your first studio project
+                      </p>
                       <Button 
-                        variant="link" 
-                        className="mt-1 text-sm text-primary"
+                        variant="outline" 
+                        className="border-zinc-800 bg-black/30 hover:bg-zinc-800 text-white"
                         onClick={() => navigate('/studio')}
                       >
-                        Create your first project
+                        Create New Project
                       </Button>
                     </div>
                   )}
                 </CardContent>
-                <CardFooter>
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => navigate('/studio')}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    New Project
-                  </Button>
-                </CardFooter>
+                {projects && projects.length > 0 && (
+                  <CardFooter className="pt-0 pb-5 px-5">
+                    <Button variant="outline" size="sm" className="w-full border-zinc-800 bg-black/30 hover:bg-zinc-800" onClick={() => navigate('/studio')}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      New Project
+                    </Button>
+                  </CardFooter>
+                )}
               </Card>
               
               {/* Live Sessions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Studio Sessions</CardTitle>
-                  <CardDescription>
+              <Card className="border-0 shadow-xl bg-zinc-900/50 backdrop-blur-sm overflow-hidden">
+                <CardHeader className="border-b border-zinc-800/70">
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-xl font-bold">Studio Sessions</CardTitle>
+                    {sessions && sessions.some((s: any) => s.isLive) && (
+                      <Badge className="bg-red-500 hover:bg-red-600 px-2">LIVE</Badge>
+                    )}
+                  </div>
+                  <CardDescription className="text-zinc-400">
                     Your scheduled recording sessions
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-5">
                   {sessionsLoading ? (
-                    <div className="flex justify-center p-2">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    <div className="flex justify-center p-6">
+                      <div className="relative h-10 w-10">
+                        <div className="absolute inset-0 rounded-full border-2 border-zinc-700 opacity-20"></div>
+                        <div className="absolute inset-0 rounded-full border-t-2 border-primary animate-spin"></div>
+                      </div>
                     </div>
                   ) : sessions && sessions.length > 0 ? (
                     <div className="space-y-3">
                       {sessions.map((session: any) => (
-                        <div key={session.id} className="p-2 rounded-md hover:bg-accent transition-colors">
+                        <div key={session.id} className="p-3 rounded-lg bg-black/20 hover:bg-black/40 transition-all duration-200 border border-zinc-800/40 hover:border-zinc-700">
                           <div className="flex items-center">
                             <div className="mr-3">
-                              <div className="w-10 h-10 rounded-md bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                                <Mic className="h-5 w-5 text-blue-600 dark:text-blue-300" />
+                              <div className={`w-12 h-12 rounded-md flex items-center justify-center border border-zinc-800 ${
+                                session.isLive 
+                                  ? 'bg-gradient-to-br from-red-600/20 to-red-800/20' 
+                                  : 'bg-gradient-to-br from-blue-600/20 to-indigo-600/20'
+                              }`}>
+                                <Mic className={`h-5 w-5 ${session.isLive ? 'text-red-400' : 'text-blue-400'}`} />
                               </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-medium text-sm truncate">{session.title}</h4>
-                              <div className="flex items-center">
-                                <p className="text-xs text-muted-foreground">
+                              <h4 className="font-medium text-white truncate">{session.title}</h4>
+                              <div className="flex items-center mt-1">
+                                <p className="text-xs text-zinc-400">
                                   {formatDate(new Date(session.startTime))}
                                 </p>
                                 {session.isLive && (
-                                  <Badge variant="default" className="ml-2 text-xs">
-                                    Live
+                                  <Badge variant="default" className="ml-2 text-xs bg-red-500 hover:bg-red-600">
+                                    Live Now
                                   </Badge>
                                 )}
                               </div>
@@ -313,66 +380,122 @@ export default function Dashboard() {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center p-4 text-muted-foreground">
-                      <p className="text-sm">No sessions scheduled</p>
+                    <div className="text-center p-6 bg-black/20 rounded-xl border border-zinc-800/50">
+                      <div className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-zinc-900 mb-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-zinc-600">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                      </div>
+                      <h3 className="text-base font-medium">No sessions scheduled</h3>
+                      <p className="text-sm text-zinc-500 mt-2 mb-4">
+                        Schedule your next studio session
+                      </p>
                       <Button 
-                        variant="link" 
-                        className="mt-1 text-sm text-primary"
+                        variant="outline" 
+                        className="border-zinc-800 bg-black/30 hover:bg-zinc-800 text-white"
                         onClick={() => navigate('/studio')}
                       >
-                        Schedule a session
+                        Schedule Session
                       </Button>
                     </div>
                   )}
                 </CardContent>
-                <CardFooter>
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => navigate('/studio')}>
-                    Manage Sessions
-                  </Button>
-                </CardFooter>
+                {sessions && sessions.length > 0 && (
+                  <CardFooter className="pt-0 pb-5 px-5">
+                    <Button variant="outline" size="sm" className="w-full border-zinc-800 bg-black/30 hover:bg-zinc-800" onClick={() => navigate('/studio')}>
+                      Manage Sessions
+                    </Button>
+                  </CardFooter>
+                )}
               </Card>
             </>
           ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Subscription</CardTitle>
-                <CardDescription>
-                  Current plan and benefits
+            <Card className="border-0 shadow-xl bg-zinc-900/50 backdrop-blur-sm overflow-hidden">
+              <CardHeader className="border-b border-zinc-800/70">
+                <CardTitle className="text-xl font-bold">Elite Membership</CardTitle>
+                <CardDescription className="text-zinc-400">
+                  Upgrade to unlock premium features
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg p-4 text-white">
-                    <h3 className="font-bold text-lg">Free Plan</h3>
-                    <p className="text-sm opacity-90">Upgrade for premium features</p>
+              <CardContent className="p-0">
+                <div className="relative overflow-hidden">
+                  <div className="bg-gradient-to-br from-indigo-600 to-purple-900 p-6 text-white">
+                    <div className="absolute top-0 right-0 p-2 bg-black/20 rounded-bl-lg text-xs font-bold">
+                      CURRENT PLAN
+                    </div>
+                    <h3 className="font-bold text-xl mb-1">Free Tier</h3>
+                    <p className="text-sm text-indigo-200">Limited access to premium features</p>
+                    <div className="mt-4 mb-1">
+                      <span className="text-3xl font-bold">$0</span>
+                      <span className="text-indigo-200 ml-1">/month</span>
+                    </div>
                   </div>
                   
-                  <div className="space-y-2">
-                    <h4 className="font-medium text-sm">What you get:</h4>
-                    <ul className="text-sm space-y-1">
-                      <li className="flex items-center">
-                        <span className="h-1.5 w-1.5 rounded-full bg-green-500 mr-2"></span>
-                        Access to all free tracks
-                      </li>
-                      <li className="flex items-center">
-                        <span className="h-1.5 w-1.5 rounded-full bg-green-500 mr-2"></span>
-                        Create playlists
-                      </li>
-                      <li className="flex items-center opacity-50">
-                        <span className="h-1.5 w-1.5 rounded-full bg-gray-400 mr-2"></span>
-                        Ad-free listening (Premium)
-                      </li>
-                      <li className="flex items-center opacity-50">
-                        <span className="h-1.5 w-1.5 rounded-full bg-gray-400 mr-2"></span>
-                        Access to exclusive content (Premium)
-                      </li>
-                    </ul>
+                  <div className="p-6 space-y-4">
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 mr-2 text-indigo-500">
+                          <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Included Features
+                      </h4>
+                      <ul className="space-y-2 text-sm">
+                        <li className="flex items-center text-zinc-200">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 mr-2 text-emerald-500">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
+                          Access to all free tracks
+                        </li>
+                        <li className="flex items-center text-zinc-200">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 mr-2 text-emerald-500">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
+                          Create and share playlists
+                        </li>
+                      </ul>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-semibold mb-3 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 mr-2 text-indigo-500">
+                          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                          <circle cx="9" cy="7" r="4"></circle>
+                          <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                        Elite Tier Benefits
+                      </h4>
+                      <ul className="space-y-2 text-sm">
+                        <li className="flex items-center text-zinc-500">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 mr-2 text-zinc-600">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
+                          Exclusive athlete content
+                        </li>
+                        <li className="flex items-center text-zinc-500">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 mr-2 text-zinc-600">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
+                          High quality lossless audio
+                        </li>
+                        <li className="flex items-center text-zinc-500">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 mr-2 text-zinc-600">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
+                          Priority access to new releases
+                        </li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
               </CardContent>
-              <CardFooter>
-                <Button className="w-full" onClick={() => navigate('/subscriptions')}>
-                  Upgrade to Premium
+              <CardFooter className="p-6 bg-black/30">
+                <Button className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 border-0 shadow-lg" onClick={() => navigate('/subscriptions')}>
+                  Upgrade to Elite Tier
                 </Button>
               </CardFooter>
             </Card>
