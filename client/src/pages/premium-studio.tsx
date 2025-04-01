@@ -1354,7 +1354,7 @@ const PremiumStudio: React.FC = () => {
           </TooltipProvider>
           
           <Avatar className="h-8 w-8 border border-zinc-700">
-            <AvatarImage src={user?.profileImage} />
+            <AvatarImage src={user?.profileImage || undefined} />
             <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white">
               {user?.username?.[0] || 'A'}
             </AvatarFallback>
@@ -1767,7 +1767,7 @@ const PremiumStudio: React.FC = () => {
                       <div className="h-full flex items-center px-1">
                         {region.waveformData.map((value, idx) => (
                           <div 
-                            key={idx}
+                            key={`${region.id}-waveform-${idx}`}
                             className="w-px bg-white/60"
                             style={{ 
                               height: `${Math.max(3, value/2)}%`,
