@@ -106,12 +106,25 @@ class AudioProcessor {
   /**
    * Initialize the audio context (must be called after user interaction)
    */
+  /**
+   * Check if the audio processor has been initialized
+   * @returns Whether the audio processor is initialized
+   */
+  isReady(): boolean {
+    return this.isInitialized;
+  }
+  
+  /**
+   * Initialize the audio processor and start the audio context
+   * This must be called from a user interaction (click, tap) to comply with browser autoplay policies
+   */
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
     
     try {
-      // Start audio context
+      // Start audio context - this requires user interaction due to browser autoplay policies
       await Tone.start();
+      console.log('Tone.js audio context started successfully');
       
       // Set default BPM
       Tone.Transport.bpm.value = 120;

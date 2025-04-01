@@ -155,11 +155,9 @@ const EnhancedStudio: React.FC = () => {
   useEffect(() => {
     const initAudio = async () => {
       try {
-        await audioProcessor.initialize();
-        // Set up master volume
+        // We don't auto-initialize audio context in the constructor due to browser autoplay policies
+        // Instead, we configure the master settings now, but initialization happens on user interaction
         audioProcessor.setMasterVolume(masterVolume);
-        
-        // Set the BPM
         audioProcessor.setBpm(project.bpm);
         
         // Initialize demo tracks
@@ -263,13 +261,39 @@ const EnhancedStudio: React.FC = () => {
   }, [isPlaying, isRecording]);
   
   // Handle playback controls
-  const handlePlayPause = () => {
-    if (isPlaying) {
-      audioProcessor.pause();
-      setIsPlaying(false);
-    } else {
-      audioProcessor.play();
-      setIsPlaying(true);
+  const handlePlayPause = async () => {
+    try {
+      // Initialize audio context on first user interaction to comply with browser autoplay policies
+      if (!audioProcessor.isReady()) {
+        // Show loading state
+        toast({
+          title: "Initializing audio engine...",
+          description: "Please wait while we set up the audio system.",
+        });
+        
+        // Initialize the audio processor
+        await audioProcessor.initialize();
+        
+        toast({
+          title: "Audio engine ready",
+          description: "You can now play and record audio.",
+        });
+      }
+      
+      if (isPlaying) {
+        audioProcessor.pause();
+        setIsPlaying(false);
+      } else {
+        audioProcessor.play();
+        setIsPlaying(true);
+      }
+    } catch (error) {
+      console.error("Failed to initialize audio:", error);
+      toast({
+        title: "Audio Error",
+        description: "Could not initialize audio engine. Please try again.",
+        variant: "destructive"
+      });
     }
   };
   
@@ -279,13 +303,40 @@ const EnhancedStudio: React.FC = () => {
     setProjectTime(0);
   };
   
-  const handleRecordStart = () => {
-    audioProcessor.startRecording();
-    setIsRecording(true);
-    // If not playing, start playback too
-    if (!isPlaying) {
-      audioProcessor.play();
-      setIsPlaying(true);
+  const handleRecordStart = async () => {
+    try {
+      // Initialize audio context on first user interaction to comply with browser autoplay policies
+      if (!audioProcessor.isReady()) {
+        // Show loading state
+        toast({
+          title: "Initializing audio engine...",
+          description: "Please wait while we set up the audio system.",
+        });
+        
+        // Initialize the audio processor
+        await audioProcessor.initialize();
+        
+        toast({
+          title: "Audio engine ready",
+          description: "You can now record audio.",
+        });
+      }
+      
+      await audioProcessor.startRecording();
+      setIsRecording(true);
+      
+      // If not playing, start playback too
+      if (!isPlaying) {
+        audioProcessor.play();
+        setIsPlaying(true);
+      }
+    } catch (error) {
+      console.error("Failed to start recording:", error);
+      toast({
+        title: "Recording Error",
+        description: "Could not start recording. Please check microphone permissions and try again.",
+        variant: "destructive"
+      });
     }
   };
   
