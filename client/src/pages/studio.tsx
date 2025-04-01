@@ -1,450 +1,584 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import MainLayout from '@/components/layout/MainLayout';
-import { StudioSession } from '@shared/schema';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRoute, useLocation } from 'wouter';
+import { apiRequest } from '@/lib/queryClient';
+import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Mic2, Calendar, Clock, Trash2, Edit } from 'lucide-react';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertCircle, Music, Plus, Calendar, Users, Mic } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { ProjectEditor } from '@/components/studio/project-editor';
 
-// Form schema for studio session
-const studioSessionSchema = z.object({
-  title: z.string().min(1, 'Title is required'),
-  description: z.string().optional(),
-  location: z.string().optional(),
-  startTime: z.string().refine(val => !isNaN(Date.parse(val)), {
-    message: 'Start time is required and must be a valid date',
-  }),
-  endTime: z.string().refine(val => !isNaN(Date.parse(val)), {
-    message: 'End time is required and must be a valid date',
-  }),
-  collaborators: z.string().optional(),
-}).refine(data => {
-  const start = new Date(data.startTime);
-  const end = new Date(data.endTime);
-  return end > start;
-}, {
-  message: 'End time must be after start time',
-  path: ['endTime'],
-});
-
-type StudioSessionForm = z.infer<typeof studioSessionSchema>;
-
-export default function Studio() {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentSession, setCurrentSession] = useState<StudioSession | null>(null);
+export default function StudioPage() {
+  const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+  const [match, params] = useRoute('/studio/:projectId');
+  const [match2] = useRoute('/studio/join/:code');
+  const [createSessionOpen, setCreateSessionOpen] = useState(false);
+  const [newSessionTitle, setNewSessionTitle] = useState('');
+  const [newSessionDescription, setNewSessionDescription] = useState('');
+  const [newProjectTitle, setNewProjectTitle] = useState('');
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
+  const [joinLiveSessionCode, setJoinLiveSessionCode] = useState('');
+  const [joinSessionDialogOpen, setJoinSessionDialogOpen] = useState(false);
   
-  // Fetch studio sessions
-  const { data: sessions, isLoading } = useQuery<StudioSession[]>({
+  // State for tracking which project/session we're currently viewing
+  const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
+  const [activeLiveSession, setActiveLiveSession] = useState<any | null>(null);
+  
+  // Fetch user's studio sessions
+  const { data: sessions, isLoading: sessionsLoading } = useQuery({
     queryKey: ['/api/studio/sessions'],
     queryFn: async () => {
-      const res = await fetch('/api/studio/sessions');
-      if (!res.ok) throw new Error('Failed to fetch studio sessions');
-      return res.json();
-    },
-  });
-  
-  // Form definition
-  const form = useForm<StudioSessionForm>({
-    resolver: zodResolver(studioSessionSchema),
-    defaultValues: {
-      title: '',
-      description: '',
-      location: '',
-      startTime: '',
-      endTime: '',
-      collaborators: '',
-    },
-  });
-  
-  // Update form values when editing a session
-  useEffect(() => {
-    if (currentSession && isEditing) {
-      const startTime = new Date(currentSession.startTime);
-      const endTime = new Date(currentSession.endTime);
-      
-      // Format date-time for datetime-local input
-      const formatDateForInput = (date: Date) => {
-        return date.toISOString().slice(0, 16);  // Format as "YYYY-MM-DDThh:mm"
-      };
-      
-      form.reset({
-        title: currentSession.title,
-        description: currentSession.description || '',
-        location: currentSession.location || '',
-        startTime: formatDateForInput(startTime),
-        endTime: formatDateForInput(endTime),
-        collaborators: currentSession.collaborators || '',
-      });
+      const response = await fetch('/api/studio/sessions');
+      return response.json();
     }
-  }, [currentSession, isEditing, form]);
+  });
   
-  // Create studio session mutation
+  // Fetch user's projects
+  const { data: projects, isLoading: projectsLoading } = useQuery({
+    queryKey: ['/api/studio/projects'],
+    queryFn: async () => {
+      const response = await fetch('/api/studio/projects');
+      return response.json();
+    }
+  });
+  
+  // Create new session mutation
   const createSessionMutation = useMutation({
-    mutationFn: async (data: StudioSessionForm) => {
-      const res = await apiRequest('POST', '/api/studio/sessions', data);
+    mutationFn: async (sessionData: any) => {
+      const res = await apiRequest('POST', '/api/studio/sessions', sessionData);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/studio/sessions'] });
       toast({
-        title: 'Success',
-        description: 'Studio session created successfully',
+        title: 'Session Created',
+        description: 'Your studio session has been created successfully',
       });
-      setIsDialogOpen(false);
-      form.reset();
+      setCreateSessionOpen(false);
+      setNewSessionTitle('');
+      setNewSessionDescription('');
+      queryClient.invalidateQueries({ queryKey: ['/api/studio/sessions'] });
     },
     onError: (error: Error) => {
       toast({
-        title: 'Error',
-        description: `Failed to create session: ${error.message}`,
+        title: 'Creation Failed',
+        description: error.message,
         variant: 'destructive',
       });
-    },
-  });
-  
-  // Update studio session mutation
-  const updateSessionMutation = useMutation({
-    mutationFn: async (data: StudioSessionForm & { id: number }) => {
-      const { id, ...sessionData } = data;
-      const res = await apiRequest('POST', `/api/studio/sessions/${id}/update`, sessionData);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/studio/sessions'] });
-      toast({
-        title: 'Success',
-        description: 'Studio session updated successfully',
-      });
-      setIsDialogOpen(false);
-      setIsEditing(false);
-      setCurrentSession(null);
-      form.reset();
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: `Failed to update session: ${error.message}`,
-        variant: 'destructive',
-      });
-    },
-  });
-  
-  // Delete studio session mutation
-  const deleteSessionMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiRequest('DELETE', `/api/studio/sessions/${id}`);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/studio/sessions'] });
-      toast({
-        title: 'Success',
-        description: 'Studio session deleted successfully',
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: `Failed to delete session: ${error.message}`,
-        variant: 'destructive',
-      });
-    },
-  });
-  
-  const onSubmit = (data: StudioSessionForm) => {
-    if (isEditing && currentSession) {
-      updateSessionMutation.mutate({ ...data, id: currentSession.id });
-    } else {
-      createSessionMutation.mutate(data);
     }
-  };
+  });
   
-  const openCreateDialog = () => {
-    setIsEditing(false);
-    setCurrentSession(null);
-    form.reset({
-      title: '',
-      description: '',
-      location: '',
-      startTime: '',
-      endTime: '',
-      collaborators: '',
+  // Create new project mutation
+  const createProjectMutation = useMutation({
+    mutationFn: async (projectData: any) => {
+      const res = await apiRequest('POST', '/api/studio/projects', projectData);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Project Created',
+        description: 'Your project has been created successfully',
+      });
+      setCreateProjectOpen(false);
+      setNewProjectTitle('');
+      queryClient.invalidateQueries({ queryKey: ['/api/studio/projects'] });
+      
+      // Navigate to the new project
+      setLocation(`/studio/${data.id}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Creation Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  });
+  
+  // Start live session mutation
+  const startLiveSessionMutation = useMutation({
+    mutationFn: async (sessionId: number) => {
+      const res = await apiRequest('POST', `/api/studio/sessions/${sessionId}/start-live`, {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Live Session Started',
+        description: `Session code: ${data.sessionCode}`,
+      });
+      setActiveLiveSession(data);
+      queryClient.invalidateQueries({ queryKey: ['/api/studio/sessions'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to Start Live Session',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  });
+  
+  // End live session mutation
+  const endLiveSessionMutation = useMutation({
+    mutationFn: async (sessionId: number) => {
+      const res = await apiRequest('POST', `/api/studio/sessions/${sessionId}/end-live`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Live Session Ended',
+        description: 'Your live session has been ended',
+      });
+      setActiveLiveSession(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/studio/sessions'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to End Live Session',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  });
+  
+  // Join live session by code
+  const joinLiveSessionMutation = useMutation({
+    mutationFn: async (code: string) => {
+      const res = await apiRequest('GET', `/api/studio/join/${code}`, {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: 'Joined Live Session',
+        description: `You've joined ${data.title}`,
+      });
+      setActiveLiveSession(data);
+      setJoinSessionDialogOpen(false);
+      
+      // Find a project in this session to load
+      queryClient.fetchQuery({
+        queryKey: [`/api/studio/sessions/${data.id}/projects`],
+        queryFn: async () => {
+          const response = await fetch(`/api/studio/sessions/${data.id}/projects`);
+          return response.json();
+        }
+      }).then((sessionProjects) => {
+        if (sessionProjects && sessionProjects.length > 0) {
+          // Load the first project
+          setActiveProjectId(sessionProjects[0].id);
+        }
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Failed to Join Session',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  });
+  
+  // Handle creation of a new session
+  const handleCreateSession = () => {
+    if (!newSessionTitle) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please provide a title for your session',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    const now = new Date();
+    const oneHourLater = new Date(now.getTime() + 60 * 60 * 1000);
+    
+    createSessionMutation.mutate({
+      title: newSessionTitle,
+      description: newSessionDescription,
+      startTime: now.toISOString(),
+      endTime: oneHourLater.toISOString(),
+      isLive: false
     });
-    setIsDialogOpen(true);
   };
   
-  const openEditDialog = (session: StudioSession) => {
-    setIsEditing(true);
-    setCurrentSession(session);
-    setIsDialogOpen(true);
-  };
-  
-  // Group sessions by date
-  const groupedSessions = sessions?.reduce((acc, session) => {
-    const date = new Date(session.startTime).toDateString();
-    if (!acc[date]) {
-      acc[date] = [];
+  // Handle creation of a new project
+  const handleCreateProject = () => {
+    if (!newProjectTitle) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please provide a title for your project',
+        variant: 'destructive',
+      });
+      return;
     }
-    acc[date].push(session);
-    return acc;
-  }, {} as Record<string, StudioSession[]>);
+    
+    createProjectMutation.mutate({
+      title: newProjectTitle,
+      sessionId: null,
+      status: 'active'
+    });
+  };
   
-  return (
-    <MainLayout 
-      title="Studio" 
-      description="Manage your recording sessions and creative workspace"
-    >
-      <div className="mb-6 flex justify-end">
-        <Button onClick={openCreateDialog}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Studio Session
+  // Handle joining a live session
+  const handleJoinLiveSession = () => {
+    if (!joinLiveSessionCode) {
+      toast({
+        title: 'Missing Information',
+        description: 'Please enter a session code',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    joinLiveSessionMutation.mutate(joinLiveSessionCode.toUpperCase());
+  };
+  
+  // Check if we're requesting a specific project or joining a session via URL
+  useEffect(() => {
+    if (match && params && params.projectId) {
+      setActiveProjectId(parseInt(params.projectId));
+    } else if (match2 && params && params.code) {
+      joinLiveSessionMutation.mutate(params.code.toUpperCase());
+    }
+  }, [match, match2, params]);
+  
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+      </div>
+    );
+  }
+  
+  // If the user is not authenticated or not an athlete, show a message
+  if (!user || user.role !== 'athlete') {
+    return (
+      <div className="container mx-auto py-8">
+        <Card className="w-full max-w-lg mx-auto">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              Access Restricted
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Only verified athletes can access the studio. Please complete the verification process to continue.</p>
+          </CardContent>
+          <CardFooter>
+            <Button onClick={() => setLocation('/athlete-verification')}>
+              Go to Verification
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+  
+  // If a project is active, show the project editor
+  if (activeProjectId) {
+    return (
+      <div className="h-[calc(100vh-4rem)]">
+        <ProjectEditor
+          projectId={activeProjectId}
+          sessionId={activeLiveSession?.id}
+          sessionCode={activeLiveSession?.sessionCode}
+          isLiveSession={!!activeLiveSession}
+        />
+        <Button
+          variant="outline"
+          className="absolute top-20 left-4"
+          onClick={() => {
+            setActiveProjectId(null);
+            setLocation('/studio');
+          }}
+        >
+          Back to Studio
         </Button>
       </div>
-      
-      {isLoading ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full"></div>
-        </div>
-      ) : sessions && sessions.length > 0 ? (
-        <div className="space-y-8">
-          {groupedSessions && Object.entries(groupedSessions)
-            .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
-            .map(([date, dateSessions]) => (
-              <div key={date} className="space-y-4">
-                <h3 className="text-xl font-bold">{formatDate(date)}</h3>
-                <div className="grid gap-4">
-                  {dateSessions
-                    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-                    .map(session => (
-                      <Card key={session.id} className="overflow-hidden">
-                        <CardContent className="p-0">
-                          <div className="flex flex-col md:flex-row md:items-center">
-                            <div className="bg-primary/10 p-6 md:w-56 flex justify-center items-center">
-                              <div className="text-center">
-                                <Mic2 className="h-12 w-12 mx-auto text-primary" />
-                                <p className="mt-2 font-medium text-gray-700 dark:text-gray-300">
-                                  {new Date(session.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
-                                  {new Date(session.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="p-6 flex-1">
-                              <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                                <div>
-                                  <h3 className="text-lg font-bold">{session.title}</h3>
-                                  {session.location && (
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                      <span className="inline-block mr-1">📍</span> {session.location}
-                                    </p>
-                                  )}
-                                </div>
-                                <div className="flex space-x-2 mt-4 md:mt-0">
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm"
-                                    onClick={() => openEditDialog(session)}
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </Button>
-                                  <Button 
-                                    variant="destructive" 
-                                    size="sm"
-                                    onClick={() => deleteSessionMutation.mutate(session.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </Button>
-                                </div>
-                              </div>
-                              {session.description && (
-                                <p className="mt-4 text-gray-700 dark:text-gray-300">{session.description}</p>
-                              )}
-                              {session.collaborators && (
-                                <div className="mt-4">
-                                  <p className="text-sm font-medium text-gray-900 dark:text-white">Collaborators:</p>
-                                  <p className="text-sm text-gray-500 dark:text-gray-400">{session.collaborators}</p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+    );
+  }
+  
+  return (
+    <div className="container mx-auto py-8">
+      <div className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Studio</h1>
+        <div className="flex gap-2">
+          <Dialog open={joinSessionDialogOpen} onOpenChange={setJoinSessionDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Users className="h-4 w-4 mr-2" />
+                Join Live Session
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Join a Live Session</DialogTitle>
+                <DialogDescription>
+                  Enter the session code provided by the session host
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="sessionCode" className="text-right">
+                    Code
+                  </Label>
+                  <Input
+                    id="sessionCode"
+                    value={joinLiveSessionCode}
+                    onChange={(e) => setJoinLiveSessionCode(e.target.value)}
+                    className="col-span-3"
+                    placeholder="Enter session code (e.g. AB12CD)"
+                  />
                 </div>
               </div>
-            ))}
-        </div>
-      ) : (
-        <Card>
-          <CardHeader className="text-center">
-            <Mic2 className="mx-auto h-12 w-12 text-primary/60" />
-            <CardTitle className="mt-4">No Studio Sessions Scheduled</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center pb-8">
-            <p className="text-gray-500 dark:text-gray-400 mb-6">
-              Schedule your first studio session to start creating music
-            </p>
-            <Button onClick={openCreateDialog}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Studio Session
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-      
-      {/* Create/Edit Session Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>{isEditing ? 'Edit Studio Session' : 'Create New Studio Session'}</DialogTitle>
-            <DialogDescription>
-              {isEditing 
-                ? 'Update your studio session details below.' 
-                : 'Fill in the details to schedule a new studio session.'}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Session Title*</FormLabel>
-                    <FormControl>
-                      <Input placeholder="E.g., Beat Making Session" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="startTime"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Start Time*</FormLabel>
-                      <FormControl>
-                        <Input type="datetime-local" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="endTime"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>End Time*</FormLabel>
-                      <FormControl>
-                        <Input type="datetime-local" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <FormControl>
-                      <Input placeholder="E.g., Home Studio, Studio A" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Add details about the session" 
-                        rows={3}
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={form.control}
-                name="collaborators"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Collaborators</FormLabel>
-                    <FormControl>
-                      <Input placeholder="E.g., Producer Jay, Audio Engineer Marcus" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
               <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createSessionMutation.isPending || updateSessionMutation.isPending}
-                >
-                  {createSessionMutation.isPending || updateSessionMutation.isPending
-                    ? 'Saving...'
-                    : isEditing ? 'Update Session' : 'Create Session'
-                  }
-                </Button>
+                <Button onClick={handleJoinLiveSession}>Join Session</Button>
               </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-    </MainLayout>
+            </DialogContent>
+          </Dialog>
+          
+          <Dialog open={createSessionOpen} onOpenChange={setCreateSessionOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Calendar className="h-4 w-4 mr-2" />
+                New Session
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Studio Session</DialogTitle>
+                <DialogDescription>
+                  Studio sessions help you organize your recording time and collaborations
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="title" className="text-right">
+                    Title
+                  </Label>
+                  <Input
+                    id="title"
+                    value={newSessionTitle}
+                    onChange={(e) => setNewSessionTitle(e.target.value)}
+                    className="col-span-3"
+                    placeholder="Session title"
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="description" className="text-right">
+                    Description
+                  </Label>
+                  <Input
+                    id="description"
+                    value={newSessionDescription}
+                    onChange={(e) => setNewSessionDescription(e.target.value)}
+                    className="col-span-3"
+                    placeholder="Optional description"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleCreateSession}>Create Session</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          
+          <Dialog open={createProjectOpen} onOpenChange={setCreateProjectOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Music className="h-4 w-4 mr-2" />
+                New Project
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Studio Project</DialogTitle>
+                <DialogDescription>
+                  Create a new audio project to start recording, mixing and mastering
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="projectTitle" className="text-right">
+                    Title
+                  </Label>
+                  <Input
+                    id="projectTitle"
+                    value={newProjectTitle}
+                    onChange={(e) => setNewProjectTitle(e.target.value)}
+                    className="col-span-3"
+                    placeholder="Project title"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleCreateProject}>Create Project</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+      
+      <Tabs defaultValue="projects">
+        <TabsList className="mb-4">
+          <TabsTrigger value="projects">My Projects</TabsTrigger>
+          <TabsTrigger value="sessions">Recording Sessions</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="projects">
+          {projectsLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Card className="flex flex-col justify-center items-center h-64 cursor-pointer hover:border-primary transition-colors" onClick={() => setCreateProjectOpen(true)}>
+                <CardContent className="flex flex-col items-center justify-center p-6">
+                  <Plus className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">Create New Project</h3>
+                  <p className="text-sm text-muted-foreground text-center mt-2">
+                    Start a new audio project for recording and mastering
+                  </p>
+                </CardContent>
+              </Card>
+              
+              {projects && projects.map((project: any) => (
+                <Card key={project.id} className="cursor-pointer hover:border-primary transition-colors" onClick={() => {
+                  setActiveProjectId(project.id);
+                  setLocation(`/studio/${project.id}`);
+                }}>
+                  <CardHeader>
+                    <CardTitle>{project.title}</CardTitle>
+                    <CardDescription>
+                      Last updated: {formatDate(project.updatedAt)}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Music className="h-4 w-4" />
+                      <span>Project ID: {project.id}</span>
+                    </div>
+                    {project.status && (
+                      <div className="mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        {project.status}
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="border-t pt-4">
+                    <Button variant="ghost" className="w-full" onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveProjectId(project.id);
+                      setLocation(`/studio/${project.id}`);
+                    }}>
+                      Open Project
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="sessions">
+          {sessionsLoading ? (
+            <div className="flex justify-center py-12">
+              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <Card className="flex flex-col justify-center items-center h-64 cursor-pointer hover:border-primary transition-colors" onClick={() => setCreateSessionOpen(true)}>
+                <CardContent className="flex flex-col items-center justify-center p-6">
+                  <Plus className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium">Create New Session</h3>
+                  <p className="text-sm text-muted-foreground text-center mt-2">
+                    Schedule a recording session or collaboration
+                  </p>
+                </CardContent>
+              </Card>
+              
+              {sessions && sessions.map((session: any) => (
+                <Card key={session.id} className={session.isLive ? 'border-green-500' : ''}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <CardTitle>{session.title}</CardTitle>
+                      {session.isLive && (
+                        <div className="flex items-center gap-1">
+                          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                          <span className="text-xs text-green-500">LIVE</span>
+                        </div>
+                      )}
+                    </div>
+                    <CardDescription>
+                      {formatDate(session.startTime)} - {formatDate(session.endTime)}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {session.description && (
+                      <p className="text-sm text-muted-foreground mb-4">{session.description}</p>
+                    )}
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Mic className="h-4 w-4" />
+                      <span>Session ID: {session.id}</span>
+                    </div>
+                    {session.sessionCode && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-sm font-medium">Code:</span>
+                        <code className="px-2 py-1 rounded bg-muted text-sm">{session.sessionCode}</code>
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="border-t pt-4 flex flex-col gap-2">
+                    {session.isLive ? (
+                      <>
+                        <Button variant="default" className="w-full" onClick={() => {
+                          setActiveLiveSession(session);
+                          
+                          // Try to find a project to load
+                          queryClient.fetchQuery({
+                            queryKey: [`/api/studio/sessions/${session.id}/projects`],
+                            queryFn: async () => {
+                              const response = await fetch(`/api/studio/sessions/${session.id}/projects`);
+                              return response.json();
+                            }
+                          }).then((projects) => {
+                            if (projects && projects.length > 0) {
+                              setActiveProjectId(projects[0].id);
+                            } else {
+                              // If no projects, create one
+                              createProjectMutation.mutate({
+                                title: `${session.title} Project`,
+                                sessionId: session.id,
+                                status: 'active'
+                              });
+                            }
+                          });
+                        }}>
+                          Join Live Session
+                        </Button>
+                        <Button variant="destructive" className="w-full" onClick={() => endLiveSessionMutation.mutate(session.id)}>
+                          End Live Session
+                        </Button>
+                      </>
+                    ) : (
+                      <Button variant="outline" className="w-full" onClick={() => startLiveSessionMutation.mutate(session.id)}>
+                        Start Live Session
+                      </Button>
+                    )}
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

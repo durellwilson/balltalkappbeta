@@ -1,7 +1,8 @@
 import {
-  users, tracks, messages, studioSessions, verificationDocs,
-  type User, type Track, type Message, type StudioSession, type VerificationDoc,
-  type InsertUser, type InsertTrack, type InsertMessage, type InsertStudioSession, type InsertVerificationDoc
+  users, tracks, messages, studioSessions, verificationDocs, studioProjects, projectTracks, masteringSettings, trackComments,
+  type User, type Track, type Message, type StudioSession, type VerificationDoc, type StudioProject, type ProjectTrack, type MasteringSettings, type TrackComment,
+  type InsertUser, type InsertTrack, type InsertMessage, type InsertStudioSession, type InsertVerificationDoc, 
+  type InsertStudioProject, type InsertProjectTrack, type InsertMasteringSettings, type InsertTrackComment
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -43,6 +44,34 @@ export interface IStorage {
   getSessionsByUser(userId: number): Promise<StudioSession[]>;
   updateStudioSession(id: number, session: Partial<StudioSession>): Promise<StudioSession | undefined>;
   deleteStudioSession(id: number): Promise<boolean>;
+  startLiveSession(id: number, sessionCode: string): Promise<StudioSession | undefined>;
+  endLiveSession(id: number): Promise<StudioSession | undefined>;
+  getLiveSessionByCode(sessionCode: string): Promise<StudioSession | undefined>;
+  
+  // Studio Project operations
+  createStudioProject(project: InsertStudioProject): Promise<StudioProject>;
+  getStudioProject(id: number): Promise<StudioProject | undefined>;
+  getStudioProjectsByUser(userId: number): Promise<StudioProject[]>;
+  getStudioProjectsBySession(sessionId: number): Promise<StudioProject[]>;
+  updateStudioProject(id: number, project: Partial<StudioProject>): Promise<StudioProject | undefined>;
+  deleteStudioProject(id: number): Promise<boolean>;
+  
+  // Project Track operations
+  createProjectTrack(track: InsertProjectTrack): Promise<ProjectTrack>;
+  getProjectTrack(id: number): Promise<ProjectTrack | undefined>;
+  getProjectTracksByProject(projectId: number): Promise<ProjectTrack[]>;
+  updateProjectTrack(id: number, track: Partial<ProjectTrack>): Promise<ProjectTrack | undefined>;
+  deleteProjectTrack(id: number): Promise<boolean>;
+  
+  // Mastering operations
+  saveMasteringSettings(settings: InsertMasteringSettings): Promise<MasteringSettings>;
+  getMasteringSettings(projectId: number): Promise<MasteringSettings | undefined>;
+  updateMasteringSettings(id: number, settings: Partial<MasteringSettings>): Promise<MasteringSettings | undefined>;
+  
+  // Track comments
+  addTrackComment(comment: InsertTrackComment): Promise<TrackComment>;
+  getTrackComments(projectTrackId: number): Promise<TrackComment[]>;
+  deleteTrackComment(id: number): Promise<boolean>;
   
   // Session store for authentication
   sessionStore: session.SessionStore;
@@ -54,6 +83,10 @@ export class MemStorage implements IStorage {
   private messages: Map<number, Message>;
   private studioSessions: Map<number, StudioSession>;
   private verificationDocs: Map<number, VerificationDoc>;
+  private studioProjects: Map<number, StudioProject>;
+  private projectTracks: Map<number, ProjectTrack>;
+  private masteringSettings: Map<number, MasteringSettings>;
+  private trackComments: Map<number, TrackComment>;
   
   sessionStore: session.SessionStore;
   
@@ -62,6 +95,10 @@ export class MemStorage implements IStorage {
   currentMessageId: number;
   currentSessionId: number;
   currentVerificationDocId: number;
+  currentStudioProjectId: number;
+  currentProjectTrackId: number;
+  currentMasteringSettingsId: number;
+  currentTrackCommentId: number;
 
   constructor() {
     this.users = new Map();
@@ -69,12 +106,20 @@ export class MemStorage implements IStorage {
     this.messages = new Map();
     this.studioSessions = new Map();
     this.verificationDocs = new Map();
+    this.studioProjects = new Map();
+    this.projectTracks = new Map();
+    this.masteringSettings = new Map();
+    this.trackComments = new Map();
     
     this.currentUserId = 1;
     this.currentTrackId = 1;
     this.currentMessageId = 1;
     this.currentSessionId = 1;
     this.currentVerificationDocId = 1;
+    this.currentStudioProjectId = 1;
+    this.currentProjectTrackId = 1;
+    this.currentMasteringSettingsId = 1;
+    this.currentTrackCommentId = 1;
     
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000 // 24 hours
@@ -280,6 +325,180 @@ export class MemStorage implements IStorage {
 
   async deleteStudioSession(id: number): Promise<boolean> {
     return this.studioSessions.delete(id);
+  }
+  
+  async startLiveSession(id: number, sessionCode: string): Promise<StudioSession | undefined> {
+    const session = this.studioSessions.get(id);
+    if (!session) return undefined;
+    
+    const updatedSession = { 
+      ...session, 
+      isLive: true,
+      sessionCode
+    };
+    this.studioSessions.set(id, updatedSession);
+    return updatedSession;
+  }
+  
+  async endLiveSession(id: number): Promise<StudioSession | undefined> {
+    const session = this.studioSessions.get(id);
+    if (!session) return undefined;
+    
+    const updatedSession = { 
+      ...session, 
+      isLive: false,
+      sessionCode: null
+    };
+    this.studioSessions.set(id, updatedSession);
+    return updatedSession;
+  }
+  
+  async getLiveSessionByCode(sessionCode: string): Promise<StudioSession | undefined> {
+    return Array.from(this.studioSessions.values())
+      .find(session => session.sessionCode === sessionCode && session.isLive === true);
+  }
+  
+  // Studio Project operations
+  async createStudioProject(project: InsertStudioProject): Promise<StudioProject> {
+    const id = this.currentStudioProjectId++;
+    const now = new Date();
+    const newProject: StudioProject = {
+      ...project,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    this.studioProjects.set(id, newProject);
+    return newProject;
+  }
+  
+  async getStudioProject(id: number): Promise<StudioProject | undefined> {
+    return this.studioProjects.get(id);
+  }
+  
+  async getStudioProjectsByUser(userId: number): Promise<StudioProject[]> {
+    return Array.from(this.studioProjects.values())
+      .filter(project => project.userId === userId)
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  }
+  
+  async getStudioProjectsBySession(sessionId: number): Promise<StudioProject[]> {
+    return Array.from(this.studioProjects.values())
+      .filter(project => project.sessionId === sessionId)
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  }
+  
+  async updateStudioProject(id: number, projectData: Partial<StudioProject>): Promise<StudioProject | undefined> {
+    const project = this.studioProjects.get(id);
+    if (!project) return undefined;
+    
+    const updatedProject = { 
+      ...project, 
+      ...projectData,
+      updatedAt: new Date()
+    };
+    this.studioProjects.set(id, updatedProject);
+    return updatedProject;
+  }
+  
+  async deleteStudioProject(id: number): Promise<boolean> {
+    return this.studioProjects.delete(id);
+  }
+  
+  // Project Track operations
+  async createProjectTrack(track: InsertProjectTrack): Promise<ProjectTrack> {
+    const id = this.currentProjectTrackId++;
+    const now = new Date();
+    const newTrack: ProjectTrack = {
+      ...track,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    this.projectTracks.set(id, newTrack);
+    return newTrack;
+  }
+  
+  async getProjectTrack(id: number): Promise<ProjectTrack | undefined> {
+    return this.projectTracks.get(id);
+  }
+  
+  async getProjectTracksByProject(projectId: number): Promise<ProjectTrack[]> {
+    return Array.from(this.projectTracks.values())
+      .filter(track => track.projectId === projectId)
+      .sort((a, b) => a.position - b.position);
+  }
+  
+  async updateProjectTrack(id: number, trackData: Partial<ProjectTrack>): Promise<ProjectTrack | undefined> {
+    const track = this.projectTracks.get(id);
+    if (!track) return undefined;
+    
+    const updatedTrack = { 
+      ...track, 
+      ...trackData,
+      updatedAt: new Date()
+    };
+    this.projectTracks.set(id, updatedTrack);
+    return updatedTrack;
+  }
+  
+  async deleteProjectTrack(id: number): Promise<boolean> {
+    return this.projectTracks.delete(id);
+  }
+  
+  // Mastering operations
+  async saveMasteringSettings(settings: InsertMasteringSettings): Promise<MasteringSettings> {
+    const id = this.currentMasteringSettingsId++;
+    const now = new Date();
+    const newSettings: MasteringSettings = {
+      ...settings,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    this.masteringSettings.set(id, newSettings);
+    return newSettings;
+  }
+  
+  async getMasteringSettings(projectId: number): Promise<MasteringSettings | undefined> {
+    return Array.from(this.masteringSettings.values())
+      .find(settings => settings.projectId === projectId);
+  }
+  
+  async updateMasteringSettings(id: number, settingsData: Partial<MasteringSettings>): Promise<MasteringSettings | undefined> {
+    const settings = this.masteringSettings.get(id);
+    if (!settings) return undefined;
+    
+    const updatedSettings = { 
+      ...settings, 
+      ...settingsData,
+      updatedAt: new Date()
+    };
+    this.masteringSettings.set(id, updatedSettings);
+    return updatedSettings;
+  }
+  
+  // Track comments
+  async addTrackComment(comment: InsertTrackComment): Promise<TrackComment> {
+    const id = this.currentTrackCommentId++;
+    const now = new Date();
+    const newComment: TrackComment = {
+      ...comment,
+      id,
+      createdAt: now
+    };
+    this.trackComments.set(id, newComment);
+    return newComment;
+  }
+  
+  async getTrackComments(projectTrackId: number): Promise<TrackComment[]> {
+    return Array.from(this.trackComments.values())
+      .filter(comment => comment.projectTrackId === projectTrackId)
+      .sort((a, b) => a.timestamp - b.timestamp);
+  }
+  
+  async deleteTrackComment(id: number): Promise<boolean> {
+    return this.trackComments.delete(id);
   }
 }
 

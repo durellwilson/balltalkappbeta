@@ -63,6 +63,9 @@ export const messages = pgTable("messages", {
 });
 
 // Studio sessions scheduled by athletes
+// Enum for mastering presets
+export const masteringPresetEnum = pgEnum('mastering_preset', ['warm', 'balanced', 'open', 'custom']);
+
 export const studioSessions = pgTable("studio_sessions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
@@ -72,6 +75,62 @@ export const studioSessions = pgTable("studio_sessions", {
   endTime: timestamp("end_time").notNull(),
   location: text("location"),
   collaborators: text("collaborators"),
+  isLive: boolean("is_live").default(false),
+  sessionCode: text("session_code"),
+});
+
+// Project files for studio sessions
+export const studioProjects = pgTable("studio_projects", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  sessionId: integer("session_id").references(() => studioSessions.id),
+  title: text("title").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  bpm: integer("bpm").default(120),
+  key: text("key"),
+  status: text("status").default('draft'),
+  version: integer("version").default(1)
+});
+
+// Audio tracks within a project
+export const projectTracks = pgTable("project_tracks", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => studioProjects.id),
+  name: text("name").notNull(),
+  audioUrl: text("audio_url").notNull(),
+  waveformData: text("waveform_data"),
+  position: integer("position").default(0),
+  muted: boolean("muted").default(false),
+  solo: boolean("solo").default(false),
+  volume: integer("volume").default(100),
+  pan: integer("pan").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Mastering settings
+export const masteringSettings = pgTable("mastering_settings", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => studioProjects.id),
+  preset: masteringPresetEnum("preset").default('balanced'),
+  eqSettings: text("eq_settings"), // Stored as JSON string
+  compressorSettings: text("compressor_settings"), // Stored as JSON string
+  limiterSettings: text("limiter_settings"), // Stored as JSON string
+  lufsTarget: integer("lufs_target").default(-14), // Target loudness in LUFS
+  referenceTrackUrl: text("reference_track_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Track comments for collaboration
+export const trackComments = pgTable("track_comments", {
+  id: serial("id").primaryKey(),
+  projectTrackId: integer("project_track_id").notNull().references(() => projectTracks.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  timestamp: integer("timestamp").notNull(), // Position in ms where comment is placed
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Create the insert schemas
@@ -90,18 +149,38 @@ export const insertMessageSchema = createInsertSchema(messages)
 export const insertStudioSessionSchema = createInsertSchema(studioSessions)
   .omit({ id: true });
 
+export const insertStudioProjectSchema = createInsertSchema(studioProjects)
+  .omit({ id: true, createdAt: true, updatedAt: true });
+
+export const insertProjectTrackSchema = createInsertSchema(projectTracks)
+  .omit({ id: true, createdAt: true, updatedAt: true });
+
+export const insertMasteringSettingsSchema = createInsertSchema(masteringSettings)
+  .omit({ id: true, createdAt: true, updatedAt: true });
+
+export const insertTrackCommentSchema = createInsertSchema(trackComments)
+  .omit({ id: true, createdAt: true });
+
 // Define types from the schemas
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertVerificationDoc = z.infer<typeof insertVerificationDocSchema>;
 export type InsertTrack = z.infer<typeof insertTrackSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type InsertStudioSession = z.infer<typeof insertStudioSessionSchema>;
+export type InsertStudioProject = z.infer<typeof insertStudioProjectSchema>;
+export type InsertProjectTrack = z.infer<typeof insertProjectTrackSchema>;
+export type InsertMasteringSettings = z.infer<typeof insertMasteringSettingsSchema>;
+export type InsertTrackComment = z.infer<typeof insertTrackCommentSchema>;
 
 export type User = typeof users.$inferSelect;
 export type VerificationDoc = typeof verificationDocs.$inferSelect;
 export type Track = typeof tracks.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type StudioSession = typeof studioSessions.$inferSelect;
+export type StudioProject = typeof studioProjects.$inferSelect;
+export type ProjectTrack = typeof projectTracks.$inferSelect;
+export type MasteringSettings = typeof masteringSettings.$inferSelect;
+export type TrackComment = typeof trackComments.$inferSelect;
 
 // Extended schemas for login
 export const loginSchema = z.object({

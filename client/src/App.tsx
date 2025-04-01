@@ -33,6 +33,8 @@ function Router() {
       
       {/* Athlete-specific routes */}
       <Route path="/studio">{user?.role === "athlete" ? <Studio /> : <NotFound />}</Route>
+      <Route path="/studio/:projectId">{user?.role === "athlete" ? <Studio /> : <NotFound />}</Route>
+      <Route path="/studio/join/:code">{user?.role === "athlete" ? <Studio /> : <NotFound />}</Route>
       <Route path="/uploads">{user?.role === "athlete" ? <Uploads /> : <NotFound />}</Route>
       <Route path="/earnings">{user?.role === "athlete" ? <Earnings /> : <NotFound />}</Route>
       <Route path="/athlete-verification">{user && user.role !== "admin" ? <AthleteVerification /> : <NotFound />}</Route>

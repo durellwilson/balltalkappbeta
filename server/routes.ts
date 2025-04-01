@@ -7,6 +7,8 @@ import path from "path";
 import fs from "fs/promises";
 import { z } from "zod";
 import Stripe from "stripe";
+import { WebSocketServer } from 'ws';
+import * as Y from 'yjs';
 import { insertTrackSchema, insertMessageSchema, insertStudioSessionSchema } from "@shared/schema";
 
 // Initialize Stripe
@@ -625,6 +627,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Create HTTP server
   const httpServer = createServer(app);
+  
+  // Setup WebSocket server for real-time collaboration
+  if (process.env.NODE_ENV !== 'test') {
+    const { setupYjs } = require('./webSocketServer');
+    setupYjs(httpServer);
+  }
   
   return httpServer;
 }
