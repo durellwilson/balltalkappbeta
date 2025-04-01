@@ -1,0 +1,49 @@
+Build an enterprise-grade streaming platform for professional athletes and fans with the following features:
+Authentication & Roles
+	•	Implement multi-step identity verification for athletes (document checks, league/team affiliation validation, admin approval workflow)
+	•	Create fan signup with email/social/phone auth and role-based permissions
+	•	Admin dashboard for managing verifications, content, and user reports
+Core Athlete Features
+	•	Integrated music studio: Recording tools, beat library (categorized by genre/mood), real-time collaboration, mastering suite
+	•	Content management: High-quality uploads with metadata tagging, release scheduling, preview clip generator
+	•	Earnings dashboard: Real-time revenue tracking (streams/subscriptions), subscriber demographics, performance analytics
+	•	Secure athlete-fan messaging: Approval-based DMs, filtered comments, league-specific forums
+Fan Experience
+	•	Tiered subscriptions: Bronze/Silver/Gold access levels with payment processing (Stripe/PayPal)
+	•	Music discovery: League/genre/mood filters, AI recommendations, offline downloads
+	•	Social features: Playlist sharing, live event RSVPs, virtual meet-and-greet system
+	•	Activity dashboard: Listening history, contribution metrics, saved content
+Integrations
+	•	Audio processing API for studio tools
+	•	Cloud storage for media files
+	•	Payment gateways with tax compliance
+	•	Social media sharing (Instagram/Twitter embeds)
+	•	Analytics engine for engagement tracking
+Security & Compliance
+	•	End-to-end encryption for messages
+	•	DRM-protected audio streaming
+	•	GDPR/CCPA-compliant data handling
+	•	Automated content moderation
+	•	Role-based access controls
+UI/UX Requirements
+	•	Dual interface: Clean athlete studio vs. fan-focused discovery layout
+	•	Mobile-responsive design with dark/light modes
+	•	Accessibility-compliant navigation (WCAG 2.1)
+	•	Real-time notifications system
+Scalability
+	•	Cloud deployment with auto-scaling
+	•	Load-balanced audio delivery
+	•	Multi-region database replication
+	•	Usage monitoring dashboard”
+This prompt structures requirements using ToolJet’s natural language processing conventions, focusing on:
+	1.	Clear feature groupings (Auth, Athlete Tools, Fan Experience)
+	2.	Technical specificity (WCAG 2.1, DRM, GDPR)
+	3.	Integration targets (Stripe, Instagram API)
+	4.	Compliance needs
+	5.	Scalability parameters
+The formulation enables ToolJet to auto-generate:
+	•	Database schemas with athlete/fan profiles
+	•	API connections to payment/audio services
+	•	RBAC implementation
+	•	Component library for music studio/player
+	•	Automated deployment pipeline
