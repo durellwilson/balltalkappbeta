@@ -100,7 +100,63 @@ function useLogoutMutation() {
   });
 }
 
-export const AuthContext = createContext<AuthContextType | null>(null);
+// Create default values for the mutations
+const defaultLoginMutation = {
+  mutate: () => {},
+  isPending: false,
+  isSuccess: false,
+  isError: false,
+  error: null,
+  data: null,
+  reset: () => {},
+  status: 'idle',
+  variables: null,
+  failureCount: 0,
+  failureReason: null,
+  mutateAsync: async () => ({ id: 0 } as User)
+} as ReturnType<typeof useLoginMutation>;
+
+const defaultRegisterMutation = {
+  mutate: () => {},
+  isPending: false,
+  isSuccess: false,
+  isError: false,
+  error: null,
+  data: null,
+  reset: () => {},
+  status: 'idle',
+  variables: null,
+  failureCount: 0,
+  failureReason: null,
+  mutateAsync: async () => ({ id: 0 } as User)
+} as ReturnType<typeof useRegisterMutation>;
+
+const defaultLogoutMutation = {
+  mutate: () => {},
+  isPending: false,
+  isSuccess: false,
+  isError: false,
+  error: null,
+  data: null,
+  reset: () => {},
+  status: 'idle',
+  variables: null,
+  failureCount: 0,
+  failureReason: null,
+  mutateAsync: async () => {}
+} as ReturnType<typeof useLogoutMutation>;
+
+// Default auth context with no user logged in
+const defaultAuthContext: AuthContextType = {
+  user: null,
+  isLoading: false,
+  error: null,
+  loginMutation: defaultLoginMutation,
+  registerMutation: defaultRegisterMutation,
+  logoutMutation: defaultLogoutMutation,
+};
+
+export const AuthContext = createContext<AuthContextType>(defaultAuthContext);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const {
@@ -133,9 +189,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
+  return useContext(AuthContext);
 }

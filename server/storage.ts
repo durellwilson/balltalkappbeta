@@ -167,9 +167,10 @@ export class MemStorage implements IStorage {
       updatedAt: now,
       verificationStatus: insertUser.verificationStatus || "pending",
       subscriptionTier: insertUser.subscriptionTier || "none",
+      league: insertUser.league || null,
+      team: insertUser.team || null,
       stripeCustomerId: insertUser.stripeCustomerId || null,
-      stripeSubscriptionId: insertUser.stripeSubscriptionId || null,
-      team: insertUser.team || null
+      stripeSubscriptionId: insertUser.stripeSubscriptionId || null
     };
     
     this.users.set(id, user);
