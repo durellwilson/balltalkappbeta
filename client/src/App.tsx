@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 
 // Import pages
 import StudioPage from "@/pages/studio-page";
+import DiscoverPage from "@/pages/discover-page";
+import ProfilePage from "@/pages/profile-page";
+import DashboardPage from "@/pages/dashboard";
 
 // Create a query client
 const queryClient = new QueryClient();
@@ -449,24 +452,35 @@ function App() {
           {/* Dashboard */}
           <Route path="/">
             <ProtectedRoute>
-              <Dashboard />
+              <DashboardPage />
             </ProtectedRoute>
           </Route>
           
           {/* Studio */}
           <Route path="/studio">
-            <StudioPage />
+            <ProtectedRoute>
+              <StudioPage />
+            </ProtectedRoute>
           </Route>
           
           {/* Studio with project ID */}
           <Route path="/studio/:projectId">
-            <StudioPage />
+            <ProtectedRoute>
+              <StudioPage />
+            </ProtectedRoute>
           </Route>
           
           {/* Profile */}
           <Route path="/profile">
             <ProtectedRoute>
-              <Profile />
+              <ProfilePage />
+            </ProtectedRoute>
+          </Route>
+          
+          {/* Discover */}
+          <Route path="/discover">
+            <ProtectedRoute>
+              <DiscoverPage />
             </ProtectedRoute>
           </Route>
           
