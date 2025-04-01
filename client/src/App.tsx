@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 // Import pages
 import StudioPage from "@/pages/studio-page";
 import BandLabStudio from "@/pages/studio-page-new";
+import PremiumStudio from "@/pages/premium-studio";
 import DiscoverPage from "@/pages/discover-page";
 import ProfilePage from "@/pages/profile-page";
 import DashboardPage from "@/pages/dashboard";
@@ -460,14 +461,14 @@ function App() {
           {/* Studio */}
           <Route path="/studio">
             <ProtectedRoute>
-              <BandLabStudio />
+              <PremiumStudio />
             </ProtectedRoute>
           </Route>
           
           {/* Studio with project ID */}
           <Route path="/studio/:projectId">
             <ProtectedRoute>
-              <BandLabStudio />
+              <PremiumStudio />
             </ProtectedRoute>
           </Route>
           
