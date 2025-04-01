@@ -56,8 +56,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
 
   // Fetch current user
-  const { data: user, error, isLoading } = useQuery({
+  const { data: user, error, isLoading } = useQuery<User | null>({
     queryKey: ["/api/user"],
+    queryFn: async ({ queryKey }) => {
+      try {
+        const response = await fetch(queryKey[0] as string, {
+          credentials: "include",
+        });
+        
+        if (response.status === 401) {
+          return null;
+        }
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch user data');
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        return null;
+      }
+    },
     retry: 1, // Only retry once to avoid too many failed requests
     refetchOnWindowFocus: false, // No need to refetch when focus changes
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -143,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user: user || null,
+        user: user as User | null,
         isLoading,
         error,
         registerMutation,
