@@ -10,9 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, Music, Plus, Calendar, Users, Mic } from 'lucide-react';
+import { AlertCircle, Music, Plus, Calendar, Users, Mic, Headphones, Settings, Sliders } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
-import { ProjectEditor } from '@/components/studio/project-editor';
+import { EnhancedProjectEditor } from '@/components/studio/enhanced-project-editor';
 
 export default function StudioPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -282,26 +282,20 @@ export default function StudioPage() {
     );
   }
   
-  // If a project is active, show the project editor
+  // If a project is active, show the enhanced project editor
   if (activeProjectId) {
     return (
       <div className="h-[calc(100vh-4rem)]">
-        <ProjectEditor
+        <EnhancedProjectEditor
           projectId={activeProjectId}
           sessionId={activeLiveSession?.id}
           sessionCode={activeLiveSession?.sessionCode}
           isLiveSession={!!activeLiveSession}
-        />
-        <Button
-          variant="outline"
-          className="absolute top-20 left-4"
-          onClick={() => {
+          onBack={() => {
             setActiveProjectId(null);
             setLocation('/studio');
           }}
-        >
-          Back to Studio
-        </Button>
+        />
       </div>
     );
   }
