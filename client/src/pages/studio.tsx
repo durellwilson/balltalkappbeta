@@ -19,8 +19,8 @@ export default function StudioPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
-  const [match, params] = useRoute('/studio/:projectId');
-  const [match2] = useRoute('/studio/join/:code');
+  const [matchProject, paramsProject] = useRoute('/studio/:projectId');
+  const [matchJoin, paramsJoin] = useRoute('/studio/join/:code');
   const [createSessionOpen, setCreateSessionOpen] = useState(false);
   const [newSessionTitle, setNewSessionTitle] = useState('');
   const [newSessionDescription, setNewSessionDescription] = useState('');
@@ -243,12 +243,12 @@ export default function StudioPage() {
   
   // Check if we're requesting a specific project or joining a session via URL
   useEffect(() => {
-    if (match && params && params.projectId) {
-      setActiveProjectId(parseInt(params.projectId));
-    } else if (match2 && params && params.code) {
-      joinLiveSessionMutation.mutate(params.code.toUpperCase());
+    if (matchProject && paramsProject && paramsProject.projectId) {
+      setActiveProjectId(parseInt(paramsProject.projectId));
+    } else if (matchJoin && paramsJoin && paramsJoin.code) {
+      joinLiveSessionMutation.mutate(paramsJoin.code.toUpperCase());
     }
-  }, [match, match2, params]);
+  }, [matchProject, matchJoin, paramsProject, paramsJoin]);
   
   if (authLoading) {
     return (
