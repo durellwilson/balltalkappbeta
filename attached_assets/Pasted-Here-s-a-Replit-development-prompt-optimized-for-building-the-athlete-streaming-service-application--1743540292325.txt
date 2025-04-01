@@ -1,0 +1,113 @@
+Here's a Replit development prompt optimized for building the athlete streaming service application:
+
+---
+
+**"Build a full-stack streaming platform for professional athletes using Replit with these specifications:**  
+
+**Tech Stack**  
+- Frontend: React + TypeScript with Tailwind CSS  
+- Backend: Node.js/Express REST API  
+- Database: MongoDB Atlas with Mongoose ORM  
+- Realtime: Socket.IO for collaboration features  
+- Storage: AWS S3 integration for audio files  
+- Auth: JWT with role-based access (athlete/fan/admin)  
+
+**Athlete Features**  
+1. *Verification System*:  
+   - Multi-step onboarding with document upload (PDF/IMG)  
+   - League database integration (NBA/NFL/MLB player APIs)  
+   - Admin approval dashboard with verification status webhooks  
+
+2. *Music Studio*:  
+   ```javascript  
+   // Web Audio API implementation  
+   const audioContext = new (window.AudioContext || window.webkitAudioContext)();  
+   const trackMixer = new ChannelMergerNode(audioContext, { numberOfInputs: 8 });  
+   ```
+   - Waveform visualization canvas  
+   - Beat library API integration (Spotify/Apple Music)  
+   - WebRTC real-time collaboration sessions  
+
+3. *Content Management*:  
+   - Drag-and-drop audio upload (MP3/WAV)  
+   - Metadata editor with genre/mood tagging  
+   - Release scheduler with calendar integration  
+
+**Fan Experience**  
+- Subscription tiers using Stripe API:  
+  ```python  
+  # Stripe subscription handler  
+  def create_subscription(user_id, plan):  
+      customer = stripe.Customer.create(email=user_email)  
+      subscription = stripe.Subscription.create(  
+          customer=customer.id,  
+          items=[{'price': plan.stripe_id}],  
+      )  
+      return subscription  
+  ```
+- Recommendation engine (Python ML):  
+  - Collaborative filtering based on listening history  
+  - TensorFlow.js genre prediction model  
+
+**Core Integrations**  
+1. Audio Processing:  
+   - FFmpeg.wasm for browser-based audio conversion  
+   - Loudness normalization (-14 LUFS standard)  
+   - Spectrogram generation with WebGL  
+
+2. Social Features:  
+   - ActivityPub protocol for federation  
+   - WebSocket chat with message moderation API  
+   - Shared playlist system with conflict resolution  
+
+**Security Requirements**  
+- AES-256 encryption for audio streams  
+- Content Security Policy (CSP) headers  
+- Rate limiting on API endpoints (express-rate-limit)  
+- GDPR-compliant audit logs  
+
+**Deployment**  
+- Dockerized microservices architecture  
+- Load-balanced using Replit's Nix configuration  
+- CI/CD pipeline with GitHub Actions:  
+  ```yaml  
+  # .github/workflows/deploy.yml  
+  name: Production Deploy  
+  on: [push]  
+  jobs:  
+    build:  
+      runs-on: ubuntu-latest  
+      steps:  
+        - uses: actions/checkout@v3  
+        - uses: replit/action-deploy@v1  
+          with:  
+            replId: ${{ secrets.REPL_ID }}  
+            token: ${{ secrets.REPL_TOKEN }}  
+  ```
+
+**Testing**  
+- Jest unit tests with 90% coverage threshold  
+- Cypress E2E tests for critical user flows  
+- Load testing with Artillery.io (10k concurrent users)  
+- Accessibility audits (axe-core integration)"  
+
+---
+
+This prompt combines:  
+1. **Technology Specificity** - Explicit stack requirements  
+2. **Code Snippets** - Key implementation examples  
+3. **Architecture Patterns** - Microservices, CI/CD  
+4. **Compliance Standards** - GDPR, audio normalization  
+5. **Performance Metrics** - Load testing parameters  
+
+Replit will use this to generate:  
+- Boilerplate code structure  
+- Environment configurations  
+- Service connections  
+- Test harnesses  
+- Deployment pipelines  
+
+The format leverages Replit's strength in combining natural language requirements with executable code snippets for rapid prototyping.
+
+Sources
+[1] Professional-Athlete-s-Streaming-Service-Based-App-Preliminary-Scope-of-Work-Professional-Athlet.pdf https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/237110/1fcbc482-299f-4937-9cc0-40b5ab39e6ff/Professional-Athlete-s-Streaming-Service-Based-App-Preliminary-Scope-of-Work-Professional-Athlete-s-Streaming-Service-Based-App.pdf
