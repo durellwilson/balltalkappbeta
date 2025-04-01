@@ -286,98 +286,164 @@ class StudioCollaboration {
   }
   
   /**
-   * Set up event listeners for real-time updates
+   * Set up event listeners for real-time updates with robust error handling
    */
   private setupEventListeners(): void {
-    // Listen for track changes
-    this.tracks.observe(() => {
-      if (this.onTrackUpdateCallback) {
-        this.onTrackUpdateCallback(this.getTracksData());
-      }
-    });
-    
-    // Listen for mixer changes
-    this.mixer.observe(() => {
-      if (this.onMixerUpdateCallback) {
-        this.onMixerUpdateCallback(this.getMixerData());
-      }
-    });
-    
-    // Listen for timeline changes
-    this.timeline.observe(() => {
-      if (this.onTimelineUpdateCallback) {
-        this.onTimelineUpdateCallback(this.getTimelineData());
-      }
-    });
-    
-    // Listen for master settings changes
-    this.masterSettings.observe(() => {
-      if (this.onMasterUpdateCallback) {
-        this.onMasterUpdateCallback(this.getMasterData());
-      }
-    });
-    
-    // Listen for new messages
-    this.messageHistory.observe(() => {
-      // Only callback for new messages
-      const messages = this.getMessages();
-      if (messages.length > 0 && this.onMessageCallback) {
-        // Call callback with the most recent message
-        this.onMessageCallback(messages[messages.length - 1]);
-      }
-    });
-    
-    // Handle awareness changes through provider events
-    this.provider.on('awareness', ({ added, updated, removed }: { added: Array<number>, updated: Array<number>, removed: Array<number> }) => {
-      // Handle user joins
-      if (added.length > 0 && this.onUserJoinCallback) {
-        added.forEach((clientId) => {
-          const state = this.awareness.getStates().get(clientId);
-          if (state?.user && state.user.id !== this.userId) {
-            // Track the client ID to user ID mapping
-            this.clientIdToUserId.set(clientId, state.user.id);
-            
-            // Store the user info
-            this.connectedUsers.set(state.user.id, {
-              id: state.user.id,
-              name: state.user.name,
-              color: state.user.color || this.getUserColor(state.user.id),
-              cursor: state.user.cursor,
-              activeTrack: state.user.activeTrack,
-              isActive: state.user.isActive,
-              lastActive: state.user.lastActive,
-              device: state.user.device
-            });
-            
-            // Notify the callback
-            this.onUserJoinCallback({
-              id: state.user.id,
-              name: state.user.name,
-              color: state.user.color || this.getUserColor(state.user.id)
-            });
+    try {
+      // Listen for track changes
+      this.tracks.observe(() => {
+        if (this.onTrackUpdateCallback) {
+          try {
+            this.onTrackUpdateCallback(this.getTracksData());
+          } catch (error) {
+            console.error('Error in track update callback:', error);
           }
-        });
-      }
+        }
+      });
       
-      // Handle user leaves
-      if (removed.length > 0 && this.onUserLeaveCallback) {
-        removed.forEach((clientId) => {
-          const userId = this.clientIdToUserId.get(clientId);
-          if (userId && userId !== this.userId) {
-            const userInfo = this.connectedUsers.get(userId);
-            if (userInfo) {
-              this.onUserLeaveCallback({
-                id: userId,
-                name: userInfo.name,
-                color: userInfo.color
-              });
-              this.connectedUsers.delete(userId);
+      // Listen for mixer changes
+      this.mixer.observe(() => {
+        if (this.onMixerUpdateCallback) {
+          try {
+            this.onMixerUpdateCallback(this.getMixerData());
+          } catch (error) {
+            console.error('Error in mixer update callback:', error);
+          }
+        }
+      });
+      
+      // Listen for timeline changes
+      this.timeline.observe(() => {
+        if (this.onTimelineUpdateCallback) {
+          try {
+            this.onTimelineUpdateCallback(this.getTimelineData());
+          } catch (error) {
+            console.error('Error in timeline update callback:', error);
+          }
+        }
+      });
+      
+      // Listen for master settings changes
+      this.masterSettings.observe(() => {
+        if (this.onMasterUpdateCallback) {
+          try {
+            this.onMasterUpdateCallback(this.getMasterData());
+          } catch (error) {
+            console.error('Error in master settings update callback:', error);
+          }
+        }
+      });
+      
+      // Listen for new messages
+      this.messageHistory.observe(() => {
+        try {
+          // Only callback for new messages
+          const messages = this.getMessages();
+          if (messages.length > 0 && this.onMessageCallback) {
+            // Call callback with the most recent message
+            this.onMessageCallback(messages[messages.length - 1]);
+          }
+        } catch (error) {
+          console.error('Error in message history update callback:', error);
+        }
+      });
+      
+      // Add fallback handling for user presence
+      const awarenessInterval = window.setInterval(() => {
+        try {
+          if (!this.awareness || typeof this.awareness.getStates !== 'function') {
+            console.warn('Awareness object not properly initialized');
+            return;
+          }
+          
+          // Fallback logic for awareness handling
+          const currentUsers = new Set<string>();
+          
+          // Process current users
+          this.awareness.getStates().forEach((state: any, clientId: number) => {
+            try {
+              if (state?.user && state.user.id !== this.userId) {
+                currentUsers.add(state.user.id);
+                
+                // If we haven't seen this user before, treat as a join
+                if (!this.connectedUsers.has(state.user.id) && this.onUserJoinCallback) {
+                  // Track the user
+                  this.clientIdToUserId.set(clientId, state.user.id);
+                  
+                  // Store user info
+                  this.connectedUsers.set(state.user.id, {
+                    id: state.user.id,
+                    name: state.user.name,
+                    color: state.user.color || this.getUserColor(state.user.id),
+                    cursor: state.user.cursor,
+                    activeTrack: state.user.activeTrack,
+                    isActive: state.user.isActive,
+                    lastActive: state.user.lastActive,
+                    device: state.user.device
+                  });
+                  
+                  // Notify callback
+                  this.onUserJoinCallback({
+                    id: state.user.id,
+                    name: state.user.name,
+                    color: state.user.color || this.getUserColor(state.user.id)
+                  });
+                }
+              }
+            } catch (error) {
+              console.error('Error processing user state:', error);
+            }
+          });
+          
+          // Check for users who left
+          if (this.onUserLeaveCallback) {
+            // Copy to array to prevent modification during iteration
+            const connectedUserIds = Array.from(this.connectedUsers.keys());
+            
+            for (const userId of connectedUserIds) {
+              // If user is no longer in the current set, they left
+              if (!currentUsers.has(userId) && userId !== this.userId) {
+                const userInfo = this.connectedUsers.get(userId);
+                if (userInfo) {
+                  try {
+                    this.onUserLeaveCallback({
+                      id: userId,
+                      name: userInfo.name,
+                      color: userInfo.color
+                    });
+                  } catch (error) {
+                    console.error('Error in user leave callback:', error);
+                  }
+                  this.connectedUsers.delete(userId);
+                }
+              }
             }
           }
-          this.clientIdToUserId.delete(clientId);
+        } catch (error) {
+          console.error('Error in awareness polling:', error);
+        }
+      }, 3000); // Check every 3 seconds
+      
+      // Clean up interval on page unload
+      window.addEventListener('beforeunload', () => {
+        window.clearInterval(awarenessInterval);
+      });
+      
+      // Try to set up traditional awareness events if available
+      try {
+        this.provider.on('status', ({ status }: { status: 'connected' | 'connecting' | 'disconnected' }) => {
+          if (this.onConnectionStatusCallback) {
+            this.onConnectionStatusCallback(status);
+          }
         });
+      } catch (error) {
+        console.warn('Could not set up status handler:', error);
       }
-    });
+      
+      console.log('Event listeners set up successfully');
+    } catch (error) {
+      console.error('Error setting up event listeners:', error);
+    }
   }
   
   /**
@@ -599,24 +665,54 @@ class StudioCollaboration {
    * Update user cursor position (for showing remote cursors)
    */
   updateCursor(position: { x: number, y: number }): void {
-    const localState = this.awareness.getLocalState();
-    
-    this.awareness.setLocalStateField('user', {
-      ...localState.user,
-      cursor: position
-    });
+    try {
+      if (!this.awareness) {
+        console.warn('Awareness object is not available for cursor update');
+        return;
+      }
+      
+      // Safely get local state and update user cursor
+      const localState = this.awareness.getLocalState() || {};
+      const userData = localState.user || { 
+        id: this.userId, 
+        name: this.username,
+        color: this.getUserColor(this.userId)
+      };
+      
+      this.awareness.setLocalStateField('user', {
+        ...userData,
+        cursor: position
+      });
+    } catch (error) {
+      console.error('Error updating cursor position:', error);
+    }
   }
   
   /**
    * Update active track (shows what track each user is working on)
    */
   updateActiveTrack(trackId: string | null): void {
-    const localState = this.awareness.getLocalState();
-    
-    this.awareness.setLocalStateField('user', {
-      ...localState.user,
-      activeTrack: trackId
-    });
+    try {
+      if (!this.awareness) {
+        console.warn('Awareness object is not available for active track update');
+        return;
+      }
+      
+      // Safely get local state and update user active track
+      const localState = this.awareness.getLocalState() || {};
+      const userData = localState.user || { 
+        id: this.userId, 
+        name: this.username,
+        color: this.getUserColor(this.userId)
+      };
+      
+      this.awareness.setLocalStateField('user', {
+        ...userData,
+        activeTrack: trackId
+      });
+    } catch (error) {
+      console.error('Error updating active track:', error);
+    }
   }
   
   /**
@@ -658,9 +754,21 @@ class StudioCollaboration {
    * Get all active users in the session
    */
   getActiveUsers(): any[] {
-    const states = Array.from(this.awareness.getStates().entries());
-    return states.map(([clientId, state]: [number, any]) => state.user)
-      .filter((user: any) => user && user.id !== this.userId);
+    // Safely check if awareness exists and has getStates method
+    if (!this.awareness || typeof this.awareness.getStates !== 'function') {
+      console.warn('Awareness object or getStates method is not available');
+      return [];
+    }
+    
+    try {
+      const states = Array.from(this.awareness.getStates().entries());
+      return states
+        .map(([clientId, state]: [number, any]) => state?.user)
+        .filter((user: any) => user && user.id !== this.userId);
+    } catch (error) {
+      console.error('Error getting active users:', error);
+      return [];
+    }
   }
   
   /**
