@@ -69,11 +69,11 @@ import {
   Clock,
   Share2,
   Users,
-  Waveform,
+  Music2,
   HelpCircle,
   Info,
   LayoutGrid,
-  CloudLightning,
+  Cloud,
   Layers,
   Scissors,
   Copy,
@@ -86,7 +86,7 @@ import {
   PenTool,
   AlignLeft,
   Award,
-  HeartPulse,
+  Heart,
   BarChart
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -144,9 +144,9 @@ interface User {
 // Available audio effect types
 const effectTypes = [
   { id: 'eq', name: 'Equalizer', icon: <Sliders className="h-4 w-4" /> },
-  { id: 'compressor', name: 'Compressor', icon: <HeartPulse className="h-4 w-4" /> },
-  { id: 'reverb', name: 'Reverb', icon: <Waveform className="h-4 w-4" /> },
-  { id: 'delay', name: 'Delay', icon: <CloudLightning className="h-4 w-4" /> },
+  { id: 'compressor', name: 'Compressor', icon: <Heart className="h-4 w-4" /> },
+  { id: 'reverb', name: 'Reverb', icon: <Music2 className="h-4 w-4" /> },
+  { id: 'delay', name: 'Delay', icon: <Cloud className="h-4 w-4" /> },
   { id: 'autotune', name: 'AutoPitch™', icon: <Zap className="h-4 w-4" /> },
   { id: 'limiter', name: 'Limiter', icon: <BarChart className="h-4 w-4" /> }
 ];
@@ -1201,7 +1201,7 @@ export default function StudioPage() {
                 <div className="flex-1 flex items-center justify-center bg-grid-zinc-950/[0.03] bg-zinc-950">
                   <div className="text-center max-w-md p-8">
                     <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-zinc-900 mb-4">
-                      <Waveform className="h-8 w-8 text-zinc-600" />
+                      <Music2 className="h-8 w-8 text-zinc-600" />
                     </div>
                     <h2 className="text-2xl font-bold mb-2">Track Editor</h2>
                     <p className="text-zinc-400 mb-6">
@@ -1747,7 +1747,7 @@ export default function StudioPage() {
                   <Card className="border-zinc-800 bg-zinc-900/30">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center">
-                        <HeartPulse className="h-4 w-4 mr-2 text-primary" />
+                        <Heart className="h-4 w-4 mr-2 text-primary" />
                         Mastering Compressor
                       </CardTitle>
                     </CardHeader>
