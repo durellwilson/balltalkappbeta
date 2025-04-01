@@ -15,30 +15,43 @@ import VerificationsAdmin from "@/pages/admin/verifications";
 import ContentModerationAdmin from "@/pages/admin/content-moderation";
 import UserManagementAdmin from "@/pages/admin/user-management";
 import { ProtectedRoute } from "./lib/protected-route";
+import { AuthProvider } from "./hooks/use-auth";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+// Create a client
+const queryClient = new QueryClient();
+
+function Router() {
+  return (
+    <Switch>
+      <Route path="/auth" component={AuthPage} />
+      <ProtectedRoute path="/" component={Dashboard} />
+      <Route path="/discover" component={Discover} />
+      <ProtectedRoute path="/library" component={Library} />
+      <ProtectedRoute path="/profile" component={Profile} />
+      <ProtectedRoute path="/subscriptions" component={Subscriptions} />
+      <ProtectedRoute path="/studio" component={Studio} />
+      <ProtectedRoute path="/studio/join/:code" component={Studio} />
+      <ProtectedRoute path="/studio/:projectId" component={Studio} />
+      <ProtectedRoute path="/uploads" component={Uploads} />
+      <ProtectedRoute path="/earnings" component={Earnings} />
+      <ProtectedRoute path="/athlete-verification" component={AthleteVerification} />
+      <ProtectedRoute path="/admin/verifications" component={VerificationsAdmin} />
+      <ProtectedRoute path="/admin/content-moderation" component={ContentModerationAdmin} />
+      <ProtectedRoute path="/admin/user-management" component={UserManagementAdmin} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
 
 function App() {
   return (
-    <>
-      <Switch>
-        <Route path="/auth" component={AuthPage} />
-        <ProtectedRoute path="/" component={Dashboard} />
-        <Route path="/discover" component={Discover} />
-        <ProtectedRoute path="/library" component={Library} />
-        <ProtectedRoute path="/profile" component={Profile} />
-        <ProtectedRoute path="/subscriptions" component={Subscriptions} />
-        <ProtectedRoute path="/studio" component={Studio} />
-        <ProtectedRoute path="/studio/join/:code" component={Studio} />
-        <ProtectedRoute path="/studio/:projectId" component={Studio} />
-        <ProtectedRoute path="/uploads" component={Uploads} />
-        <ProtectedRoute path="/earnings" component={Earnings} />
-        <ProtectedRoute path="/athlete-verification" component={AthleteVerification} />
-        <ProtectedRoute path="/admin/verifications" component={VerificationsAdmin} />
-        <ProtectedRoute path="/admin/content-moderation" component={ContentModerationAdmin} />
-        <ProtectedRoute path="/admin/user-management" component={UserManagementAdmin} />
-        <Route component={NotFound} />
-      </Switch>
-      <Toaster />
-    </>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <Router />
+        <Toaster />
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

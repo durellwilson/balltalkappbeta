@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useAuth } from '@/hooks/use-auth';
 import { useLocation } from 'wouter';
 import {
   Form,
@@ -17,6 +16,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Music } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
 
 // Login form schema
 const loginSchema = z.object({
@@ -33,19 +34,19 @@ const registerSchema = z.object({
   username: z.string().min(3, {
     message: 'Username must be at least 3 characters',
   }),
-  email: z.string().email({
-    message: 'Please enter a valid email address',
-  }),
   password: z.string().min(6, {
     message: 'Password must be at least 6 characters',
   }),
   confirmPassword: z.string().min(6, {
     message: 'Confirm password must be at least 6 characters',
   }),
+  email: z.string().email({
+    message: 'Please enter a valid email address',
+  }),
   fullName: z.string().min(2, {
     message: 'Full name must be at least 2 characters',
   }),
-  role: z.enum(['fan', 'athlete'], {
+  role: z.enum(['fan', 'athlete', 'admin'], {
     required_error: 'Please select a role',
   }),
 }).refine(data => data.password === data.confirmPassword, {
@@ -55,15 +56,9 @@ const registerSchema = z.object({
 
 export default function AuthPage() {
   const [activeTab, setActiveTab] = useState('login');
-  const { loginMutation, registerMutation } = useAuth();
   const [, navigate] = useLocation();
-  const { user } = useAuth();
-
-  // If user is already logged in, redirect to dashboard
-  if (user) {
-    navigate('/');
-    return null;
-  }
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   // Login form
   const loginForm = useForm<z.infer<typeof loginSchema>>({
@@ -74,12 +69,31 @@ export default function AuthPage() {
     },
   });
 
-  const onLoginSubmit = (values: z.infer<typeof loginSchema>) => {
-    loginMutation.mutate(values, {
-      onSuccess: () => {
-        navigate('/');
-      },
-    });
+  const onLoginSubmit = async (values: z.infer<typeof loginSchema>) => {
+    setIsSubmitting(true);
+    try {
+      const response = await apiRequest('POST', '/api/login', values);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Login failed');
+      }
+      
+      const userData = await response.json();
+      toast({
+        title: 'Login successful',
+        description: `Welcome back, ${userData.username}!`,
+      });
+      navigate('/');
+    } catch (error: any) {
+      toast({
+        title: 'Login failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Register form
@@ -87,26 +101,46 @@ export default function AuthPage() {
     resolver: zodResolver(registerSchema),
     defaultValues: {
       username: '',
-      email: '',
       password: '',
       confirmPassword: '',
+      email: '',
       fullName: '',
       role: 'fan',
     },
   });
 
-  const onRegisterSubmit = (values: z.infer<typeof registerSchema>) => {
-    registerMutation.mutate(values, {
-      onSuccess: () => {
-        navigate('/');
-      },
-    });
+  const onRegisterSubmit = async (values: z.infer<typeof registerSchema>) => {
+    setIsSubmitting(true);
+    try {
+      const { confirmPassword, ...registerData } = values;
+      const response = await apiRequest('POST', '/api/register', registerData);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Registration failed');
+      }
+      
+      const userData = await response.json();
+      toast({
+        title: 'Registration successful',
+        description: `Welcome, ${userData.username}!`,
+      });
+      navigate('/');
+    } catch (error: any) {
+      toast({
+        title: 'Registration failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-background">
       {/* Hero Section */}
-      <div className="hidden md:flex md:w-1/2 bg-primary p-10 text-white items-center justify-center">
+      <div className="hidden md:flex md:w-1/2 bg-gradient-to-br from-purple-700 to-pink-500 p-10 text-white items-center justify-center">
         <div className="max-w-md">
           <div className="flex items-center space-x-2 mb-8">
             <div className="text-white h-12 w-12">
@@ -189,8 +223,8 @@ export default function AuthPage() {
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="w-full" disabled={loginMutation.isPending}>
-                      {loginMutation.isPending ? 'Logging in...' : 'Login'}
+                    <Button type="submit" className="w-full" disabled={isSubmitting}>
+                      {isSubmitting ? 'Logging in...' : 'Login'}
                     </Button>
                   </form>
                 </Form>
@@ -293,8 +327,8 @@ export default function AuthPage() {
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="w-full" disabled={registerMutation.isPending}>
-                      {registerMutation.isPending ? 'Creating Account...' : 'Create Account'}
+                    <Button type="submit" className="w-full" disabled={isSubmitting}>
+                      {isSubmitting ? 'Creating Account...' : 'Create Account'}
                     </Button>
                   </form>
                 </Form>

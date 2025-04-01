@@ -1,0 +1,257 @@
+Athletes Profile - Users view 
+https://claude.site/artifacts/98d70aeb-4b99-43f8-b2f6-60a75ff98079 
+(Tab screen component)
+
+https://claude.site/artifacts/95248d5a-446f-4fd8-864b-d9ea5daff230
+(Layout components)
+
+
+https://claude.site/artifacts/95248d5a-446f-4fd8-864b-d9ea5daff230
+
+(Themed Components)
+
+https://claude.site/artifacts/bdf53c6a-4f23-465b-9145-9e56bc6ac399
+
+(Color constant )
+
+https://claude.site/artifacts/bdf53c6a-4f23-465b-9145-9e56bc6ac399
+
+(Package configuration)
+
+
+
+
+
+Athlete Profile Component  (dashboard)
+
+https://claude.ai/chat/da113a52-db74-44ad-b6e4-06eee9e1855e
+
+(Constants and Hooks)
+
+https://claude.ai/chat/da113a52-db74-44ad-b6e4-06eee9e1855e
+
+(Navigation and Layout Components) 
+
+https://claude.ai/chat/da113a52-db74-44ad-b6e4-06eee9e1855e
+
+(Core component)
+
+https://claude.ai/chat/da113a52-db74-44ad-b6e4-06eee9e1855e
+
+(Project Configuration)
+
+Athletes upload authentication , music making , etc 
+
+https://claude.site/artifacts/f65242e3-e779-4aad-9466-f3304896c08d
+
+(Project Configuration )
+
+https://claude.site/artifacts/f65242e3-e779-4aad-9466-f3304896c08d
+
+(Core components )
+
+https://claude.site/artifacts/2a7dd5cf-639d-47a8-bacb-79fa8af26ce8
+
+(Hooks and Constants)
+
+
+Fan Hub Sign 
+
+https://claude.site/artifacts/2931ff0a-3a8f-467e-adbd-2e2bcd5015d7
+ Tsconfig.json
+
+https://claude.site/artifacts/24fb2915-f475-49eb-a70e-08d4b3e7b211
+
+Package.json
+
+https://claude.site/artifacts/53105e2e-14f2-408b-be17-08d97c85504f
+
+Constants/Colors
+
+https://claude.site/artifacts/714fce31-fd06-4c21-870a-95c4383bbda8
+
+Components / Themed Components 
+
+https://claude.site/artifacts/0c7fb41c-da6d-4379-aca8-b1aaf320fdeb
+
+(App (tabs) / layout.tsx)
+
+https://claude.site/artifacts/b3887e1a-9a84-4a74-9472-dd01fe854918
+
+( app Layout)
+
+Admin Dashboard
+
+Athletes Profile - Users view 
+https://claude.site/artifacts/98d70aeb-4b99-43f8-b2f6-60a75ff98079 
+(Tab screen component)
+
+https://claude.site/artifacts/95248d5a-446f-4fd8-864b-d9ea5daff230
+(Layout components)
+
+
+https://claude.site/artifacts/95248d5a-446f-4fd8-864b-d9ea5daff230
+
+(Themed Components)
+
+https://claude.site/artifacts/bdf53c6a-4f23-465b-9145-9e56bc6ac399
+
+(Color constant )
+
+https://claude.site/artifacts/bdf53c6a-4f23-465b-9145-9e56bc6ac399
+
+(Package configuration)
+
+
+
+
+
+Athlete Profile Component  (dashboard)
+
+https://claude.ai/chat/da113a52-db74-44ad-b6e4-06eee9e1855e
+
+(Constants and Hooks)
+
+https://claude.ai/chat/da113a52-db74-44ad-b6e4-06eee9e1855e
+
+(Navigation and Layout Components) 
+
+https://claude.ai/chat/da113a52-db74-44ad-b6e4-06eee9e1855e
+
+(Core component)
+
+https://claude.ai/chat/da113a52-db74-44ad-b6e4-06eee9e1855e
+
+(Project Configuration)
+
+Athletes upload authentication , music making , etc 
+
+https://claude.site/artifacts/f65242e3-e779-4aad-9466-f3304896c08d
+
+(Project Configuration )
+
+https://claude.site/artifacts/f65242e3-e779-4aad-9466-f3304896c08d
+
+(Core components )
+
+https://claude.site/artifacts/2a7dd5cf-639d-47a8-bacb-79fa8af26ce8
+
+(Hooks and Constants)
+
+
+Fan Hub Sign 
+
+https://claude.site/artifacts/2931ff0a-3a8f-467e-adbd-2e2bcd5015d7
+ Tsconfig.json
+
+https://claude.site/artifacts/24fb2915-f475-49eb-a70e-08d4b3e7b211
+
+Package.json
+
+https://claude.site/artifacts/53105e2e-14f2-408b-be17-08d97c85504f
+
+Constants/Colors
+
+https://claude.site/artifacts/714fce31-fd06-4c21-870a-95c4383bbda8
+
+Components / Themed Components 
+
+https://claude.site/artifacts/0c7fb41c-da6d-4379-aca8-b1aaf320fdeb
+
+(App (tabs) / layout.tsx)
+
+https://claude.site/artifacts/b3887e1a-9a84-4a74-9472-dd01fe854918
+
+( app Layout)
+
+Admin Dashboard
+
+https://claude.site/artifacts/1941e34d-5149-4bf1-9abf-d63fbefe9ce9
+
+Users Home Page 
+
+https://claude.site/artifacts/f377ce24-b634-4917-ad87-09da86a51c3f
+
+Color constants
+
+https://claude.site/artifacts/7da4f56f-a7e9-449a-9462-fc0f7f47ac4b
+
+Themed Components
+
+https://claude.site/artifacts/7c8977f2-82fd-4d8a-80b2-ce27a403390d
+
+Navigation and Layout Files
+
+https://claude.site/artifacts/7c8977f2-82fd-4d8a-80b2-ce27a403390d
+
+Let's create the platform-specific UI components
+
+https://claude.site/artifacts/f3ac56f9-c695-476d-b41c-e6b29d0cde35
+
+Configuration files 
+
+https://claude.site/artifacts/bca12917-92fd-41f9-9ae5-5a14fcc2c8ab
+
+
+Constant And Hooks
+
+https://claude.site/artifacts/5d8bc8d3-62e3-4a69-aa39-35966a997e67
+
+
+Base Compnents
+
+https://claude.site/artifacts/0a5b6ca5-30b0-4383-a0e1-805f5a2b85a8
+
+
+Platform- Specific Components 
+
+
+User Profile
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Core Features
+* Podcast functionality
+* Live streaming
+* Music integration
+* Video and music posting
+* Reels-style short-form content
+* Multi-platform authentication
+Authentication
+* Google sign-up/sign-in
+* Apple sign-up/sign-in
+* Email sign-up/sign-in
+Athlete Authentication
+* Dedicated area for athlete verification
+* Implement secure process for confirming athlete identities
+Content Types
+* Podcasts: Audio content creation and playback
+* Live Streaming: Real-time video broadcasts
+* Music: Integration with music streaming services
+* Video Posts: Allow users to upload and share videos
+* Music Posts: Enable sharing of music clips or full tracks
+* Reels: Short-form vertical video content
+Additional Notes
+* Ensure seamless integration between different content types
+* Implement robust content moderation system
+* Optimize for mobile performance
+* Consider implementing discovery algorithms for content recommendations
+* Develop analytics dashboard for content creators and athletes
+
+
+
