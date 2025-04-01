@@ -18,6 +18,7 @@ import {
   Square,
   PlayCircle,
   PauseCircle,
+  Import,
   ChevronRight,
   ChevronLeft,
   Mic,
@@ -49,6 +50,8 @@ import {
 import { InteractiveTrack } from '@/components/studio/interactive-track';
 import { WaveformVisualizer } from '@/components/ui/waveform-visualizer';
 import { SpectrumAnalyzer } from '@/components/ui/spectrum-analyzer';
+import { FileUploadModal } from '@/components/studio/file-upload-modal';
+import { FileDropZone } from '@/components/studio/file-drop-zone';
 
 // Hooks and Utils
 import { useToast } from '@/hooks/use-toast';
@@ -109,6 +112,7 @@ const EnhancedStudio: React.FC = () => {
   const [sidebarTab, setSidebarTab] = useState<'tracks' | 'mixer' | 'collab'>('tracks');
   const [projectTime, setProjectTime] = useState<number>(0);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   
   // References
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -151,14 +155,16 @@ const EnhancedStudio: React.FC = () => {
     }
   });
   
-  // Initialize audio processor for this studio session
+  // Configure audio processor for this studio session
   useEffect(() => {
-    const initAudio = async () => {
+    const configureAudio = () => {
       try {
-        // We don't auto-initialize audio context in the constructor due to browser autoplay policies
-        // Instead, we configure the master settings now, but initialization happens on user interaction
-        audioProcessor.setMasterVolume(masterVolume);
-        audioProcessor.setBpm(project.bpm);
+        // Configure master settings without initializing the audio context
+        // Audio context initialization happens on user interaction
+        if (audioProcessor.isReady()) {
+          audioProcessor.setMasterVolume(masterVolume);
+          audioProcessor.setBpm(project.bpm);
+        }
         
         // Initialize demo tracks
         const demoTracks: Track[] = [
@@ -220,7 +226,7 @@ const EnhancedStudio: React.FC = () => {
       }
     };
     
-    initAudio();
+    configureAudio();
   }, []);
   
   // Auto-scroll chat to bottom when new messages arrive
@@ -263,23 +269,17 @@ const EnhancedStudio: React.FC = () => {
   // Handle playback controls
   const handlePlayPause = async () => {
     try {
-      // Initialize audio context on first user interaction to comply with browser autoplay policies
+      // Check if audio processor is ready - if not, we show the overlay prompt now
       if (!audioProcessor.isReady()) {
-        // Show loading state
         toast({
-          title: "Initializing audio engine...",
-          description: "Please wait while we set up the audio system.",
+          title: "Audio Not Initialized",
+          description: "Please enable the audio engine first using the 'Enable Audio Engine' button.",
+          variant: "destructive"
         });
-        
-        // Initialize the audio processor
-        await audioProcessor.initialize();
-        
-        toast({
-          title: "Audio engine ready",
-          description: "You can now play and record audio.",
-        });
+        return;
       }
       
+      // Toggle play state
       if (isPlaying) {
         audioProcessor.pause();
         setIsPlaying(false);
@@ -288,60 +288,80 @@ const EnhancedStudio: React.FC = () => {
         setIsPlaying(true);
       }
     } catch (error) {
-      console.error("Failed to initialize audio:", error);
+      console.error("Failed to play/pause:", error);
       toast({
-        title: "Audio Error",
-        description: "Could not initialize audio engine. Please try again.",
+        title: "Playback Error",
+        description: "Could not control playback. Please try again.",
         variant: "destructive"
       });
     }
   };
   
   const handleStop = () => {
-    audioProcessor.stop();
-    setIsPlaying(false);
-    setProjectTime(0);
+    if (audioProcessor.isReady()) {
+      audioProcessor.stop();
+      setIsPlaying(false);
+      setProjectTime(0);
+    }
   };
   
   const handleRecordStart = async () => {
     try {
-      // Initialize audio context on first user interaction to comply with browser autoplay policies
+      // Check if audio processor is ready - if not, we show the overlay prompt now
       if (!audioProcessor.isReady()) {
-        // Show loading state
         toast({
-          title: "Initializing audio engine...",
-          description: "Please wait while we set up the audio system.",
+          title: "Audio Not Initialized",
+          description: "Please enable the audio engine first using the 'Enable Audio Engine' button.",
+          variant: "destructive"
         });
-        
-        // Initialize the audio processor
-        await audioProcessor.initialize();
-        
-        toast({
-          title: "Audio engine ready",
-          description: "You can now record audio.",
-        });
+        return;
       }
       
-      await audioProcessor.startRecording();
-      setIsRecording(true);
-      
-      // If not playing, start playback too
-      if (!isPlaying) {
-        audioProcessor.play();
-        setIsPlaying(true);
+      // Request microphone permissions explicitly
+      try {
+        // Check if we have microphone permissions
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // If we get here, we have permissions - immediately stop the stream
+        stream.getTracks().forEach(track => track.stop());
+        
+        // Now start recording with the audio processor
+        await audioProcessor.startRecording();
+        setIsRecording(true);
+        
+        // If not playing, start playback too
+        if (!isPlaying) {
+          audioProcessor.play();
+          setIsPlaying(true);
+        }
+      } catch (micError) {
+        console.error("Microphone access error:", micError);
+        toast({
+          title: "Microphone Access Denied",
+          description: "Please grant microphone permissions to record audio.",
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error("Failed to start recording:", error);
       toast({
         title: "Recording Error",
-        description: "Could not start recording. Please check microphone permissions and try again.",
+        description: "Could not start recording. Please try again.",
         variant: "destructive"
       });
     }
   };
   
-  const handleRecordStop = () => {
-    audioProcessor.stopRecording().then(blob => {
+  const handleRecordStop = async () => {
+    if (!audioProcessor.isReady()) {
+      setIsRecording(false);
+      return;
+    }
+    
+    try {
+      // Stop the recording and get resulting audio data
+      const blob = await audioProcessor.stopRecording();
+      
       if (blob) {
         // Create a new track with the recording
         const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
@@ -361,20 +381,46 @@ const EnhancedStudio: React.FC = () => {
           pan: newTrack.pan
         });
         
-        // Load the recorded audio
-        const url = URL.createObjectURL(blob);
-        track.loadAudio(url);
-        
-        // Add to tracks list
-        setTracks(prev => [...prev, newTrack]);
-        
+        try {
+          // Load the recorded audio
+          const url = URL.createObjectURL(blob);
+          await track.loadAudio(url);
+          
+          // Add to tracks list
+          setTracks(prev => [...prev, newTrack]);
+          
+          toast({
+            title: 'Recording completed',
+            description: `New track "${newTrack.name}" created with your recording.`
+          });
+        } catch (error) {
+          console.error("Failed to load recorded audio:", error);
+          toast({
+            title: "Recording Error",
+            description: "Recorded audio could not be loaded. Please try again.",
+            variant: "destructive"
+          });
+          
+          // Clean up the created track
+          audioProcessor.removeTrack(newTrackId);
+        }
+      } else {
         toast({
-          title: 'Recording completed',
-          description: `New track "${newTrack.name}" created with your recording.`
+          title: "Recording Error",
+          description: "No audio was recorded. Please try again.",
+          variant: "destructive"
         });
       }
-    });
-    setIsRecording(false);
+    } catch (error) {
+      console.error("Failed to stop recording:", error);
+      toast({
+        title: "Recording Error",
+        description: "Could not save the recording. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRecording(false);
+    }
   };
   
   // Handle track operations
@@ -512,6 +558,71 @@ const EnhancedStudio: React.FC = () => {
     audioProcessor.setBpm(bpm);
   };
   
+  // Handle file uploads
+  const handleFileUpload = async (files: File[]): Promise<boolean> => {
+    try {
+      // Check if audio processor is ready
+      if (!audioProcessor.isReady()) {
+        toast({
+          title: "Audio Not Initialized",
+          description: "Please enable the audio engine first using the 'Enable Audio Engine' button.",
+          variant: "destructive"
+        });
+        return false;
+      }
+      
+      if (files.length === 0) return false;
+      
+      // Process each file
+      for (const file of files) {
+        // Create a new track for this file
+        const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
+        const newTrack: Track = {
+          id: newTrackId,
+          name: file.name.split('.')[0] || `Audio ${newTrackId}`, // Use filename without extension as track name
+          type: 'audio',
+          volume: 0.8,
+          pan: 0,
+          isMuted: false,
+          isSoloed: false
+        };
+        
+        // Create track processor
+        const track = audioProcessor.createTrack(newTrackId, {
+          volume: newTrack.volume,
+          pan: newTrack.pan
+        });
+        
+        // Load the audio file
+        await track.loadAudioFile(file);
+        
+        // Add to tracks list
+        setTracks(prev => [...prev, newTrack]);
+        
+        // Set as active track
+        setActiveTrackId(newTrackId);
+      }
+      
+      toast({
+        title: 'Files imported',
+        description: `${files.length} audio ${files.length === 1 ? 'file' : 'files'} added to your project.`
+      });
+      
+      // Set to tracks panel
+      setSidebarTab('tracks');
+      
+      return true;
+    } catch (error) {
+      console.error("Failed to import audio files:", error);
+      toast({
+        title: "Import Error",
+        description: "Failed to import audio files. Please try again.",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+  
   // Handle chat message send
   const handleSendMessage = () => {
     if (!newChatMessage.trim()) return;
@@ -530,8 +641,59 @@ const EnhancedStudio: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
   };
   
+  // Function to init audio engine on direct user interaction
+  const initAudio = async () => {
+    try {
+      // Show loading state
+      toast({
+        title: "Initializing audio engine...",
+        description: "Please wait while we set up the audio system.",
+      });
+      
+      // Initialize the audio processor
+      await audioProcessor.initialize();
+      
+      // Now configure the audio settings
+      audioProcessor.setMasterVolume(masterVolume);
+      audioProcessor.setBpm(project.bpm);
+      
+      toast({
+        title: "Audio engine ready",
+        description: "You can now play and record audio.",
+      });
+    } catch (error) {
+      console.error("Failed to initialize audio:", error);
+      toast({
+        title: "Audio Error",
+        description: "Could not initialize audio engine. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+      {/* Audio initialization overlay - shown when audio is not initialized */}
+      {!audioProcessor.isReady() && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-gray-900 p-6 rounded-lg max-w-md text-center">
+            <Music size={48} className="mx-auto mb-4 text-blue-500" />
+            <h2 className="text-xl font-bold mb-2">Enable Audio</h2>
+            <p className="mb-4 text-gray-300">
+              Click the button below to enable the audio engine. Browsers require a direct user interaction to allow audio playback.
+            </p>
+            <Button 
+              size="lg" 
+              className="mx-auto bg-blue-600 hover:bg-blue-700"
+              onClick={initAudio}
+            >
+              <Volume2 className="mr-2" />
+              Enable Audio Engine
+            </Button>
+          </div>
+        </div>
+      )}
+      
       {/* Top header with transport controls */}
       <header className="bg-gray-900 border-b border-gray-800 p-3 flex items-center justify-between">
         <div className="flex items-center space-x-3">
@@ -803,6 +965,10 @@ const EnhancedStudio: React.FC = () => {
                             <Music size={14} className="mr-2" />
                             Instrument Track
                           </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setIsUploadModalOpen(true)}>
+                            <Upload size={14} className="mr-2" />
+                            Import Audio
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleAddTrack('drum')}>
                             <Disc size={14} className="mr-2" />
                             Drum Track
@@ -876,7 +1042,14 @@ const EnhancedStudio: React.FC = () => {
                           <div className="text-center py-6 text-gray-500">
                             <Music size={32} className="mx-auto mb-2 opacity-30" />
                             <p className="text-sm">No tracks yet. Add a track to get started.</p>
-                            <p className="text-xs mt-4">Drag audio files here to add tracks</p>
+                            <div className="mt-4">
+                              <FileDropZone 
+                                onFilesSelected={files => {
+                                  // Don't open modal, directly process files
+                                  handleFileUpload(files);
+                                }}
+                              />
+                            </div>
                           </div>
                         ) : (
                           tracks.map(track => (
@@ -1118,6 +1291,15 @@ const EnhancedStudio: React.FC = () => {
           </div>
         </DialogContent>
       </Dialog>
+      
+      {/* File upload modal */}
+      <FileUploadModal
+        open={isUploadModalOpen}
+        onOpenChange={setIsUploadModalOpen}
+        onUpload={handleFileUpload}
+        title="Import Audio Files"
+        description="Upload audio files to add to your project. Supported formats: .mp3, .wav, .aiff, .m4a"
+      />
     </div>
   );
 };
