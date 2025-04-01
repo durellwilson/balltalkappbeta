@@ -1,10 +1,82 @@
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { v4 as uuidv4 } from 'uuid';
+import { encode } from 'lib0/encoding';
+import { fromUint8Array, toUint8Array } from 'js-base64';
 
 /**
- * StudioCollaboration provides real-time collaboration for the studio environment
- * using Y.js for conflict-free replicated data types (CRDT) and WebSockets for communication
+ * User state interface for shared awareness
+ */
+interface UserState {
+  id: string;
+  name: string;
+  color: string;
+  cursor?: { x: number; y: number } | null;
+  activeTrack?: string | null;
+  isActive?: boolean;
+  lastActive?: string;
+  device?: string;
+}
+
+/**
+ * Track data interface
+ */
+interface TrackData {
+  id: string;
+  name: string;
+  type: string;
+  audioUrl?: string;
+  waveform?: number[];
+  createdBy?: string;
+  createdAt?: string;
+  updatedBy?: string;
+  updatedAt?: string;
+  [key: string]: any;
+}
+
+/**
+ * Mixer settings interface
+ */
+interface MixerSettings {
+  volume: number;
+  pan: number;
+  muted: boolean;
+  soloed: boolean;
+  eq?: { low: number; mid: number; high: number };
+  effects?: { [key: string]: any };
+}
+
+/**
+ * Timeline region interface
+ */
+interface TimelineRegion {
+  id: string;
+  start: number;
+  end: number;
+  color?: string;
+  label?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+/**
+ * Message interface
+ */
+interface Message {
+  id: string;
+  sender: {
+    id: string;
+    name: string;
+  };
+  text: string;
+  timestamp: string;
+}
+
+/**
+ * StudioCollaboration provides enterprise-grade real-time collaboration for the studio environment
+ * using Y.js for conflict-free replicated data types (CRDT) and WebSockets for low-latency communication
  */
 export class StudioCollaboration {
   private doc: Y.Doc;
@@ -13,22 +85,32 @@ export class StudioCollaboration {
   private userId: string;
   private username: string;
   private awareness: any; // Y.js awareness type
+  private connectionStatus: 'connected' | 'disconnected' | 'connecting' = 'connecting';
+  private syncInterval: number | null = null;
+  private heartbeatInterval: number | null = null;
+  private lastSyncTime: number = 0;
+  private pendingChanges: boolean = false;
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 10;
+  private reconnectTimeout: number | null = null;
   
-  // Shared data structures
-  private tracks: Y.Map<any>;
-  private mixer: Y.Map<any>;
-  private timeline: Y.Map<any>;
+  // Shared data structures with strong typing
+  private tracks: Y.Map<TrackData>;
+  private mixer: Y.Map<MixerSettings>;
+  private timeline: Y.Map<{ regions: TimelineRegion[] }>;
   private masterSettings: Y.Map<any>;
-  private messageHistory: Y.Array<any>;
+  private messageHistory: Y.Array<Message>;
+  private undoManager: Y.UndoManager;
   
   // Event callbacks
-  private onTrackUpdateCallback: ((tracks: any) => void) | null = null;
-  private onMixerUpdateCallback: ((mixer: any) => void) | null = null;
-  private onTimelineUpdateCallback: ((timeline: any) => void) | null = null;
+  private onTrackUpdateCallback: ((tracks: Record<string, TrackData>) => void) | null = null;
+  private onMixerUpdateCallback: ((mixer: Record<string, MixerSettings>) => void) | null = null;
+  private onTimelineUpdateCallback: ((timeline: Record<string, { regions: TimelineRegion[] }>) => void) | null = null;
   private onMasterUpdateCallback: ((master: any) => void) | null = null;
-  private onMessageCallback: ((message: any) => void) | null = null;
-  private onUserJoinCallback: ((user: any) => void) | null = null;
-  private onUserLeaveCallback: ((user: any) => void) | null = null;
+  private onMessageCallback: ((message: Message) => void) | null = null;
+  private onUserJoinCallback: ((user: UserState) => void) | null = null;
+  private onUserLeaveCallback: ((user: UserState) => void) | null = null;
+  private onConnectionStatusCallback: ((status: 'connected' | 'disconnected' | 'connecting') => void) | null = null;
 
   /**
    * Create a new StudioCollaboration instance
@@ -42,15 +124,21 @@ export class StudioCollaboration {
     this.userId = userId;
     this.username = username;
     
-    // Create a Y.js document
-    this.doc = new Y.Doc();
+    // Create a Y.js document with client ID for conflict resolution
+    this.doc = new Y.Doc({ gc: true });
     
-    // Set up collaborative data structures
+    // Set up collaborative data structures with strong typing
     this.tracks = this.doc.getMap('tracks');
     this.mixer = this.doc.getMap('mixer');
     this.timeline = this.doc.getMap('timeline');
     this.masterSettings = this.doc.getMap('master');
     this.messageHistory = this.doc.getArray('messages');
+    
+    // Setup undo manager for tracks and timeline (not for real-time mixer control)
+    this.undoManager = new Y.UndoManager([this.tracks, this.timeline], {
+      captureTimeout: 500, // Group edits within 500ms
+      trackedOrigins: new Set([this.userId]) // Only track changes from this user
+    });
     
     // Calculate WebSocket URL if not provided
     if (!wsUrl) {
@@ -58,28 +146,171 @@ export class StudioCollaboration {
       wsUrl = `${protocol}//${window.location.host}/ws`;
     }
     
-    // Connect to WebSocket server
+    // Connect to WebSocket server with enhanced error handling and binary protocol support
     this.provider = new WebsocketProvider(wsUrl, `studio-${projectId}`, this.doc, {
       connect: true,
       awareness: {
         // Send client info when connecting
-        clientID: this.userId,
+        clientID: this.userId, // Will be used internally by y-websocket
         name: this.username
-      }
+      },
+      resyncInterval: 10000, // Resync every 10 seconds to ensure consistency
+      maxBackoffTime: 5000 // Maximum reconnection delay
     });
     
-    // Set up awareness (for user presence)
+    // Set up awareness (for user presence) with device info
     this.awareness = this.provider.awareness;
     this.awareness.setLocalStateField('user', {
       id: this.userId,
       name: this.username,
       color: this.getUserColor(this.userId),
       cursor: null,
-      activeTrack: null
+      activeTrack: null,
+      isActive: true,
+      lastActive: new Date().toISOString(),
+      device: this.getDeviceInfo()
     });
     
-    // Set up awareness event listeners
+    // Set up event listeners
     this.setupEventListeners();
+    
+    // Set up connection status tracking
+    this.setupConnectionHandling();
+    
+    // Set up periodic state syncing for more reliable real-time collaboration
+    this.setupPeriodicSync();
+  }
+  
+  /**
+   * Setup connection status tracking and recovery mechanisms
+   */
+  private setupConnectionHandling(): void {
+    // Connection and disconnection handling
+    this.provider.on('status', ({ status }: { status: 'connecting' | 'connected' | 'disconnected' }) => {
+      this.connectionStatus = status;
+      
+      if (status === 'connected') {
+        // Reset reconnect attempts on successful connection
+        this.reconnectAttempts = 0;
+        
+        // Update status to show we're online
+        this.awareness.setLocalStateField('user', {
+          ...this.awareness.getLocalState().user,
+          isActive: true,
+          lastActive: new Date().toISOString()
+        });
+        
+        // Sync any pending changes
+        if (this.pendingChanges) {
+          this.forceSyncState();
+          this.pendingChanges = false;
+        }
+      } else if (status === 'disconnected') {
+        // Set flag to sync when reconnected
+        this.pendingChanges = true;
+        
+        // Try to reconnect automatically with exponential backoff
+        if (this.reconnectAttempts < this.maxReconnectAttempts) {
+          const backoffTime = Math.min(1000 * Math.pow(1.5, this.reconnectAttempts), 30000);
+          console.log(`Connection lost. Attempting to reconnect in ${backoffTime / 1000} seconds...`);
+          
+          if (this.reconnectTimeout !== null) {
+            window.clearTimeout(this.reconnectTimeout);
+          }
+          
+          this.reconnectTimeout = window.setTimeout(() => {
+            if (this.connectionStatus === 'disconnected') {
+              this.reconnect();
+              this.reconnectAttempts++;
+            }
+          }, backoffTime);
+        }
+      }
+      
+      // Trigger callback for UI updates
+      if (this.onConnectionStatusCallback) {
+        this.onConnectionStatusCallback(status);
+      }
+    });
+    
+    // Automatically update activity status every minute
+    setInterval(() => {
+      if (this.connectionStatus === 'connected') {
+        this.awareness.setLocalStateField('user', {
+          ...this.awareness.getLocalState().user,
+          lastActive: new Date().toISOString()
+        });
+      }
+    }, 60000);
+  }
+  
+  /**
+   * Setup periodic state synchronization for reliability
+   */
+  private setupPeriodicSync(): void {
+    // Create a heartbeat to ensure connection stays alive
+    this.heartbeatInterval = window.setInterval(() => {
+      if (this.connectionStatus === 'connected') {
+        // Send a minimal update to keep connection alive
+        this.awareness.setLocalStateField('user', {
+          ...this.awareness.getLocalState().user
+        });
+      }
+    }, 30000); // Every 30 seconds
+    
+    // Sync state to ensure no updates are lost
+    this.syncInterval = window.setInterval(() => {
+      // Only sync if connected and changes have been made since last sync
+      if (this.connectionStatus === 'connected' && 
+          this.pendingChanges && 
+          Date.now() - this.lastSyncTime > 5000) {
+        this.forceSyncState();
+      }
+    }, 10000); // Check every 10 seconds
+  }
+  
+  /**
+   * Force a state sync with all peers, using binary encoding for efficiency
+   */
+  private forceSyncState(): void {
+    if (this.connectionStatus !== 'connected') return;
+    
+    try {
+      // Encode current document state as binary update
+      const update = Y.encodeStateAsUpdate(this.doc);
+      
+      // Convert to base64 for transmission
+      const base64Update = fromUint8Array(update);
+      
+      // Send via the provider's network layer
+      this.provider.awareness.setLocalStateField('_yjs_sync', {
+        update: base64Update,
+        timestamp: Date.now()
+      });
+      
+      this.lastSyncTime = Date.now();
+      this.pendingChanges = false;
+      
+      console.log('Forced state synchronization complete');
+    } catch (error) {
+      console.error('Error during state synchronization:', error);
+    }
+  }
+  
+  /**
+   * Get simplified device information for better collaboration context
+   */
+  private getDeviceInfo(): string {
+    const userAgent = navigator.userAgent;
+    let deviceType = 'Desktop';
+    
+    if (/Mobi|Android/i.test(userAgent)) {
+      deviceType = 'Mobile';
+    } else if (/iPad|Tablet/i.test(userAgent)) {
+      deviceType = 'Tablet';
+    }
+    
+    return deviceType;
   }
 
   /**
@@ -151,7 +382,8 @@ export class StudioCollaboration {
           if (state && state.user && state.user.id !== this.userId) {
             this.onUserLeaveCallback!({
               id: state.user.id,
-              name: state.user.name
+              name: state.user.name,
+              color: state.user.color || this.getUserColor(state.user.id)
             });
           }
         });
@@ -309,7 +541,7 @@ export class StudioCollaboration {
    * Send a chat message to all users
    */
   sendMessage(text: string): void {
-    const message = {
+    const message: Message = {
       id: uuidv4(),
       sender: {
         id: this.userId,
@@ -320,6 +552,58 @@ export class StudioCollaboration {
     };
     
     this.messageHistory.push([message]);
+    
+    // Mark that we have pending changes to sync
+    this.pendingChanges = true;
+  }
+  
+  /**
+   * Undo the last change made by this user
+   */
+  undo(): void {
+    if (this.undoManager.canUndo()) {
+      this.undoManager.undo();
+      this.pendingChanges = true;
+    }
+  }
+  
+  /**
+   * Redo the last undone change
+   */
+  redo(): void {
+    if (this.undoManager.canRedo()) {
+      this.undoManager.redo();
+      this.pendingChanges = true;
+    }
+  }
+  
+  /**
+   * Process incoming binary state update (from another client)
+   * Used to manually merge updates for faster syncing or in offline scenarios
+   */
+  processExternalUpdate(base64Update: string): boolean {
+    try {
+      // Convert from base64 to binary
+      const update = toUint8Array(base64Update);
+      
+      // Apply the update to the document
+      Y.applyUpdate(this.doc, update);
+      
+      console.log('External update applied successfully');
+      return true;
+    } catch (error) {
+      console.error('Failed to apply external update:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Export the current document state as a base64 string
+   * Useful for saving the state or transferring via alternative channels
+   */
+  exportDocumentState(): string {
+    const update = Y.encodeStateAsUpdate(this.doc);
+    return fromUint8Array(update);
   }
 
   /**
@@ -444,7 +728,12 @@ export class StudioCollaboration {
    */
   private getUserColor(userId: string): string {
     // Simple hash function for user ID
-    const hash = [...userId].reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    let hash = 0;
+    for (let i = 0; i < userId.length; i++) {
+      hash = ((hash << 5) - hash) + userId.charCodeAt(i);
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    hash = Math.abs(hash);
     
     // Predefined colors for better visibility
     const colors = [
@@ -482,11 +771,50 @@ export class StudioCollaboration {
   }
 
   /**
+   * Set callback for connection status updates
+   */
+  onConnectionStatus(callback: (status: 'connected' | 'disconnected' | 'connecting') => void): void {
+    this.onConnectionStatusCallback = callback;
+  }
+  
+  /**
    * Clean up resources
    */
   destroy(): void {
+    // Clear intervals
+    if (this.syncInterval !== null) {
+      window.clearInterval(this.syncInterval);
+      this.syncInterval = null;
+    }
+    
+    if (this.heartbeatInterval !== null) {
+      window.clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+    
+    if (this.reconnectTimeout !== null) {
+      window.clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    
+    // Disconnect from server
     this.disconnect();
+    
+    // Clean up event listeners
+    this.tracks.unobserve();
+    this.mixer.unobserve();
+    this.timeline.unobserve();
+    this.masterSettings.unobserve();
+    this.messageHistory.unobserve();
+    
+    // Clean up undo manager
+    this.undoManager.stopCapturing();
+    this.undoManager.clear();
+    
+    // Destroy the document (frees up memory)
     this.doc.destroy();
+    
+    console.log('StudioCollaboration resources cleaned up');
   }
 }
 
