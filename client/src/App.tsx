@@ -403,7 +403,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
             </svg>
             <span className="text-xs mt-0.5">Discover</span>
           </Link>
-          <Link href="/enhanced-studio" 
+          <Link href="/studio" 
             className={`flex flex-col items-center py-2 ${activeTab === 'live' ? 'text-primary' : 'text-zinc-400'}`}
             onClick={() => setActiveTab('live')}
           >
@@ -469,15 +469,21 @@ function App() {
             </ProtectedRoute>
           </Route>
           
-          {/* Studio */}
+          {/* Studio Routes */}
           <Route path="/studio">
             <ProtectedRoute>
               <StudioPage />
             </ProtectedRoute>
           </Route>
           
-          {/* Studio with project ID */}
           <Route path="/studio/:projectId">
+            <ProtectedRoute>
+              <StudioPage />
+            </ProtectedRoute>
+          </Route>
+          
+          {/* Redirect enhanced-studio to main studio */}
+          <Route path="/enhanced-studio">
             <ProtectedRoute>
               <StudioPage />
             </ProtectedRoute>
