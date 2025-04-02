@@ -18,6 +18,225 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+// Helper function to generate synthetic audio for demos
+async function generateSyntheticAudio(
+  type: 'music' | 'vocal' | 'speech' | 'sfx',
+  duration: number,
+  parameters: any
+): Promise<AudioBuffer> {
+  // Create audio context
+  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  
+  // Create an empty audio buffer with the specified duration
+  const sampleRate = 44100;
+  const numberOfChannels = 2;
+  const frameCount = duration * sampleRate;
+  const audioBuffer = audioContext.createBuffer(numberOfChannels, frameCount, sampleRate);
+  
+  // Fill the buffer with synthetic audio based on the type
+  for (let channel = 0; channel < numberOfChannels; channel++) {
+    const channelData = audioBuffer.getChannelData(channel);
+    
+    // Different audio generation algorithms for each type
+    if (type === 'music') {
+      // Generate music-like waveforms with harmonics
+      const baseFreq = ['electronic', 'pop'].includes(parameters.genre) ? 110 : 
+                       ['rock', 'hiphop'].includes(parameters.genre) ? 82.41 : 220;
+      const bpm = parameters.tempo;
+      const beatsPerSecond = bpm / 60;
+      
+      // Create a more complex musical pattern
+      for (let i = 0; i < frameCount; i++) {
+        const t = i / sampleRate;
+        const beat = t * beatsPerSecond;
+        const bar = Math.floor(beat / 4);
+        
+        // Create a sequence of notes that changes every bar
+        const notePattern = [0, 4, 7, 12, 7, 4, 0, 5];
+        const noteIndex = Math.floor(beat % 8);
+        const note = notePattern[noteIndex];
+        const freq = baseFreq * Math.pow(2, note / 12);
+        
+        // Create drum-like accent on beats
+        const drumAccent = (beat % 1) < 0.1 ? 0.3 : 0;
+        const kickDrum = (beat % 2) < 0.1 ? 0.6 : 0;
+        
+        // Main melody
+        let value = 0.15 * Math.sin(2 * Math.PI * freq * t);
+        
+        // Add harmonics
+        value += 0.05 * Math.sin(2 * Math.PI * freq * 2 * t);
+        value += 0.03 * Math.sin(2 * Math.PI * freq * 3 * t);
+        
+        // Add bass on every quarter note
+        value += 0.2 * Math.sin(2 * Math.PI * (baseFreq / 2) * t) * (beat % 1 < 0.5 ? 0.7 : 0.3);
+        
+        // Add percussion
+        value += kickDrum * Math.sin(2 * Math.PI * 60 * t) * Math.exp(-30 * (beat % 2));
+        value += drumAccent * Math.random() * 0.5;
+        
+        // Add some variation and dynamics
+        const dynamicsFactor = 0.7 + 0.3 * Math.sin(2 * Math.PI * 0.1 * t);
+        
+        // Apply the value
+        channelData[i] = Math.max(-0.8, Math.min(0.8, value * dynamicsFactor));
+      }
+    } 
+    else if (type === 'vocal' || type === 'speech') {
+      // Generate synthetic vocal-like signals
+      const baseFreq = type === 'vocal' ? 
+                       (parameters.gender === 'male' ? 120 : 220) : // Vocal
+                       180; // Speech
+      const modulationRate = type === 'vocal' ? 5 : 8; // Faster for speech
+      
+      // Speech formants (peaks in the frequency spectrum)
+      const formants = [500, 1500, 2500];
+      
+      for (let i = 0; i < frameCount; i++) {
+        const t = i / sampleRate;
+        
+        // Create a carrier wave with vibrato for vocals
+        const vibrato = type === 'vocal' ? 15 * Math.sin(2 * Math.PI * 5 * t) : 0;
+        const freq = baseFreq + vibrato;
+        
+        // Create a modulator wave for the formants
+        let value = 0;
+        
+        // Vowel-like formants
+        for (let j = 0; j < formants.length; j++) {
+          const formantFreq = formants[j] + 200 * Math.sin(2 * Math.PI * 0.2 * t);
+          value += (0.2 / (j + 1)) * Math.sin(2 * Math.PI * formantFreq * t);
+        }
+        
+        // Add carrier
+        value += 0.3 * Math.sin(2 * Math.PI * freq * t);
+        
+        // Modulate amplitude to create syllable-like pattern
+        const syllableEnvelope = 0.5 + 0.5 * Math.sin(2 * Math.PI * modulationRate * t / 5);
+        
+        // Apply some variation so it sounds less robotic
+        const randomVariation = 0.05 * (Math.random() * 2 - 1);
+        
+        // Apply the value with modulation
+        channelData[i] = (value * syllableEnvelope + randomVariation) * 0.7;
+      }
+    } 
+    else if (type === 'sfx') {
+      // Generate sound effects based on category
+      switch (parameters.genre) {
+        case 'ambient':
+          // Ambient sound - wind, background noise
+          for (let i = 0; i < frameCount; i++) {
+            const t = i / sampleRate;
+            let noise = 0.2 * (Math.random() * 2 - 1);
+            
+            // Filtered noise
+            let filteredNoise = 0;
+            for (let j = 0; j < 10; j++) {
+              filteredNoise += noise * Math.sin(2 * Math.PI * (50 + j * 50) * t);
+            }
+            filteredNoise /= 10;
+            
+            channelData[i] = filteredNoise * 0.5;
+          }
+          break;
+          
+        case 'impact':
+          // Impact sound - hit, explosion
+          for (let i = 0; i < frameCount; i++) {
+            const t = i / sampleRate;
+            const envelope = Math.exp(-10 * t);
+            const noise = Math.random() * 2 - 1;
+            
+            channelData[i] = noise * envelope * 0.8;
+          }
+          break;
+          
+        default:
+          // Default SFX - computer beeps
+          for (let i = 0; i < frameCount; i++) {
+            const t = i / sampleRate;
+            const freq = 440 + 880 * Math.floor(t * 2 % 4) / 4;
+            const envelope = Math.max(0, 1 - 10 * (t % 0.5));
+            
+            channelData[i] = 0.5 * Math.sin(2 * Math.PI * freq * t) * envelope;
+          }
+      }
+    }
+  }
+  
+  return audioBuffer;
+}
+
+// Helper function to convert AudioBuffer to WAV format for playback
+async function audioBufferToWAV(buffer: AudioBuffer): Promise<Blob> {
+  const numOfChan = buffer.numberOfChannels;
+  const length = buffer.length * numOfChan * 2;
+  const dataView = new DataView(new ArrayBuffer(44 + length));
+  
+  // Write WAV header
+  writeString(dataView, 0, 'RIFF');
+  dataView.setUint32(4, 36 + length, true);
+  writeString(dataView, 8, 'WAVE');
+  writeString(dataView, 12, 'fmt ');
+  dataView.setUint32(16, 16, true);
+  dataView.setUint16(20, 1, true);
+  dataView.setUint16(22, numOfChan, true);
+  dataView.setUint32(24, buffer.sampleRate, true);
+  dataView.setUint32(28, buffer.sampleRate * 2 * numOfChan, true);
+  dataView.setUint16(32, numOfChan * 2, true);
+  dataView.setUint16(34, 16, true);
+  writeString(dataView, 36, 'data');
+  dataView.setUint32(40, length, true);
+  
+  // Write audio data
+  const channelData = [];
+  for (let i = 0; i < numOfChan; i++) {
+    channelData.push(buffer.getChannelData(i));
+  }
+  
+  let offset = 44;
+  for (let i = 0; i < buffer.length; i++) {
+    for (let channel = 0; channel < numOfChan; channel++) {
+      const sample = channelData[channel][i];
+      // Convert float to int16
+      const int16 = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+      dataView.setInt16(offset, int16, true);
+      offset += 2;
+    }
+  }
+  
+  return new Blob([dataView.buffer], { type: 'audio/wav' });
+}
+
+// Helper function to write strings to DataView
+function writeString(dataView: DataView, offset: number, str: string): void {
+  for (let i = 0; i < str.length; i++) {
+    dataView.setUint8(offset + i, str.charCodeAt(i));
+  }
+}
+
+// Extract waveform data from AudioBuffer for visualization
+function extractWaveformData(audioBuffer: AudioBuffer): number[] {
+  const channelData = audioBuffer.getChannelData(0); // Use the first channel
+  const points = 100; // Number of points for the visualization
+  const blockSize = Math.floor(channelData.length / points);
+  const waveform = [];
+  
+  for (let i = 0; i < points; i++) {
+    const start = blockSize * i;
+    let sum = 0;
+    
+    for (let j = 0; j < blockSize; j++) {
+      sum += Math.abs(channelData[start + j] || 0);
+    }
+    
+    waveform.push(sum / blockSize);
+  }
+  
+  return waveform;
+}
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -35,6 +254,8 @@ import {
   DialogFooter 
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+
+// Make toast accessible throughout the component
 
 // Import Track and AudioRegion types from the parent component
 interface Track {
@@ -121,6 +342,9 @@ export function AIGenerationPanel({
   isSubscriptionActive = false,
   apiKeyAvailable = false
 }: AIGenerationPanelProps) {
+  // Get toast function
+  const { toast } = useToast();
+  
   // State
   const [activeTab, setActiveTab] = useState<'music' | 'vocal' | 'speech' | 'sfx'>('music');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -239,12 +463,19 @@ export function AIGenerationPanel({
           break;
       }
       
-      // Simulate generation
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Show loading state
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Create a mock audio blob for demo
-      const mockAudioBlob = new Blob(['dummy audio data'], { type: 'audio/mp3' });
-      setGeneratedAudio(mockAudioBlob);
+      // Create synthetic audio with Web Audio API based on type
+      const audioBuffer = await generateSyntheticAudio(
+        activeTab, 
+        generationSettings.parameters.duration, 
+        generationSettings.parameters
+      );
+      
+      // Convert AudioBuffer to MP3 Blob (simulated with WAV for demo)
+      const audioBlob = await audioBufferToWAV(audioBuffer);
+      setGeneratedAudio(audioBlob);
       
       // Add to history
       const historyItem: HistoryItem = {
@@ -260,10 +491,12 @@ export function AIGenerationPanel({
       
       setHistory(prev => [historyItem, ...prev.slice(0, 9)]);
       
-      // Call the callback
-      // Convert Blob to ArrayBuffer
+      // Extract waveform data for visualization
+      const waveformData = extractWaveformData(audioBuffer);
+      
+      // Create an ArrayBuffer from the Blob for the callback
       const reader = new FileReader();
-      reader.readAsArrayBuffer(mockAudioBlob);
+      reader.readAsArrayBuffer(audioBlob);
       reader.onloadend = () => {
         if (reader.result) {
           onGenerateTrack({
@@ -273,7 +506,7 @@ export function AIGenerationPanel({
                  activeTab === 'vocal' ? 'vocal' : 
                  activeTab === 'speech' ? 'vocal' : 'audio',
             duration: generationSettings.parameters.duration,
-            waveform: Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15),
+            waveform: waveformData,
             creationMethod: 'ai-generated'
           });
         }

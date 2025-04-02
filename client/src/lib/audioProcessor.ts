@@ -28,7 +28,7 @@ class AudioProcessor {
 
   constructor() {
     // Create Tone context with optimized settings for lower latency
-    this.context = Tone.context;
+    this.context = Tone.context.rawContext;
     
     // Configure Tone.js for lower latency
     Tone.context.lookAhead = 0.01; // 10ms lookahead for more responsive playback
@@ -296,6 +296,13 @@ class AudioProcessor {
   setPosition(time: number): void {
     Tone.Transport.seconds = time;
   }
+  
+  /**
+   * Get the current playback position in seconds
+   */
+  getPlaybackPosition(): number {
+    return Tone.Transport.seconds;
+  }
 
   /**
    * Set the master volume (0-1)
@@ -555,17 +562,18 @@ class TrackProcessor {
 
   /**
    * Stop recording and create a player with the recorded audio
+   * Returns the recording blob so it can be used immediately
    */
-  async stopRecording(): Promise<void> {
-    if (!this.recorder) return;
+  async stopRecording(): Promise<Blob | null> {
+    if (!this.recorder) return null;
     
     try {
       const recorder = new Tone.Recorder();
       this.recorder.connect(recorder);
       recorder.start();
       
-      // Record for a small duration to get the buffer
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Record for at least 500ms to capture some audio
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       const blob = await recorder.stop();
       const arrayBuffer = await blob.arrayBuffer();
@@ -576,8 +584,12 @@ class TrackProcessor {
       
       this.audioBuffer = audioBuffer;
       this.player = new Tone.Player(audioBuffer).connect(this.compressor);
+      
+      // Return the blob so it can be used immediately
+      return blob;
     } catch (error) {
       console.error('Failed to stop recording:', error);
+      this.disposeRecorder();
       throw error;
     }
   }
