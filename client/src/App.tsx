@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { Switch, Route, Link, useLocation } from "wouter";
+
+// Simple redirect component using React Router
+const RedirectComponent = ({ to }: { to: string }) => {
+  const [location, setLocation] = useLocation();
+  
+  useEffect(() => {
+    setLocation(to);
+  }, [to, setLocation]);
+  
+  return null;
+};
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
@@ -191,14 +202,13 @@ const Dashboard = () => {
       <div className="fixed top-20 right-4 z-50 bg-zinc-800 p-3 rounded-lg shadow-lg opacity-50 hover:opacity-100 transition-opacity">
         <h3 className="text-sm font-bold mb-2">Dev Controls</h3>
         <div className="flex flex-col space-y-2">
-          <Button size="sm" asChild><Link href="/studio">Studio</Link></Button>
           <Button 
             size="sm" 
             asChild 
             className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-none font-medium"
           >
-            <Link href="/enhanced-studio">
-              Enhanced Studio
+            <Link href="/studio">
+              Studio
               <span className="ml-1 text-xs animate-pulse">✨</span>
             </Link>
           </Button>
@@ -472,24 +482,22 @@ function App() {
             </ProtectedRoute>
           </Route>
           
-          {/* Studio Routes */}
+          {/* Studio Routes - Unified Experience */}
           <Route path="/studio">
             <ProtectedRoute>
-              <StudioPage />
+              <EnhancedStudio />
             </ProtectedRoute>
           </Route>
           
           <Route path="/studio/:projectId">
             <ProtectedRoute>
-              <StudioPage />
+              <EnhancedStudio />
             </ProtectedRoute>
           </Route>
           
-          {/* Enhanced Studio route */}
+          {/* Redirect legacy /enhanced-studio to /studio for unified experience */}
           <Route path="/enhanced-studio">
-            <ProtectedRoute>
-              <EnhancedStudio />
-            </ProtectedRoute>
+            <RedirectComponent to="/studio" />
           </Route>
           
           {/* Profile */}
