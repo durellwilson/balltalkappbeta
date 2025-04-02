@@ -33,7 +33,8 @@ import {
   Zap,
   LayoutGrid,
   Cloud,
-  Folder
+  Folder,
+  Sparkles
 } from 'lucide-react';
 
 // UI Components
@@ -70,6 +71,7 @@ import { AudioRegion } from '@/lib';
 import { RecordingControls } from '@/components/studio/recording-controls';
 import { EffectsPanel } from '@/components/studio/effects-panel';
 import { MasteringPanel } from '@/components/studio/mastering-panel';
+import { AIGenerationPanel } from '@/components/studio/ai-generation-panel';
 import { ProjectSync } from '@/components/studio/project-sync';
 
 // Hooks and Utils
@@ -165,7 +167,7 @@ const EnhancedStudio: React.FC = () => {
   const [inputGain, setInputGain] = useState<number>(100);
   const [overlapRecording, setOverlapRecording] = useState<boolean>(true);
   const [recordingTime, setRecordingTime] = useState<number>(0);
-  const [rightPanelTab, setRightPanelTab] = useState<'effects' | 'master' | 'collab'>('effects');
+  const [rightPanelTab, setRightPanelTab] = useState<'effects' | 'master' | 'collab' | 'ai'>('effects');
   
   // References
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -1226,6 +1228,10 @@ const EnhancedStudio: React.FC = () => {
                       <Cloud size={14} className="mr-1" />
                       Cloud
                     </TabsTrigger>
+                    <TabsTrigger value="ai" className="flex-1">
+                      <Sparkles size={14} className="mr-1" />
+                      AI
+                    </TabsTrigger>
                   </TabsList>
                 </div>
                 
@@ -1628,6 +1634,67 @@ const EnhancedStudio: React.FC = () => {
                         </CardContent>
                       </Card>
                     </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="ai" className="m-0">
+                  <div className="p-3">
+                    <h3 className="text-sm font-medium mb-3">AI Tools</h3>
+                    
+                    <AIGenerationPanel 
+                      onGenerateTrack={(track) => {
+                        if (track && track.buffer) {
+                          // Create a new track with the AI generated audio
+                          const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
+                          const newTrack: Track = {
+                            id: newTrackId,
+                            name: track.name || `AI Generated ${newTrackId}`,
+                            type: track.type || 'audio',
+                            volume: 0.8,
+                            pan: 0,
+                            isMuted: false,
+                            isSoloed: false
+                          };
+                          
+                          // Create track processor
+                          const trackProcessor = audioProcessor.createTrack(newTrackId, {
+                            volume: newTrack.volume,
+                            pan: newTrack.pan
+                          });
+                          
+                          // Add to tracks list
+                          setTracks(prev => [...prev, newTrack]);
+                          
+                          // Create a blob from the buffer
+                          const blob = new Blob([track.buffer], { type: 'audio/wav' });
+                          const url = URL.createObjectURL(blob);
+                          
+                          // Add region for this generated audio
+                          const newRegion: AudioRegion = {
+                            id: `region-${Date.now()}`,
+                            trackId: newTrackId,
+                            start: 0,
+                            end: track.duration || 10,
+                            offset: 0,
+                            name: track.name || 'AI Generated',
+                            waveform: track.waveform || Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15),
+                            file: url
+                          };
+                          
+                          // Add to regions
+                          setRegions(prev => [...prev, newRegion]);
+                          
+                          toast({
+                            title: 'AI Generation Completed',
+                            description: `New track "${newTrack.name}" created with AI generated audio.`
+                          });
+                        }
+                      }}
+                      activeTrack={activeTrackId ? tracks.find(t => t.id === activeTrackId) : undefined}
+                      selectedRegions={regions.filter(r => selectedRegions.includes(r.id))}
+                      bpm={project.bpm}
+                      isSubscriptionActive={true}
+                    />
                   </div>
                 </TabsContent>
               </Tabs>
