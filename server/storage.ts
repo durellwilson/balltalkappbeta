@@ -1120,6 +1120,116 @@ export class DatabaseStorage implements IStorage {
       .where(eq(trackComments.id, id));
     return true;
   }
+  
+  // Cloud sync operations
+  async createProjectSync(sync: InsertProjectSync): Promise<ProjectSync> {
+    const now = new Date();
+    const [newSync] = await db
+      .insert(projectSyncs)
+      .values({
+        ...sync,
+        syncedAt: now,
+        lastError: null,
+        status: sync.status || "pending"
+      })
+      .returning();
+    return newSync;
+  }
+  
+  async getProjectSyncStatus(projectId: number): Promise<ProjectSync | undefined> {
+    const [sync] = await db
+      .select()
+      .from(projectSyncs)
+      .where(eq(projectSyncs.projectId, projectId));
+    return sync || undefined;
+  }
+  
+  async getProjectSyncsByUser(userId: number): Promise<ProjectSync[]> {
+    return await db
+      .select()
+      .from(projectSyncs)
+      .where(eq(projectSyncs.userId, userId))
+      .orderBy(desc(projectSyncs.syncedAt));
+  }
+  
+  async updateProjectSyncStatus(id: number, status: string, error?: string): Promise<ProjectSync | undefined> {
+    const [updatedSync] = await db
+      .update(projectSyncs)
+      .set({
+        status: status as any,
+        syncedAt: new Date(),
+        lastError: error || null
+      })
+      .where(eq(projectSyncs.id, id))
+      .returning();
+    return updatedSync || undefined;
+  }
+  
+  async startProjectSync(projectId: number, userId: number): Promise<ProjectSync | undefined> {
+    // Check if there's an existing sync record
+    const existingSync = await this.getProjectSyncStatus(projectId);
+    
+    if (existingSync) {
+      // Update existing record
+      const [updatedSync] = await db
+        .update(projectSyncs)
+        .set({
+          status: 'syncing' as any,
+          syncedAt: new Date(),
+          lastError: null
+        })
+        .where(eq(projectSyncs.id, existingSync.id))
+        .returning();
+      return updatedSync;
+    } else {
+      // Create a new sync record
+      return this.createProjectSync({
+        projectId,
+        userId,
+        status: 'syncing',
+        version: 1,
+        cloudUrl: null,
+        syncHash: null,
+        metadata: null
+      });
+    }
+  }
+  
+  async completeProjectSync(id: number, cloudUrl: string, syncHash: string): Promise<ProjectSync | undefined> {
+    const sync = await db
+      .select()
+      .from(projectSyncs)
+      .where(eq(projectSyncs.id, id))
+      .then(rows => rows[0]);
+      
+    if (!sync) return undefined;
+    
+    const [updatedSync] = await db
+      .update(projectSyncs)
+      .set({
+        status: 'synced' as any,
+        syncedAt: new Date(),
+        cloudUrl,
+        syncHash,
+        version: sync.version + 1,
+        lastError: null
+      })
+      .where(eq(projectSyncs.id, id))
+      .returning();
+    
+    return updatedSync || undefined;
+  }
+  
+  async getLatestProjectSync(projectId: number): Promise<ProjectSync | undefined> {
+    const syncs = await db
+      .select()
+      .from(projectSyncs)
+      .where(eq(projectSyncs.projectId, projectId))
+      .orderBy(desc(projectSyncs.version))
+      .limit(1);
+      
+    return syncs.length > 0 ? syncs[0] : undefined;
+  }
 }
 
 // Switch from in-memory to database storage

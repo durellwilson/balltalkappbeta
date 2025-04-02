@@ -555,6 +555,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cloud sync routes
+  app.post("/api/studio/projects/:projectId/sync", isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const userId = req.user.id;
+      
+      // Verify the project exists and belongs to the user
+      const project = await storage.getStudioProject(projectId);
+      if (!project) {
+        return res.status(404).json({ error: 'Project not found' });
+      }
+      
+      if (project.userId !== userId) {
+        return res.status(403).json({ error: 'You do not have permission to sync this project' });
+      }
+      
+      // Start the sync process
+      const syncRecord = await storage.startProjectSync(projectId, userId);
+      
+      // In a real application, this would trigger an async job to upload to cloud storage
+      // For now, we'll simulate the process completing successfully after a short delay
+      setTimeout(async () => {
+        const cloudUrl = `https://cloud-storage.example.com/projects/${projectId}/backup-${Date.now()}.json`;
+        const syncHash = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+        
+        await storage.completeProjectSync(syncRecord.id, cloudUrl, syncHash);
+      }, 2000);
+      
+      res.status(202).json({
+        status: 'syncing',
+        message: 'Project sync started',
+        syncId: syncRecord.id
+      });
+    } catch (error) {
+      console.error('Error starting project sync:', error);
+      res.status(500).json({ error: 'Failed to start project sync' });
+    }
+  });
+  
+  app.get("/api/studio/projects/:projectId/sync", isAuthenticated, async (req, res) => {
+    try {
+      const projectId = parseInt(req.params.projectId);
+      const userId = req.user.id;
+      
+      // Get the latest sync status for this project
+      const syncStatus = await storage.getProjectSyncStatus(projectId);
+      
+      if (!syncStatus) {
+        return res.status(404).json({ error: 'No sync record found for this project' });
+      }
+      
+      // Verify ownership
+      if (syncStatus.userId !== userId) {
+        return res.status(403).json({ error: 'You do not have permission to view this sync record' });
+      }
+      
+      res.json(syncStatus);
+    } catch (error) {
+      console.error('Error getting project sync status:', error);
+      res.status(500).json({ error: 'Failed to get project sync status' });
+    }
+  });
+  
+  app.get("/api/user/syncs", isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.id;
+      
+      // Get all sync records for this user
+      const syncs = await storage.getProjectSyncsByUser(userId);
+      
+      res.json(syncs);
+    } catch (error) {
+      console.error('Error getting user sync records:', error);
+      res.status(500).json({ error: 'Failed to get user sync records' });
+    }
+  });
+
   // Stripe payment endpoints
   app.post("/api/create-payment-intent", isAuthenticated, async (req, res) => {
     try {
