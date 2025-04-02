@@ -472,14 +472,14 @@ function App() {
           {/* Studio */}
           <Route path="/studio">
             <ProtectedRoute>
-              <PremiumStudio />
+              <EnhancedStudio />
             </ProtectedRoute>
           </Route>
           
           {/* Studio with project ID */}
           <Route path="/studio/:projectId">
             <ProtectedRoute>
-              <PremiumStudio />
+              <EnhancedStudio />
             </ProtectedRoute>
           </Route>
           

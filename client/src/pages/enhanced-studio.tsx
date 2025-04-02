@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useLocation } from 'wouter';
+import { useLocation, useParams } from 'wouter';
 import { 
   PlusCircle, 
   Save, 
@@ -18,13 +18,20 @@ import {
   Square,
   PlayCircle,
   PauseCircle,
-  Import,
   ChevronRight,
   ChevronLeft,
   Mic,
   Music,
   Disc,
-  HelpCircle
+  HelpCircle,
+  Wand2,
+  Sliders,
+  SkipBack,
+  SkipForward,
+  Headphones,
+  Record,
+  Zap,
+  LayoutGrid
 } from 'lucide-react';
 
 // UI Components
@@ -32,13 +39,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -52,13 +63,18 @@ import { WaveformVisualizer } from '@/components/ui/waveform-visualizer';
 import { SpectrumAnalyzer } from '@/components/ui/spectrum-analyzer';
 import { FileUploadModal } from '@/components/studio/file-upload-modal';
 import { FileDropZone } from '@/components/studio/file-drop-zone';
+import { ArrangementView, AudioRegion } from '@/components/studio/arrangement-view';
+import { RecordingControls } from '@/components/studio/recording-controls';
+import { EffectsPanel } from '@/components/studio/effects-panel';
+import { MasteringPanel } from '@/components/studio/mastering-panel';
 
 // Hooks and Utils
 import { useToast } from '@/hooks/use-toast';
 import audioProcessor from '@/lib/audioProcessor';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useStudioCollaboration } from '@/hooks/use-studio-collaboration';
+import { useAuth } from '@/hooks/use-auth';
 
 // Types and Interfaces
 interface Track {
@@ -101,7 +117,9 @@ const EnhancedStudio: React.FC = () => {
     updatedAt: new Date().toISOString()
   });
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [regions, setRegions] = useState<AudioRegion[]>([]);
   const [activeTrackId, setActiveTrackId] = useState<number | null>(null);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [masterVolume, setMasterVolume] = useState<number>(0.8);
@@ -113,6 +131,17 @@ const EnhancedStudio: React.FC = () => {
   const [projectTime, setProjectTime] = useState<number>(0);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  const [duration, setDuration] = useState<number>(120); // Total timeline duration in seconds
+  const [audioInputLevel, setAudioInputLevel] = useState<number>(0);
+  const [audioOutputLevel, setAudioOutputLevel] = useState<number>(0);
+  const [microphoneAccess, setMicrophoneAccess] = useState<boolean>(false);
+  const [inputDevices, setInputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedInputDevice, setSelectedInputDevice] = useState<string>('');
+  const [isMonitoring, setIsMonitoring] = useState<boolean>(false);
+  const [inputGain, setInputGain] = useState<number>(100);
+  const [overlapRecording, setOverlapRecording] = useState<boolean>(true);
+  const [recordingTime, setRecordingTime] = useState<number>(0);
+  const [rightPanelTab, setRightPanelTab] = useState<'effects' | 'master' | 'collab'>('effects');
   
   // References
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -389,6 +418,21 @@ const EnhancedStudio: React.FC = () => {
           // Add to tracks list
           setTracks(prev => [...prev, newTrack]);
           
+          // Create a region for this recording
+          const recordingDuration = recordingTime;
+          const newRegion: AudioRegion = {
+            id: `region-${Date.now()}`,
+            trackId: newTrackId,
+            startTime: overlapRecording ? projectTime - recordingDuration : 0,
+            duration: recordingDuration,
+            name: `Recording ${new Date().toLocaleTimeString()}`,
+            waveformData: Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15),
+            audioUrl: url
+          };
+          
+          // Add to regions
+          setRegions(prev => [...prev, newRegion]);
+          
           toast({
             title: 'Recording completed',
             description: `New track "${newTrack.name}" created with your recording.`
@@ -420,7 +464,134 @@ const EnhancedStudio: React.FC = () => {
       });
     } finally {
       setIsRecording(false);
+      setRecordingTime(0);
     }
+  };
+  
+  // Set up recording timer
+  useEffect(() => {
+    if (isRecording) {
+      const timer = setInterval(() => {
+        setRecordingTime(prev => prev + 0.1);
+      }, 100);
+      
+      return () => clearInterval(timer);
+    }
+  }, [isRecording]);
+  
+  // Handle arrangement view interactions
+  const handleTimeChange = (time: number) => {
+    setProjectTime(time);
+    
+    // Update audio processor position if it's ready
+    if (audioProcessor.isReady()) {
+      audioProcessor.setPosition(time);
+    }
+  };
+  
+  // Region operations
+  const handleRegionSelect = (regionId: string, addToSelection: boolean = false) => {
+    if (addToSelection) {
+      // Multi-select (add/remove from selection)
+      setSelectedRegions(prev => 
+        prev.includes(regionId) 
+          ? prev.filter(id => id !== regionId) 
+          : [...prev, regionId]
+      );
+    } else {
+      // Single select
+      setSelectedRegions([regionId]);
+    }
+  };
+  
+  const handleRegionMove = (regionId: string, trackId: number, startTime: number) => {
+    // Update region position in state
+    setRegions(prev => prev.map(r => 
+      r.id === regionId 
+        ? { ...r, trackId, startTime } 
+        : r
+    ));
+    
+    // In a real implementation, would also update the region in the audio processor
+  };
+  
+  const handleRegionResize = (regionId: string, startTime: number, duration: number) => {
+    // Update region in state
+    setRegions(prev => prev.map(r => 
+      r.id === regionId 
+        ? { ...r, startTime, duration } 
+        : r
+    ));
+    
+    // In a real implementation, would also update the region in the audio processor
+  };
+  
+  const handleRegionCopy = (regionId: string) => {
+    const regionToCopy = regions.find(r => r.id === regionId);
+    if (!regionToCopy) return;
+    
+    const newRegion: AudioRegion = {
+      ...regionToCopy,
+      id: `region-${Date.now()}`,
+      startTime: regionToCopy.startTime + regionToCopy.duration, // Place after the original
+    };
+    
+    setRegions(prev => [...prev, newRegion]);
+    
+    toast({
+      description: "Region duplicated"
+    });
+  };
+  
+  const handleRegionDelete = (regionId: string) => {
+    setRegions(prev => prev.filter(r => r.id !== regionId));
+    
+    // Remove from selection if selected
+    setSelectedRegions(prev => prev.filter(id => id !== regionId));
+    
+    toast({
+      description: "Region deleted"
+    });
+  };
+  
+  const handleRegionSplit = (regionId: string, splitTime: number) => {
+    const regionToSplit = regions.find(r => r.id === regionId);
+    if (!regionToSplit) return;
+    
+    // Only split if the split point is within the region
+    if (splitTime <= regionToSplit.startTime || splitTime >= regionToSplit.startTime + regionToSplit.duration) {
+      toast({
+        title: "Cannot Split",
+        description: "Split point is outside the region",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Create two new regions
+    const firstRegion: AudioRegion = {
+      ...regionToSplit,
+      id: `region-${Date.now()}-a`,
+      duration: splitTime - regionToSplit.startTime
+    };
+    
+    const secondRegion: AudioRegion = {
+      ...regionToSplit,
+      id: `region-${Date.now()}-b`,
+      startTime: splitTime,
+      duration: regionToSplit.startTime + regionToSplit.duration - splitTime
+    };
+    
+    // Replace the original with the two new regions
+    setRegions(prev => [
+      ...prev.filter(r => r.id !== regionId),
+      firstRegion,
+      secondRegion
+    ]);
+    
+    toast({
+      description: "Region split at playhead"
+    });
   };
   
   // Handle track operations

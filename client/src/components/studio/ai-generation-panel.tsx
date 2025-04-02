@@ -1,877 +1,735 @@
 import React, { useState } from 'react';
 import { 
   Sparkles, 
-  Wand2, 
   Music, 
   Mic, 
-  Volume2, 
-  Play, 
-  Square, 
-  Save, 
-  Clock, 
-  Loader2,
-  ArrowRight,
-  Hash,
-  RefreshCw,
-  ThumbsUp,
-  ThumbsDown,
-  HelpCircle,
-  AlertCircle
+  MessageSquare, 
+  Upload, 
+  RotateCw, 
+  Wand2, 
+  Star, 
+  Check,
+  Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { toast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
 import { 
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger
 } from '@/components/ui/tooltip';
+import { toast } from '@/hooks/use-toast';
 
-interface AIGenerationPanelProps {
-  onGenerateAudio?: (audioData: Blob, settings: any) => void;
-  onAddToProject?: (audioData: Blob, settings: any) => void;
-  isProcessing?: boolean;
-  error?: string | null;
-  apiKeyAvailable?: boolean;
-  onRequestAPIKey?: () => void;
+// Define types
+
+interface GenParameters {
+  model: string;
+  genre: string;
+  mood: string;
+  tempo: number;
+  duration: number;
 }
 
-// Define available AI models (in a real app, this would come from an API)
-const availableModels = [
-  { id: 'music-gen-1', name: 'MusicGen Standard', type: 'music', description: 'Music generation model (30s clips)' },
-  { id: 'text-to-speech-1', name: 'TTS Standard', type: 'speech', description: 'Text-to-speech model with natural voices' },
-  { id: 'music-gen-2', name: 'MusicGen Premium', type: 'music', description: 'Advanced music generation (60s clips)' },
-  { id: 'vocal-gen-1', name: 'VocalGen', type: 'vocal', description: 'Vocal track generation with lyrics' },
-  { id: 'music-clone-1', name: 'StyleClone', type: 'music', description: 'Generate music in a specific style' },
-  { id: 'sound-fx-1', name: 'SoundFX', type: 'sfx', description: 'Generate sound effects from text' }
-];
+interface GenerationSettings {
+  type: 'music' | 'vocal' | 'speech' | 'sfx';
+  prompt: string;
+  parameters: GenParameters;
+}
 
-// Available voices for TTS
-const availableVoices = [
-  { id: 'male-1', name: 'Daniel (Male)', gender: 'male', language: 'en-US' },
-  { id: 'female-1', name: 'Sophia (Female)', gender: 'female', language: 'en-US' },
-  { id: 'male-2', name: 'James (Male)', gender: 'male', language: 'en-GB' },
-  { id: 'female-2', name: 'Emily (Female)', gender: 'female', language: 'en-GB' },
-  { id: 'male-3', name: 'Carlos (Male)', gender: 'male', language: 'es-ES' },
-  { id: 'female-3', name: 'Maria (Female)', gender: 'female', language: 'es-ES' }
-];
+interface HistoryItem {
+  id: string;
+  timestamp: Date;
+  type: 'music' | 'vocal' | 'speech' | 'sfx';
+  prompt: string;
+  parameters: GenParameters;
+  duration: number;
+}
 
-// Musical styles/genres
-const musicGenres = [
-  'Pop', 'Rock', 'Hip Hop', 'Electronic', 'Classical', 'Jazz',
-  'R&B', 'Country', 'Folk', 'Ambient', 'Cinematic', 'Lo-Fi',
-  'Trap', 'House', 'Dubstep', 'Funk', 'Soul', 'Metal'
-];
-
-// Mood options for music generation
-const musicMoods = [
-  'Happy', 'Sad', 'Energetic', 'Calm', 'Aggressive', 'Hopeful',
-  'Mysterious', 'Romantic', 'Epic', 'Playful', 'Tense', 'Whimsical',
-  'Dark', 'Bright', 'Nostalgic', 'Dreamy', 'Inspiring'
-];
-
-// Instruments that the AI can focus on
-const instruments = [
-  'Piano', 'Guitar', 'Drums', 'Bass', 'Strings', 'Synth',
-  'Brass', 'Woodwinds', 'Percussion', 'Choir', 'Electric Guitar',
-  'Acoustic Guitar', 'Violin', 'Saxophone', 'Trumpet', 'Flute'
-];
-
-// Sample generations
-const sampleGenerations = [
-  {
-    id: 'gen1',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    duration: 26.4,
-    type: 'music',
-    prompt: 'A lo-fi hip hop beat with jazzy piano samples, chill drums and rain ambience',
-    parameters: {
-      model: 'music-gen-1',
-      genre: 'Hip Hop',
-      mood: 'Calm',
-      tempo: 80,
-      duration: 30
-    }
-  },
-  {
-    id: 'gen2',
-    timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    duration: 12.8,
-    type: 'speech',
-    prompt: 'Welcome to the audio studio, where creativity flows and ideas come to life. Let's make something amazing today!',
-    parameters: {
-      model: 'text-to-speech-1',
-      voice: 'female-1',
-      speed: 1.1,
-      pitch: 1.0
-    }
-  },
-  {
-    id: 'gen3',
-    timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    duration: 18.2,
-    type: 'sfx',
-    prompt: 'A futuristic portal opening with energy charging up, then a whoosh as it activates',
-    parameters: {
-      model: 'sound-fx-1',
-      complexity: 0.8,
-      duration: 20
-    }
-  }
-];
+// Component props
+interface AIGenerationPanelProps {
+  onGenerateAudio: (audioBlob: Blob, settings: GenerationSettings) => void;
+  onAddToProject: (audioBlob: Blob, settings: GenerationSettings) => void;
+  apiKeyAvailable?: boolean;
+}
 
 export function AIGenerationPanel({
   onGenerateAudio,
   onAddToProject,
-  isProcessing = false,
-  error = null,
-  apiKeyAvailable = false,
-  onRequestAPIKey
+  apiKeyAvailable = false
 }: AIGenerationPanelProps) {
   // State
-  const [activeTab, setActiveTab] = useState<'generate' | 'history'>('generate');
-  const [generationType, setGenerationType] = useState<'music' | 'speech' | 'vocal' | 'sfx'>('music');
-  const [selectedModel, setSelectedModel] = useState(availableModels[0].id);
-  const [prompt, setPrompt] = useState('');
-  const [duration, setDuration] = useState(30);
-  const [genre, setGenre] = useState<string>('Pop');
-  const [mood, setMood] = useState<string>('Happy');
-  const [tempo, setTempo] = useState(120);
-  const [selectedVoice, setSelectedVoice] = useState(availableVoices[0].id);
-  const [speechSpeed, setSpeechSpeed] = useState(1.0);
-  const [voicePitch, setVoicePitch] = useState(1.0);
-  const [includeInstrument, setIncludeInstrument] = useState(false);
-  const [focusInstrument, setFocusInstrument] = useState<string>('Piano');
-  const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null);
-  const [generations, setGenerations] = useState(sampleGenerations);
-  const [referenceAudio, setReferenceAudio] = useState<File | null>(null);
-  const [useReference, setUseReference] = useState(false);
+  const [activeTab, setActiveTab] = useState<'music' | 'vocal' | 'speech' | 'sfx'>('music');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedAudio, setGeneratedAudio] = useState<Blob | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   
-  // Handle model change
-  const handleModelChange = (modelId: string) => {
-    const model = availableModels.find(m => m.id === modelId);
-    if (model) {
-      setSelectedModel(modelId);
-      setGenerationType(model.type as any);
-    }
-  };
+  // Music generation state
+  const [musicPrompt, setMusicPrompt] = useState('');
+  const [musicGenre, setMusicGenre] = useState('electronic');
+  const [musicMood, setMusicMood] = useState('upbeat');
+  const [musicTempo, setMusicTempo] = useState(120);
+  const [musicDuration, setMusicDuration] = useState(15);
+  const [musicModel, setMusicModel] = useState('standard');
   
-  // Handle generation
-  const handleGenerate = () => {
+  // Vocal generation state
+  const [vocalPrompt, setVocalPrompt] = useState('');
+  const [vocalStyle, setVocalStyle] = useState('pop');
+  const [vocalGender, setVocalGender] = useState('female');
+  const [vocalDuration, setVocalDuration] = useState(10);
+  
+  // Speech generation state
+  const [speechText, setSpeechText] = useState('');
+  const [speechVoice, setSpeechVoice] = useState('default');
+  const [speechSpeed, setSpeechSpeed] = useState(1);
+  
+  // SFX generation state
+  const [sfxPrompt, setSfxPrompt] = useState('');
+  const [sfxDuration, setSfxDuration] = useState(5);
+  const [sfxCategory, setSfxCategory] = useState('ambient');
+  
+  // Handle generate button click
+  const handleGenerate = async () => {
     if (!apiKeyAvailable) {
-      if (onRequestAPIKey) {
-        onRequestAPIKey();
-      } else {
-        toast({
-          title: "API Key Required",
-          description: "An API key is needed for AI generation.",
-          variant: "destructive"
-        });
-      }
-      return;
-    }
-    
-    if (!prompt.trim()) {
       toast({
-        title: "Prompt Required",
-        description: "Please enter a detailed prompt to guide the AI generation.",
-        variant: "destructive"
+        title: 'API Key Required',
+        description: 'You need to add an API key to use AI generation features.',
+        variant: 'destructive'
       });
       return;
     }
     
-    // In a real app, this would call an API with the appropriate parameters
-    // For now, we'll just simulate a success after a delay
-    toast({
-      title: "Generation Started",
-      description: `Your ${generationType} is being generated. This may take a minute.`
-    });
-    
-    // Gather parameters based on generation type
-    const parameters: any = {
-      model: selectedModel,
-      prompt,
-    };
-    
-    if (generationType === 'music') {
-      parameters.genre = genre;
-      parameters.mood = mood;
-      parameters.tempo = tempo;
-      parameters.duration = duration;
-      
-      if (includeInstrument) {
-        parameters.focusInstrument = focusInstrument;
-      }
-      
-      if (useReference && referenceAudio) {
-        parameters.referenceAudio = referenceAudio;
-      }
-    } else if (generationType === 'speech') {
-      parameters.voice = selectedVoice;
-      parameters.speed = speechSpeed;
-      parameters.pitch = voicePitch;
-    } else if (generationType === 'vocal') {
-      parameters.voice = selectedVoice;
-      parameters.pitch = voicePitch;
-      parameters.duration = duration;
-    } else if (generationType === 'sfx') {
-      parameters.duration = Math.min(duration, 20); // SFX are limited to 20 seconds
+    // Check if we have a prompt
+    if ((activeTab === 'music' && !musicPrompt) || 
+        (activeTab === 'vocal' && !vocalPrompt) || 
+        (activeTab === 'speech' && !speechText) || 
+        (activeTab === 'sfx' && !sfxPrompt)) {
+      toast({
+        description: 'Please enter a prompt or text for generation.',
+        variant: 'destructive'
+      });
+      return;
     }
     
-    // If we had a real implementation, we would call onGenerateAudio with the result
-    // For now, let's just simulate success after 3 seconds
-    setTimeout(() => {
-      // In a real app, this would be the actual audio blob from the generation API
-      const mockAudioBlob = new Blob([], { type: 'audio/wav' });
+    setIsGenerating(true);
+    
+    try {
+      // Build parameters based on active tab
+      let generationSettings: GenerationSettings;
       
-      if (onGenerateAudio) {
-        onGenerateAudio(mockAudioBlob, parameters);
+      switch (activeTab) {
+        case 'music':
+          generationSettings = {
+            type: 'music',
+            prompt: musicPrompt,
+            parameters: {
+              model: musicModel,
+              genre: musicGenre,
+              mood: musicMood,
+              tempo: musicTempo,
+              duration: musicDuration
+            }
+          };
+          break;
+          
+        case 'vocal':
+          generationSettings = {
+            type: 'vocal',
+            prompt: vocalPrompt,
+            parameters: {
+              model: vocalStyle,
+              genre: vocalStyle,
+              mood: 'default',
+              tempo: musicTempo,
+              duration: vocalDuration
+            }
+          };
+          break;
+          
+        case 'speech':
+          generationSettings = {
+            type: 'speech',
+            prompt: speechText,
+            parameters: {
+              model: speechVoice,
+              genre: 'speech',
+              mood: 'default',
+              tempo: speechSpeed,
+              duration: Math.ceil(speechText.length / 15)
+            }
+          };
+          break;
+          
+        case 'sfx':
+          generationSettings = {
+            type: 'sfx',
+            prompt: sfxPrompt,
+            parameters: {
+              model: 'standard',
+              genre: sfxCategory,
+              mood: 'default',
+              tempo: 100,
+              duration: sfxDuration
+            }
+          };
+          break;
       }
+      
+      // Simulate generation
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      // Create a mock audio blob for demo
+      const mockAudioBlob = new Blob(['dummy audio data'], { type: 'audio/mp3' });
+      setGeneratedAudio(mockAudioBlob);
       
       // Add to history
-      setGenerations([
-        {
-          id: `gen-${Date.now()}`,
-          timestamp: new Date().toISOString(),
-          duration: duration,
-          type: generationType,
-          prompt,
-          parameters
-        },
-        ...generations
-      ]);
+      const historyItem: HistoryItem = {
+        id: Date.now().toString(),
+        timestamp: new Date(),
+        type: activeTab,
+        prompt: activeTab === 'speech' ? speechText : 
+               activeTab === 'music' ? musicPrompt :
+               activeTab === 'vocal' ? vocalPrompt : sfxPrompt,
+        parameters: generationSettings.parameters,
+        duration: generationSettings.parameters.duration
+      };
+      
+      setHistory(prev => [historyItem, ...prev.slice(0, 9)]);
+      
+      // Call the callback
+      onGenerateAudio(mockAudioBlob, generationSettings);
       
       toast({
-        title: "Generation Complete",
-        description: "Your audio has been generated successfully."
+        title: 'Generation Complete',
+        description: `Your ${activeTab} has been generated successfully.`
       });
-    }, 3000);
-  };
-  
-  // Handle play/stop generation
-  const handlePlayGeneration = (id: string) => {
-    if (currentlyPlaying === id) {
-      // Stop playing
-      setCurrentlyPlaying(null);
-    } else {
-      // Start playing
-      setCurrentlyPlaying(id);
-      
-      // In a real app, we'd play the actual audio
-      // For now, simulate stopping after 3 seconds
-      setTimeout(() => {
-        if (currentlyPlaying === id) {
-          setCurrentlyPlaying(null);
-        }
-      }, 3000);
+    } catch (error) {
+      console.error('Generation error:', error);
+      toast({
+        title: 'Generation Failed',
+        description: 'There was an error generating your audio.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsGenerating(false);
     }
   };
   
-  // Handle adding a generation to the project
-  const handleAddToProject = (id: string) => {
-    const generation = generations.find(g => g.id === id);
-    if (!generation) return;
+  // Handle add to project button click
+  const handleAddToProject = () => {
+    if (!generatedAudio) return;
     
-    // In a real app, we'd have the actual audio blob
-    // For now, create a mock blob
-    const mockAudioBlob = new Blob([], { type: 'audio/wav' });
+    // Build settings object
+    let settings: GenerationSettings;
     
-    if (onAddToProject) {
-      onAddToProject(mockAudioBlob, generation.parameters);
-      
-      toast({
-        title: "Added to Project",
-        description: "The generated audio has been added to your project."
-      });
+    switch (activeTab) {
+      case 'music':
+        settings = {
+          type: 'music',
+          prompt: musicPrompt,
+          parameters: {
+            model: musicModel,
+            genre: musicGenre,
+            mood: musicMood,
+            tempo: musicTempo,
+            duration: musicDuration
+          }
+        };
+        break;
+        
+      case 'vocal':
+        settings = {
+          type: 'vocal',
+          prompt: vocalPrompt,
+          parameters: {
+            model: vocalStyle,
+            genre: vocalStyle,
+            mood: 'default',
+            tempo: musicTempo,
+            duration: vocalDuration
+          }
+        };
+        break;
+        
+      case 'speech':
+        settings = {
+          type: 'speech',
+          prompt: speechText,
+          parameters: {
+            model: speechVoice,
+            genre: 'speech',
+            mood: 'default',
+            tempo: speechSpeed,
+            duration: Math.ceil(speechText.length / 15)
+          }
+        };
+        break;
+        
+      case 'sfx':
+        settings = {
+          type: 'sfx',
+          prompt: sfxPrompt,
+          parameters: {
+            model: 'standard',
+            genre: sfxCategory,
+            mood: 'default',
+            tempo: 100,
+            duration: sfxDuration
+          }
+        };
+        break;
     }
-  };
-  
-  // Handle reference audio file selection
-  const handleReferenceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setReferenceAudio(e.target.files[0]);
-      setUseReference(true);
-      
-      toast({
-        description: `Reference file "${e.target.files[0].name}" selected.`
-      });
-    }
-  };
-  
-  // Format timestamp relative to now
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
     
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} min ago`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours} hr ago`;
-    return date.toLocaleDateString();
+    // Call the callback
+    onAddToProject(generatedAudio, settings);
+    
+    toast({
+      title: 'Added to Project',
+      description: `The generated ${activeTab} has been added to your project.`
+    });
   };
   
-  // Format duration as MM:SS
-  const formatDuration = (seconds: number) => {
+  // Handle history item click
+  const handleHistoryItemClick = (item: HistoryItem) => {
+    // Load the settings from history
+    switch (item.type) {
+      case 'music':
+        setActiveTab('music');
+        setMusicPrompt(item.prompt);
+        setMusicGenre(item.parameters.genre);
+        setMusicMood(item.parameters.mood);
+        setMusicTempo(item.parameters.tempo);
+        setMusicDuration(item.parameters.duration);
+        setMusicModel(item.parameters.model);
+        break;
+        
+      case 'vocal':
+        setActiveTab('vocal');
+        setVocalPrompt(item.prompt);
+        setVocalStyle(item.parameters.genre);
+        setVocalDuration(item.parameters.duration);
+        break;
+        
+      case 'speech':
+        setActiveTab('speech');
+        setSpeechText(item.prompt);
+        setSpeechVoice(item.parameters.model);
+        setSpeechSpeed(item.parameters.tempo);
+        break;
+        
+      case 'sfx':
+        setActiveTab('sfx');
+        setSfxPrompt(item.prompt);
+        setSfxCategory(item.parameters.genre);
+        setSfxDuration(item.parameters.duration);
+        break;
+    }
+    
+    toast({
+      description: `Loaded settings from history.`
+    });
+  };
+  
+  // Format time for display
+  const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
+    const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
   
-  // Render the appropriate generation form based on type
-  const renderGenerationForm = () => {
-    return (
-      <div className="space-y-4">
-        {/* Model selection */}
-        <div className="space-y-2">
-          <Label>AI Model</Label>
-          <Select value={selectedModel} onValueChange={handleModelChange}>
-            <SelectTrigger className="bg-gray-800 border-gray-700">
-              <SelectValue placeholder="Select a model" />
-            </SelectTrigger>
-            <SelectContent className="bg-gray-800 border-gray-700">
-              {availableModels.map(model => (
-                <SelectItem key={model.id} value={model.id}>
-                  <div className="flex flex-col">
-                    <span>{model.name}</span>
-                    <span className="text-xs text-gray-400">{model.description}</span>
+  return (
+    <div className="flex flex-col h-full bg-gray-900 border border-gray-800 rounded-md overflow-hidden">
+      <div className="p-3 border-b border-gray-800 flex items-center space-x-2">
+        <Sparkles size={16} className="text-purple-400" />
+        <h3 className="font-medium">AI Generation</h3>
+      </div>
+      
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
+        <div className="p-2 border-b border-gray-800">
+          <TabsList className="w-full bg-gray-800">
+            <TabsTrigger value="music" className="flex-1">
+              <Music size={14} className="mr-1" />
+              Music
+            </TabsTrigger>
+            <TabsTrigger value="vocal" className="flex-1">
+              <Mic size={14} className="mr-1" />
+              Vocal
+            </TabsTrigger>
+            <TabsTrigger value="speech" className="flex-1">
+              <MessageSquare size={14} className="mr-1" />
+              Speech
+            </TabsTrigger>
+            <TabsTrigger value="sfx" className="flex-1">
+              <Wand2 size={14} className="mr-1" />
+              SFX
+            </TabsTrigger>
+          </TabsList>
+        </div>
+        
+        <ScrollArea className="flex-1">
+          <div className="p-3">
+            {/* Music Generation Tab */}
+            <TabsContent value="music" className="m-0 space-y-4">
+              <div className="space-y-2">
+                <Label>Describe the music you want</Label>
+                <Textarea 
+                  placeholder="An upbeat electronic track with deep bass, synth pads, and a driving beat..."
+                  value={musicPrompt}
+                  onChange={e => setMusicPrompt(e.target.value)}
+                  className="bg-gray-800 border-gray-700 min-h-24"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Genre</Label>
+                  <Select value={musicGenre} onValueChange={setMusicGenre}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="electronic">Electronic</SelectItem>
+                      <SelectItem value="pop">Pop</SelectItem>
+                      <SelectItem value="rock">Rock</SelectItem>
+                      <SelectItem value="hiphop">Hip Hop</SelectItem>
+                      <SelectItem value="jazz">Jazz</SelectItem>
+                      <SelectItem value="ambient">Ambient</SelectItem>
+                      <SelectItem value="classical">Classical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Mood</Label>
+                  <Select value={musicMood} onValueChange={setMusicMood}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="happy">Happy</SelectItem>
+                      <SelectItem value="upbeat">Upbeat</SelectItem>
+                      <SelectItem value="energetic">Energetic</SelectItem>
+                      <SelectItem value="sad">Sad</SelectItem>
+                      <SelectItem value="chilled">Chilled</SelectItem>
+                      <SelectItem value="dramatic">Dramatic</SelectItem>
+                      <SelectItem value="tense">Tense</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label>Tempo</Label>
+                  <span className="text-xs text-gray-400">{musicTempo} BPM</span>
+                </div>
+                <Slider
+                  min={60}
+                  max={200}
+                  step={1}
+                  value={[musicTempo]}
+                  onValueChange={values => setMusicTempo(values[0])}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label>Duration</Label>
+                  <span className="text-xs text-gray-400">{formatTime(musicDuration)}</span>
+                </div>
+                <Slider
+                  min={5}
+                  max={60}
+                  step={5}
+                  value={[musicDuration]}
+                  onValueChange={values => setMusicDuration(values[0])}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Model</Label>
+                <Select value={musicModel} onValueChange={setMusicModel}>
+                  <SelectTrigger className="bg-gray-800 border-gray-700">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-800 border-gray-700">
+                    <SelectItem value="standard">Standard</SelectItem>
+                    <SelectItem value="deluxe">Deluxe (Higher Quality)</SelectItem>
+                    <SelectItem value="pro">Pro (Best Quality)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </TabsContent>
+            
+            {/* Vocal Generation Tab */}
+            <TabsContent value="vocal" className="m-0 space-y-4">
+              <div className="space-y-2">
+                <Label>Describe the vocals you want</Label>
+                <Textarea 
+                  placeholder="A soulful female vocal singing about love and loss..."
+                  value={vocalPrompt}
+                  onChange={e => setVocalPrompt(e.target.value)}
+                  className="bg-gray-800 border-gray-700 min-h-24"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Style</Label>
+                  <Select value={vocalStyle} onValueChange={setVocalStyle}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="pop">Pop</SelectItem>
+                      <SelectItem value="rock">Rock</SelectItem>
+                      <SelectItem value="soul">Soul</SelectItem>
+                      <SelectItem value="rnb">R&B</SelectItem>
+                      <SelectItem value="hiphop">Hip Hop</SelectItem>
+                      <SelectItem value="folk">Folk</SelectItem>
+                      <SelectItem value="jazz">Jazz</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Gender</Label>
+                  <Select value={vocalGender} onValueChange={setVocalGender}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                      <SelectItem value="androgynous">Androgynous</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label>Duration</Label>
+                  <span className="text-xs text-gray-400">{formatTime(vocalDuration)}</span>
+                </div>
+                <Slider
+                  min={5}
+                  max={30}
+                  step={5}
+                  value={[vocalDuration]}
+                  onValueChange={values => setVocalDuration(values[0])}
+                />
+              </div>
+            </TabsContent>
+            
+            {/* Speech Generation Tab */}
+            <TabsContent value="speech" className="m-0 space-y-4">
+              <div className="space-y-2">
+                <Label>Text to convert to speech</Label>
+                <Textarea 
+                  placeholder="Enter the text you want to convert to speech..."
+                  value={speechText}
+                  onChange={e => setSpeechText(e.target.value)}
+                  className="bg-gray-800 border-gray-700 min-h-24"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Voice</Label>
+                  <Select value={speechVoice} onValueChange={setSpeechVoice}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="default">Default</SelectItem>
+                      <SelectItem value="male1">Male 1</SelectItem>
+                      <SelectItem value="male2">Male 2</SelectItem>
+                      <SelectItem value="female1">Female 1</SelectItem>
+                      <SelectItem value="female2">Female 2</SelectItem>
+                      <SelectItem value="narrator">Narrator</SelectItem>
+                      <SelectItem value="announcement">Announcement</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label>Speed</Label>
+                    <span className="text-xs text-gray-400">{speechSpeed}x</span>
                   </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        
-        {/* Prompt */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label>Prompt</Label>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                    <HelpCircle size={14} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="max-w-xs">
-                    {generationType === 'music' && "Describe the music you want to generate. Include genre, mood, instruments, tempo, and style references."}
-                    {generationType === 'speech' && "Enter the text you want the AI to speak. Add [pause] for pauses, [emphasis] for emphasis."}
-                    {generationType === 'vocal' && "Enter lyrics and describe the vocal style, emotion, and delivery you want."}
-                    {generationType === 'sfx' && "Describe the sound effect in detail, including environment, texture, and sonic characteristics."}
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-          <Textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            className="h-24 bg-gray-800 border-gray-700 resize-none"
-            placeholder={
-              generationType === 'music' 
-                ? "Describe the music you want (e.g., 'A lo-fi hip hop beat with jazzy piano, chill drums, and rain ambience')"
-                : generationType === 'speech'
-                ? "Enter the text you want the AI to speak..."
-                : generationType === 'vocal'
-                ? "Enter lyrics and describe the vocal style..."
-                : "Describe the sound effect in detail..."
-            }
-          />
-        </div>
-        
-        {/* Additional parameters based on generation type */}
-        {generationType === 'music' && (
-          <>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Genre</Label>
-                <Select value={genre} onValueChange={setGenre}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700">
-                    <SelectValue placeholder="Select a genre" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    {musicGenres.map(g => (
-                      <SelectItem key={g} value={g}>{g}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label>Mood</Label>
-                <Select value={mood} onValueChange={setMood}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700">
-                    <SelectValue placeholder="Select a mood" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    {musicMoods.map(m => (
-                      <SelectItem key={m} value={m}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Tempo (BPM)</Label>
-                <span className="text-sm text-gray-400">{tempo} BPM</span>
-              </div>
-              <Slider
-                value={[tempo]}
-                min={40}
-                max={200}
-                step={1}
-                onValueChange={values => setTempo(values[0])}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Duration</Label>
-                <span className="text-sm text-gray-400">{duration} seconds</span>
-              </div>
-              <Slider
-                value={[duration]}
-                min={5}
-                max={60}
-                step={5}
-                onValueChange={values => setDuration(values[0])}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="include-instrument"
-                  checked={includeInstrument}
-                  onCheckedChange={setIncludeInstrument}
-                />
-                <Label htmlFor="include-instrument">Focus on specific instrument</Label>
-              </div>
-              
-              {includeInstrument && (
-                <Select value={focusInstrument} onValueChange={setFocusInstrument}>
-                  <SelectTrigger className="bg-gray-800 border-gray-700">
-                    <SelectValue placeholder="Select an instrument" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-700">
-                    {instruments.map(instrument => (
-                      <SelectItem key={instrument} value={instrument}>{instrument}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="use-reference"
-                  checked={useReference}
-                  onCheckedChange={setUseReference}
-                />
-                <Label htmlFor="use-reference">Use reference audio</Label>
-              </div>
-              
-              {useReference && (
-                <div className="mt-2">
-                  <Input
-                    type="file"
-                    accept="audio/*"
-                    className="bg-gray-800 border-gray-700"
-                    onChange={handleReferenceFileChange}
+                  <Slider
+                    min={0.5}
+                    max={2}
+                    step={0.1}
+                    value={[speechSpeed]}
+                    onValueChange={values => setSpeechSpeed(values[0])}
                   />
-                  {referenceAudio && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Selected: {referenceAudio.name} ({(referenceAudio.size / (1024 * 1024)).toFixed(2)} MB)
-                    </p>
-                  )}
+                </div>
+              </div>
+              
+              <div className="pt-2 text-sm text-gray-400">
+                <p>Approximate duration: {Math.ceil(speechText.length / 15)} seconds</p>
+              </div>
+            </TabsContent>
+            
+            {/* SFX Generation Tab */}
+            <TabsContent value="sfx" className="m-0 space-y-4">
+              <div className="space-y-2">
+                <Label>Describe the sound effect</Label>
+                <Textarea 
+                  placeholder="A door creaking open with a slight echo..."
+                  value={sfxPrompt}
+                  onChange={e => setSfxPrompt(e.target.value)}
+                  className="bg-gray-800 border-gray-700 min-h-24"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select value={sfxCategory} onValueChange={setSfxCategory}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="ambient">Ambient</SelectItem>
+                      <SelectItem value="impacts">Impacts</SelectItem>
+                      <SelectItem value="foley">Foley</SelectItem>
+                      <SelectItem value="machines">Machines</SelectItem>
+                      <SelectItem value="nature">Nature</SelectItem>
+                      <SelectItem value="vehicles">Vehicles</SelectItem>
+                      <SelectItem value="weapons">Weapons</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label>Duration</Label>
+                    <span className="text-xs text-gray-400">{formatTime(sfxDuration)}</span>
+                  </div>
+                  <Slider
+                    min={1}
+                    max={10}
+                    step={1}
+                    value={[sfxDuration]}
+                    onValueChange={values => setSfxDuration(values[0])}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+            
+            {/* Common generation controls */}
+            <div className="mt-4 space-y-4">
+              {/* Generation button */}
+              <Button 
+                className="w-full bg-purple-600 hover:bg-purple-700"
+                disabled={isGenerating}
+                onClick={handleGenerate}
+              >
+                {isGenerating ? (
+                  <>
+                    <RotateCw size={16} className="mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={16} className="mr-2" />
+                    Generate {activeTab === 'music' ? 'Music' : 
+                             activeTab === 'vocal' ? 'Vocals' : 
+                             activeTab === 'speech' ? 'Speech' : 'SFX'}
+                  </>
+                )}
+              </Button>
+              
+              {/* Action buttons for generated audio */}
+              {generatedAudio && (
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 bg-gray-800 border-gray-700"
+                    onClick={() => {
+                      // Play the audio
+                      const audioURL = URL.createObjectURL(generatedAudio);
+                      const audio = new Audio(audioURL);
+                      audio.play();
+                    }}
+                  >
+                    <Music size={16} className="mr-2" />
+                    Play
+                  </Button>
+                  
+                  <Button 
+                    variant="outline"
+                    className="flex-1 bg-gray-800 border-gray-700"
+                    onClick={handleAddToProject}
+                  >
+                    <Check size={16} className="mr-2" />
+                    Add to Project
+                  </Button>
+                  
+                  <Button 
+                    variant="outline"
+                    className="flex-1 bg-gray-800 border-gray-700"
+                    onClick={() => {
+                      const audioURL = URL.createObjectURL(generatedAudio);
+                      const a = document.createElement('a');
+                      a.href = audioURL;
+                      a.download = `generated-${activeTab}-${Date.now()}.mp3`;
+                      a.click();
+                    }}
+                  >
+                    <Download size={16} className="mr-2" />
+                    Download
+                  </Button>
                 </div>
               )}
             </div>
-          </>
-        )}
-        
-        {generationType === 'speech' && (
-          <>
-            <div className="space-y-2">
-              <Label>Voice</Label>
-              <Select value={selectedVoice} onValueChange={setSelectedVoice}>
-                <SelectTrigger className="bg-gray-800 border-gray-700">
-                  <SelectValue placeholder="Select a voice" />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-700">
-                  {availableVoices.map(voice => (
-                    <SelectItem key={voice.id} value={voice.id}>
-                      <div className="flex flex-col">
-                        <span>{voice.name}</span>
-                        <span className="text-xs text-gray-400">{voice.language}</span>
-                      </div>
-                    </SelectItem>
+            
+            {/* Generation History */}
+            {history.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-sm font-medium mb-2">Recent Generations</h4>
+                <div className="space-y-2">
+                  {history.map(item => (
+                    <Card 
+                      key={item.id} 
+                      className="bg-gray-800 border-gray-700 hover:border-gray-600 cursor-pointer"
+                      onClick={() => handleHistoryItemClick(item)}
+                    >
+                      <CardContent className="p-3 flex justify-between items-center">
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            {item.type === 'music' && <Music size={14} className="text-blue-400" />}
+                            {item.type === 'vocal' && <Mic size={14} className="text-purple-400" />}
+                            {item.type === 'speech' && <MessageSquare size={14} className="text-green-400" />}
+                            {item.type === 'sfx' && <Wand2 size={14} className="text-yellow-400" />}
+                            <span className="font-medium">{item.type.charAt(0).toUpperCase() + item.type.slice(1)}</span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1 line-clamp-1">{item.prompt}</p>
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {formatTime(item.duration)}
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Speed</Label>
-                <span className="text-sm text-gray-400">{speechSpeed.toFixed(1)}x</span>
-              </div>
-              <Slider
-                value={[speechSpeed * 10]}
-                min={5}
-                max={20}
-                step={1}
-                onValueChange={values => setSpeechSpeed(values[0] / 10)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Pitch</Label>
-                <span className="text-sm text-gray-400">{voicePitch.toFixed(1)}</span>
-              </div>
-              <Slider
-                value={[voicePitch * 10]}
-                min={7}
-                max={13}
-                step={1}
-                onValueChange={values => setVoicePitch(values[0] / 10)}
-              />
-            </div>
-          </>
-        )}
-        
-        {generationType === 'vocal' && (
-          <>
-            <div className="space-y-2">
-              <Label>Voice</Label>
-              <Select value={selectedVoice} onValueChange={setSelectedVoice}>
-                <SelectTrigger className="bg-gray-800 border-gray-700">
-                  <SelectValue placeholder="Select a voice" />
-                </SelectTrigger>
-                <SelectContent className="bg-gray-800 border-gray-700">
-                  {availableVoices.map(voice => (
-                    <SelectItem key={voice.id} value={voice.id}>
-                      {voice.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Pitch</Label>
-                <span className="text-sm text-gray-400">{voicePitch.toFixed(1)}</span>
-              </div>
-              <Slider
-                value={[voicePitch * 10]}
-                min={7}
-                max={13}
-                step={1}
-                onValueChange={values => setVoicePitch(values[0] / 10)}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Duration</Label>
-                <span className="text-sm text-gray-400">{duration} seconds</span>
-              </div>
-              <Slider
-                value={[duration]}
-                min={5}
-                max={60}
-                step={5}
-                onValueChange={values => setDuration(values[0])}
-              />
-            </div>
-          </>
-        )}
-        
-        {generationType === 'sfx' && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Duration</Label>
-              <span className="text-sm text-gray-400">{Math.min(duration, 20)} seconds</span>
-            </div>
-            <Slider
-              value={[Math.min(duration, 20)]}
-              min={1}
-              max={20}
-              step={1}
-              onValueChange={values => setDuration(values[0])}
-            />
-            <p className="text-xs text-gray-400">Sound effects are limited to 20 seconds maximum</p>
-          </div>
-        )}
-        
-        {error && (
-          <div className="bg-red-900/30 border border-red-800 rounded-md p-3 text-red-400 flex items-start">
-            <AlertCircle size={16} className="mr-2 flex-shrink-0 mt-0.5" />
-            <p className="text-sm">{error}</p>
-          </div>
-        )}
-        
-        {!apiKeyAvailable && (
-          <div className="bg-yellow-900/30 border border-yellow-800 rounded-md p-3 text-yellow-400 flex items-start">
-            <AlertCircle size={16} className="mr-2 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm">API key required for AI generation</p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="mt-2 border-yellow-800 bg-yellow-900/30 hover:bg-yellow-900/50"
-                onClick={onRequestAPIKey}
-              >
-                Request API Key
-              </Button>
-            </div>
-          </div>
-        )}
-        
-        <Button 
-          className="w-full"
-          disabled={isProcessing || !prompt.trim() || !apiKeyAvailable}
-          onClick={handleGenerate}
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 size={16} className="mr-2 animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Wand2 size={16} className="mr-2" />
-              Generate {generationType === 'music' ? 'Music' : generationType === 'speech' ? 'Speech' : generationType === 'vocal' ? 'Vocals' : 'Sound Effect'}
-            </>
-          )}
-        </Button>
-      </div>
-    );
-  };
-  
-  return (
-    <div className="bg-gray-900 border border-gray-800 rounded-md overflow-hidden h-full flex flex-col">
-      {/* Header */}
-      <div className="p-3 border-b border-gray-800 flex items-center justify-between">
-        <div className="flex items-center">
-          <Sparkles size={16} className="mr-2 text-purple-400" />
-          <h3 className="font-medium">AI Audio Generation</h3>
-        </div>
-        
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-          <TabsList className="bg-gray-800">
-            <TabsTrigger value="generate" className="text-xs">Generate</TabsTrigger>
-            <TabsTrigger value="history" className="text-xs">History</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-      
-      <TabsContent value="generate" className="flex-1 p-0 m-0 overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className="p-4">
-            <div className="grid gap-3 mb-4">
-              <Button
-                variant={generationType === 'music' ? 'default' : 'outline'}
-                className={generationType === 'music' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-800 border-gray-700'}
-                onClick={() => setGenerationType('music')}
-              >
-                <Music size={16} className="mr-2" />
-                Music
-              </Button>
-              
-              <Button
-                variant={generationType === 'speech' ? 'default' : 'outline'}
-                className={generationType === 'speech' ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-800 border-gray-700'}
-                onClick={() => setGenerationType('speech')}
-              >
-                <Volume2 size={16} className="mr-2" />
-                Speech
-              </Button>
-              
-              <Button
-                variant={generationType === 'vocal' ? 'default' : 'outline'}
-                className={generationType === 'vocal' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-800 border-gray-700'}
-                onClick={() => setGenerationType('vocal')}
-              >
-                <Mic size={16} className="mr-2" />
-                Vocals
-              </Button>
-              
-              <Button
-                variant={generationType === 'sfx' ? 'default' : 'outline'}
-                className={generationType === 'sfx' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-800 border-gray-700'}
-                onClick={() => setGenerationType('sfx')}
-              >
-                <Hash size={16} className="mr-2" />
-                Sound FX
-              </Button>
-            </div>
-            
-            {renderGenerationForm()}
-          </div>
-        </ScrollArea>
-      </TabsContent>
-      
-      <TabsContent value="history" className="flex-1 p-0 m-0 overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className="p-4">
-            {generations.length === 0 ? (
-              <div className="text-center py-6 text-gray-400">
-                <Clock size={24} className="mx-auto mb-2 opacity-40" />
-                <p className="text-sm">No generations yet</p>
-                <p className="text-xs mt-1">Your AI generations will appear here</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {generations.map(gen => (
-                  <Card key={gen.id} className="bg-gray-800 border-gray-700">
-                    <CardHeader className="p-3 pb-0">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          {gen.type === 'music' && <Music size={16} className="mr-2 text-blue-400" />}
-                          {gen.type === 'speech' && <Volume2 size={16} className="mr-2 text-green-400" />}
-                          {gen.type === 'vocal' && <Mic size={16} className="mr-2 text-purple-400" />}
-                          {gen.type === 'sfx' && <Hash size={16} className="mr-2 text-amber-400" />}
-                          <CardTitle className="text-sm font-medium">
-                            {gen.type === 'music' ? 'Music' : gen.type === 'speech' ? 'Speech' : gen.type === 'vocal' ? 'Vocals' : 'Sound FX'} Generation
-                          </CardTitle>
-                        </div>
-                        <Badge variant="outline" className="text-gray-400 text-xs">
-                          {formatTimestamp(gen.timestamp)}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    
-                    <CardContent className="p-3">
-                      <div className="mb-2 text-sm text-gray-300 line-clamp-2" title={gen.prompt}>
-                        {gen.prompt}
-                      </div>
-                      
-                      <div className="flex flex-wrap gap-1 mb-3">
-                        {gen.parameters.model && (
-                          <Badge variant="outline" className="text-xs bg-gray-900 border-gray-700">
-                            {availableModels.find(m => m.id === gen.parameters.model)?.name || gen.parameters.model}
-                          </Badge>
-                        )}
-                        
-                        {gen.parameters.genre && (
-                          <Badge variant="outline" className="text-xs bg-gray-900 border-gray-700">
-                            {gen.parameters.genre}
-                          </Badge>
-                        )}
-                        
-                        {gen.parameters.mood && (
-                          <Badge variant="outline" className="text-xs bg-gray-900 border-gray-700">
-                            {gen.parameters.mood}
-                          </Badge>
-                        )}
-                        
-                        {gen.parameters.tempo && (
-                          <Badge variant="outline" className="text-xs bg-gray-900 border-gray-700">
-                            {gen.parameters.tempo} BPM
-                          </Badge>
-                        )}
-                        
-                        {gen.parameters.voice && (
-                          <Badge variant="outline" className="text-xs bg-gray-900 border-gray-700">
-                            {availableVoices.find(v => v.id === gen.parameters.voice)?.name || gen.parameters.voice}
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center text-xs text-gray-400">
-                          <Clock size={12} className="mr-1" />
-                          {formatDuration(gen.duration)}
-                        </div>
-                        
-                        <div className="flex items-center gap-1">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="h-7 px-2 bg-gray-800 border-gray-700"
-                            onClick={() => handlePlayGeneration(gen.id)}
-                          >
-                            {currentlyPlaying === gen.id ? (
-                              <>
-                                <Square size={12} className="mr-1" />
-                                Stop
-                              </>
-                            ) : (
-                              <>
-                                <Play size={12} className="mr-1" />
-                                Play
-                              </>
-                            )}
-                          </Button>
-                          
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="h-7 px-2 bg-gray-800 border-gray-700"
-                            onClick={() => handleAddToProject(gen.id)}
-                          >
-                            <Save size={12} className="mr-1" />
-                            Add to Project
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                    
-                    <CardFooter className="p-3 pt-0">
-                      <div className="flex justify-between w-full">
-                        <div className="flex -space-x-0.5">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="h-6 w-6 p-0 rounded-full text-green-400 hover:text-green-300 hover:bg-green-900/20"
-                          >
-                            <ThumbsUp size={14} />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            className="h-6 w-6 p-0 rounded-full text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                          >
-                            <ThumbsDown size={14} />
-                          </Button>
-                        </div>
-                        
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          className="h-6 px-2 text-xs"
-                        >
-                          <RefreshCw size={12} className="mr-1" />
-                          Regenerate
-                        </Button>
-                      </div>
-                    </CardFooter>
-                  </Card>
-                ))}
+                </div>
               </div>
             )}
           </div>
         </ScrollArea>
-      </TabsContent>
+      </Tabs>
     </div>
   );
 }
