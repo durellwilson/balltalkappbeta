@@ -31,7 +31,9 @@ import {
   Headphones,
   Record,
   Zap,
-  LayoutGrid
+  LayoutGrid,
+  Cloud,
+  Folder
 } from 'lucide-react';
 
 // UI Components
