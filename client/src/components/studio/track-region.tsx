@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Unlock, Copy, Scissors, Trash2 } from 'lucide-react';
-import { AudioRegion } from '../../lib/audio-engine';
+import type { AudioRegion } from '../../lib';
 import { WaveformDisplay } from './waveform-display';
 
 interface TrackRegionProps {

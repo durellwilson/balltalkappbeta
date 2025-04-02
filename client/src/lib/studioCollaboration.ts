@@ -145,7 +145,11 @@ class StudioCollaboration {
     // Calculate WebSocket URL if not provided
     if (!wsUrl) {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      wsUrl = `${protocol}//${window.location.host}/ws`;
+      // Use window.location.host but fallback to a specific port if needed
+      // This ensures we have a valid WebSocket URL even in development environments where host may be incomplete
+      const host = window.location.host || (window.location.hostname + ':5000');
+      wsUrl = `${protocol}//${host}/ws`;
+      console.log('WebSocket URL:', wsUrl); // Log for debugging
     }
     
     try {

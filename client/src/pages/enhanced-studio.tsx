@@ -66,7 +66,7 @@ import { SpectrumAnalyzer } from '@/components/ui/spectrum-analyzer';
 import { FileUploadModal } from '@/components/studio/file-upload-modal';
 import { FileDropZone } from '@/components/studio/file-drop-zone';
 import { ArrangementView } from '@/components/studio/arrangement-view';
-import { AudioRegion } from '@/lib/audio-engine';
+import { AudioRegion } from '@/lib';
 import { RecordingControls } from '@/components/studio/recording-controls';
 import { EffectsPanel } from '@/components/studio/effects-panel';
 import { MasteringPanel } from '@/components/studio/mastering-panel';
