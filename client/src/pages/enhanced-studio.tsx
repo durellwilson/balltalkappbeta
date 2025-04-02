@@ -2095,6 +2095,7 @@ const EnhancedStudio: React.FC = () => {
                       selectedRegions={regions.filter(r => selectedRegions.includes(r.id))}
                       bpm={project.bpm}
                       isSubscriptionActive={true}
+                      apiKeyAvailable={true}
                     />
                   </div>
                 </TabsContent>
