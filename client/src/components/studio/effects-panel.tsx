@@ -45,7 +45,7 @@ import { toast } from '@/hooks/use-toast';
 import { SpectrumAnalyzer } from '@/components/ui/spectrum-analyzer';
 
 // Types
-interface Effect {
+export interface Effect {
   id: string;
   type: EffectType;
   name: string;
@@ -54,7 +54,7 @@ interface Effect {
   presetName?: string;
 }
 
-type EffectType = 
+export type EffectType = 
   | 'eq' 
   | 'compressor' 
   | 'reverb' 
@@ -69,7 +69,7 @@ type EffectType =
   | 'autoFilter'
   | 'gate';
 
-interface EffectParameters {
+export interface EffectParameters {
   [key: string]: number | boolean | string;
 }
 

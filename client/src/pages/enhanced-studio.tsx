@@ -34,7 +34,15 @@ import {
   LayoutGrid,
   Cloud,
   Folder,
-  Sparkles
+  Sparkles,
+  Grid,
+  Clock,
+  FileMusic,
+  BarChart,
+  MousePointer,
+  Scissors,
+  Maximize,
+  Minimize
 } from 'lucide-react';
 
 // UI Components
@@ -67,9 +75,10 @@ import { SpectrumAnalyzer } from '@/components/ui/spectrum-analyzer';
 import { FileUploadModal } from '@/components/studio/file-upload-modal';
 import { FileDropZone } from '@/components/studio/file-drop-zone';
 import { ArrangementView } from '@/components/studio/arrangement-view';
-import { AudioRegion } from '@/lib';
+import type { AudioRegion } from '@/lib/audio-engine';
 import { RecordingControls } from '@/components/studio/recording-controls';
 import { EffectsPanel } from '@/components/studio/effects-panel';
+import type { Effect as StudioEffect, EffectType as StudioEffectType } from '@/components/studio/effects-panel';
 import { MasteringPanel } from '@/components/studio/mastering-panel';
 import { AIGenerationPanel } from '@/components/studio/ai-generation-panel';
 import { ProjectSync } from '@/components/studio/project-sync';
@@ -81,6 +90,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useStudioCollaboration } from '@/hooks/use-studio-collaboration';
 import { useAuth } from '@/hooks/use-auth';
+
+// Utility Types
+type Record<K extends keyof any, T> = {
+  [P in K]: T;
+};
 
 // Types and Interfaces
 interface Track {
@@ -108,13 +122,7 @@ interface EffectParameter {
   options?: string[];
 }
 
-interface Effect {
-  id: string;
-  type: string;
-  name: string;
-  enabled: boolean;
-  parameters: Record<string, any>;
-}
+// Effect type already imported from effects-panel
 
 interface Project {
   id: string;
@@ -155,6 +163,26 @@ const EnhancedStudio: React.FC = () => {
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [duration, setDuration] = useState<number>(120); // Total timeline duration in seconds
+  
+  // Calculate a suitable timeline duration based on regions
+  const calculateTimelineDuration = useCallback(() => {
+    // Minimum duration is 2 minutes (120s)
+    const minDuration = 120;
+    
+    // Find the latest end time of any region
+    const regionsEndTime = regions.length > 0 
+      ? Math.max(...regions.map(r => r.end || 0)) 
+      : 0;
+    
+    // Add some padding (30 seconds or 25% of total, whichever is greater)
+    const padding = Math.max(30, regionsEndTime * 0.25);
+    
+    // Round up to the nearest minute for clean timeline divisions
+    const roundedDuration = Math.ceil((regionsEndTime + padding) / 60) * 60;
+    
+    // Return the greater of minimum duration or calculated duration
+    return Math.max(minDuration, roundedDuration);
+  }, [regions]);
   const [audioInputLevel, setAudioInputLevel] = useState<number>(0);
   const [audioOutputLevel, setAudioOutputLevel] = useState<number>(0);
   const [trackEffects, setTrackEffects] = useState<Record<number, Effect[]>>({});
@@ -309,6 +337,14 @@ const EnhancedStudio: React.FC = () => {
       });
     }
   }, [masterEffects]);
+  
+  // Update timeline duration when regions change
+  useEffect(() => {
+    const newDuration = calculateTimelineDuration();
+    if (newDuration !== duration) {
+      setDuration(newDuration);
+    }
+  }, [regions, calculateTimelineDuration, duration]);
   
   // Auto-scroll chat to bottom when new messages arrive
   useEffect(() => {
@@ -558,37 +594,125 @@ const EnhancedStudio: React.FC = () => {
   };
   
   const handleRegionMove = (regionId: string, trackId: number, startTime: number) => {
+    // Apply snap to grid based on BPM
+    const secondsPerBeat = 60 / project.bpm;
+    const gridSizes = [
+      secondsPerBeat * 4,    // Whole note
+      secondsPerBeat,        // Quarter note
+      secondsPerBeat / 2,    // Eighth note 
+      secondsPerBeat / 4     // Sixteenth note
+    ];
+    
+    // Use appropriate grid size based on zoom level
+    const gridSize = zoomLevel > 2 ? gridSizes[3] : 
+                    zoomLevel > 1 ? gridSizes[2] : 
+                    zoomLevel > 0.5 ? gridSizes[1] : gridSizes[0];
+    
+    // Snap to grid if zoom is medium or higher
+    const snappedTime = Math.round(startTime / gridSize) * gridSize;
+    const finalStartTime = zoomLevel > 0.5 ? snappedTime : startTime;
+    
     // Update region position in state
     setRegions(prev => prev.map(r => {
       if (r.id === regionId) {
         const duration = r.end - r.start;
+        
+        // If track changed, handle the reassignment
+        if (r.trackId !== trackId) {
+          // In a real implementation, would move audio data between track processors
+          console.log(`Moving region from track ${r.trackId} to track ${trackId}`);
+          
+          // Get source and destination track processors
+          const sourceTrack = audioProcessor.getTrack(r.trackId);
+          const destTrack = audioProcessor.getTrack(trackId);
+          
+          if (sourceTrack && destTrack && r.buffer) {
+            // This would be the place to transfer audio between tracks in the processor
+          }
+        }
+        
         return { 
           ...r, 
           trackId, 
-          start: startTime,
-          end: startTime + duration
+          start: finalStartTime,
+          end: finalStartTime + duration
         };
       }
       return r;
     }));
     
-    // In a real implementation, would also update the region in the audio processor
+    // Show feedback toast for precise movements
+    if (zoomLevel > 1) {
+      toast({
+        title: "Region Moved",
+        description: `Positioned at ${formatTime(finalStartTime)} (bar ${Math.floor((finalStartTime / secondsPerBeat) / 4) + 1})`,
+        variant: "default"
+      });
+    }
   };
   
-  const handleRegionResize = (regionId: string, startTime: number, duration: number) => {
+  const handleRegionResize = (regionId: string, startTime: number, endTime: number) => {
+    // Apply snap to grid based on BPM - same logic as in handleRegionMove
+    const secondsPerBeat = 60 / project.bpm;
+    const gridSizes = [
+      secondsPerBeat * 4,    // Whole note
+      secondsPerBeat,        // Quarter note
+      secondsPerBeat / 2,    // Eighth note 
+      secondsPerBeat / 4     // Sixteenth note
+    ];
+    
+    // Use appropriate grid size based on zoom level
+    const gridSize = zoomLevel > 2 ? gridSizes[3] : 
+                    zoomLevel > 1 ? gridSizes[2] : 
+                    zoomLevel > 0.5 ? gridSizes[1] : gridSizes[0];
+    
+    // Snap to grid if zoom is medium or higher
+    let finalStartTime = startTime;
+    let finalEndTime = endTime;
+    
+    if (zoomLevel > 0.5) {
+      finalStartTime = Math.round(startTime / gridSize) * gridSize;
+      finalEndTime = Math.round(endTime / gridSize) * gridSize;
+      
+      // Ensure minimal length (at least one grid unit)
+      if (finalEndTime - finalStartTime < gridSize) {
+        finalEndTime = finalStartTime + gridSize;
+      }
+    }
+    
     // Update region in state
     setRegions(prev => prev.map(r => {
       if (r.id === regionId) {
         return { 
           ...r, 
-          start: startTime,
-          end: startTime + duration
+          start: finalStartTime,
+          end: finalEndTime
         };
       }
       return r;
     }));
     
-    // In a real implementation, would also update the region in the audio processor
+    // Update the playback time range in the audio processor (in a real implementation)
+    const regionToUpdate = regions.find(r => r.id === regionId);
+    if (regionToUpdate && regionToUpdate.trackId) {
+      const track = audioProcessor.getTrack(regionToUpdate.trackId);
+      if (track) {
+        console.log(`Updated region in track ${regionToUpdate.trackId}: ${finalStartTime}s - ${finalEndTime}s`);
+        // In a real implementation, would update the playback range in the track processor
+      }
+    }
+    
+    // Calculate the new duration for feedback
+    const newDuration = finalEndTime - finalStartTime;
+    
+    // Show feedback toast for precise adjustments
+    if (zoomLevel > 1) {
+      toast({
+        title: "Region Resized",
+        description: `Duration: ${formatTime(newDuration)}`,
+        variant: "default"
+      });
+    }
   };
   
   const handleRegionCopy = (regionId: string) => {
@@ -800,59 +924,216 @@ const EnhancedStudio: React.FC = () => {
   };
   
   // Handle file uploads
-  const handleFileUpload = async (files: File[]): Promise<boolean> => {
+  interface FileUploadOptions {
+    targetTrackId?: number | null;
+    createNewTrack: boolean;
+    trackType: 'audio' | 'instrument' | 'vocal' | 'drum' | 'mix';
+    position: 'start' | 'playhead' | 'end';
+    aligned: boolean;
+    allowOverlap: boolean;
+    normalize: boolean;
+    normalizationLevel: number;
+  }
+
+  const handleFileUpload = async (
+    files: File[],
+    options?: FileUploadOptions
+  ): Promise<boolean> => {
     try {
       // Check if audio processor is ready
       if (!audioProcessor.isReady()) {
-        toast({
-          title: "Audio Not Initialized",
-          description: "Please enable the audio engine first using the 'Enable Audio Engine' button.",
-          variant: "destructive"
-        });
-        return false;
+        await audioProcessor.initialize();
+        if (!audioProcessor.isReady()) {
+          toast({
+            title: "Audio Not Initialized",
+            description: "Please enable the audio engine first using the 'Enable Audio Engine' button.",
+            variant: "destructive"
+          });
+          return false;
+        }
       }
       
       if (files.length === 0) return false;
       
+      // Default options if none provided
+      const uploadOptions = options || {
+        createNewTrack: true,
+        trackType: 'audio',
+        position: 'playhead',
+        aligned: true,
+        allowOverlap: true,
+        normalize: false,
+        normalizationLevel: -3
+      };
+      
+      // Arrays to collect uploaded items
+      const uploadedRegions: AudioRegion[] = [];
+      const createdTracks: Track[] = [];
+      
       // Process each file
       for (const file of files) {
-        // Create a new track for this file
-        const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
-        const newTrack: Track = {
-          id: newTrackId,
-          name: file.name.split('.')[0] || `Audio ${newTrackId}`, // Use filename without extension as track name
-          type: 'audio',
-          volume: 0.8,
-          pan: 0,
-          isMuted: false,
-          isSoloed: false
-        };
+        try {
+          // Determine the track to use
+          let targetTrackId = uploadOptions.targetTrackId || 0;
+          let newTrack: Track | undefined;
+          
+          // If creating a new track
+          if (uploadOptions.createNewTrack) {
+            // Generate a new ID
+            const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
+            
+            // Determine track type based on filename if not specified
+            let trackType = uploadOptions.trackType;
+            if (trackType === 'audio') {
+              const fileName = file.name.toLowerCase();
+              if (fileName.includes('drum') || fileName.includes('beat') || fileName.includes('percussion')) {
+                trackType = 'drum';
+              } else if (fileName.includes('vocal') || fileName.includes('voice') || fileName.includes('vox')) {
+                trackType = 'vocal';
+              } else if (fileName.includes('guitar') || fileName.includes('piano') || fileName.includes('bass') ||
+                        fileName.includes('synth') || fileName.includes('keys')) {
+                trackType = 'instrument';
+              }
+            }
+            
+            // Create the track object
+            newTrack = {
+              id: newTrackId,
+              name: file.name.split('.')[0] || `${trackType.charAt(0).toUpperCase() + trackType.slice(1)} ${newTrackId}`,
+              type: trackType,
+              volume: 0.8,
+              pan: 0,
+              isMuted: false,
+              isSoloed: false
+            };
+            
+            targetTrackId = newTrackId;
+            createdTracks.push(newTrack);
+            
+            // Create track processor
+            audioProcessor.createTrack(newTrackId, {
+              volume: newTrack.volume,
+              pan: newTrack.pan
+            });
+          } else {
+            // Use existing track
+            if (!targetTrackId) {
+              throw new Error('No target track specified');
+            }
+          }
+          
+          // Get the audio processor track
+          const track = audioProcessor.getTrack(targetTrackId);
+          if (!track) {
+            throw new Error(`Track ${targetTrackId} not found in audio processor`);
+          }
+          
+          // Load the audio file
+          // Create a buffer from the file
+          const arrayBuffer = await file.arrayBuffer();
+          const audioContext = new AudioContext();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          const waveform = generateWaveform(audioBuffer);
+          
+          const fileData = {
+            buffer: audioBuffer,
+            waveform,
+            duration: audioBuffer.duration
+          };
+          
+          // Determine the start position based on options
+          let startPosition = 0;
+          
+          if (uploadOptions.position === 'playhead') {
+            startPosition = projectTime;
+          } else if (uploadOptions.position === 'end') {
+            // Find the latest end time of any region
+            const lastEndTime = regions.length > 0 ? 
+              Math.max(...regions.map(r => r.end)) : 
+              0;
+            startPosition = Math.max(lastEndTime, 0.1); // At least 0.1s
+          }
+          
+          // Apply snap to grid if needed
+          if (uploadOptions.aligned) {
+            // Get grid size in seconds (based on BPM)
+            const secondsPerBeat = 60 / project.bpm;
+            const gridSize = 0.25; // Quarter note by default
+            const gridInSeconds = gridSize * secondsPerBeat;
+            
+            // Snap to nearest grid line
+            startPosition = Math.round(startPosition / gridInSeconds) * gridInSeconds;
+          }
+          
+          // Create the region
+          const region: AudioRegion = {
+            id: `region-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            trackId: targetTrackId,
+            start: startPosition,
+            end: startPosition + fileData.duration,
+            offset: 0,
+            name: file.name.split('.')[0] || 'Audio Region',
+            waveform: fileData.waveform,
+            buffer: fileData.buffer,
+            file: URL.createObjectURL(file)
+          };
+          
+          // Apply normalization if needed
+          if (uploadOptions.normalize && fileData.buffer) {
+            try {
+              const context = new AudioContext();
+              const gainNode = context.createGain();
+              const maxGain = Math.pow(10, uploadOptions.normalizationLevel / 20);
+              gainNode.gain.value = maxGain;
+              // Note: In a real implementation, we would do proper peak normalization
+              // For now we're just setting a consistent gain based on the target level
+            } catch (normError) {
+              console.error('Failed to normalize audio:', normError);
+            }
+          }
+          
+          // Add the region to our collection
+          uploadedRegions.push(region);
+          
+          // Add audio to the processor's timeline
+          track.loadAudio(region.file as string);
+        } catch (error) {
+          const fileError = error as Error;
+          console.error(`Failed to process file ${file.name}:`, fileError);
+          toast({
+            title: 'Upload Error',
+            description: `Failed to process ${file.name}. ${fileError.message}`,
+            variant: 'destructive'
+          });
+        }
+      }
+      
+      // Update the state with all created tracks and regions
+      if (createdTracks.length > 0) {
+        setTracks((prev: Track[]) => [...prev, ...createdTracks]);
+      }
+      
+      if (uploadedRegions.length > 0) {
+        setRegions(prev => [...prev, ...uploadedRegions]);
         
-        // Create track processor
-        const track = audioProcessor.createTrack(newTrackId, {
-          volume: newTrack.volume,
-          pan: newTrack.pan
-        });
+        // Select the first uploaded region
+        setSelectedRegions([uploadedRegions[0].id]);
         
-        // Load the audio file
-        await track.loadAudioFile(file);
-        
-        // Add to tracks list
-        setTracks(prev => [...prev, newTrack]);
-        
-        // Set as active track
-        setActiveTrackId(newTrackId);
+        // Set active track to the track of the first uploaded region
+        if (uploadedRegions[0].trackId) {
+          setActiveTrackId(uploadedRegions[0].trackId);
+        }
       }
       
       toast({
         title: 'Files imported',
-        description: `${files.length} audio ${files.length === 1 ? 'file' : 'files'} added to your project.`
+        description: `${uploadedRegions.length} audio ${uploadedRegions.length === 1 ? 'file' : 'files'} added to your project.`
       });
       
       // Set to tracks panel
       setSidebarTab('tracks');
       
-      return true;
+      return uploadedRegions.length > 0;
     } catch (error) {
       console.error("Failed to import audio files:", error);
       toast({
@@ -880,6 +1161,28 @@ const EnhancedStudio: React.FC = () => {
     const secs = Math.floor(seconds % 60);
     const ms = Math.floor((seconds % 1) * 100);
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+  };
+  const generateWaveform = (buffer: AudioBuffer, samples: number = 200): number[] => {
+    const channelData = buffer.getChannelData(0); // Get only the first channel
+    const blockSize = Math.floor(channelData.length / samples);
+    const waveform = [];
+
+    for (let i = 0; i < samples; i++) {
+      let blockStart = blockSize * i;
+      let sum = 0;
+      
+      // Find the max value in this block
+      for (let j = 0; j < blockSize; j++) {
+        sum += Math.abs(channelData[blockStart + j] || 0);
+      }
+      
+      // Normalize and store the value
+      waveform.push(sum / blockSize);
+    }
+
+    // Normalize the entire waveform to 0-1 range
+    const max = Math.max(...waveform, 0.01); // Avoid division by zero
+    return waveform.map(val => val / max);
   };
   
   // Function to init audio engine on direct user interaction
@@ -950,7 +1253,7 @@ const EnhancedStudio: React.FC = () => {
           <div className="flex flex-col">
             <Input
               value={project.name}
-              onChange={e => setProject(prev => ({ ...prev, name: e.target.value }))}
+              onChange={e => setProject((prev: typeof project) => ({ ...prev, name: e.target.value }))}
               className="bg-transparent border-none text-lg font-medium h-7 p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
             />
             <div className="flex items-center space-x-2 text-xs text-gray-400">
@@ -1058,7 +1361,7 @@ const EnhancedStudio: React.FC = () => {
               }))}
               regions={regions || []}
               currentTime={projectTime}
-              duration={300} // 5 minutes
+              duration={duration} // Based on project content
               bpm={project.bpm}
               timeSignature={[4, 4]}
               isPlaying={isPlaying}
@@ -1075,7 +1378,7 @@ const EnhancedStudio: React.FC = () => {
               onTrackMuteToggle={handleTrackMuteToggle}
               onTrackSoloToggle={handleTrackSoloToggle}
               onTrackArmToggle={() => {}}
-              onTrackAdd={handleAddTrack}
+              onTrackAdd={(type: string) => handleAddTrack(type as ('audio' | 'instrument' | 'vocal' | 'drum' | 'mix'))}
               onTrackDelete={handleDeleteTrack}
               onZoomChange={setZoomLevel}
               zoom={zoomLevel}
@@ -1323,7 +1626,7 @@ const EnhancedStudio: React.FC = () => {
                               const [movedTrack] = newTracks.splice(trackIndex, 1);
                               newTracks.splice(newPosition, 0, movedTrack);
                               
-                              setTracks(newTracks);
+                              setTracks(newTracks as Track[]);
                               // Sync with collaboration if available
                               // Add tracks to collaboration system one by one
                               if (collaboration) {
@@ -1396,7 +1699,7 @@ const EnhancedStudio: React.FC = () => {
                         trackType={tracks.find(t => t.id === activeTrackId)?.type || 'audio'}
                         effects={trackEffects[activeTrackId] || []}
                         onEffectsChange={(effects) => {
-                          setTrackEffects(prev => ({
+                          setTrackEffects((prev: Record<number, Effect[]>) => ({
                             ...prev,
                             [activeTrackId]: effects
                           }));
@@ -1750,6 +2053,9 @@ const EnhancedStudio: React.FC = () => {
         onUpload={handleFileUpload}
         title="Import Audio Files"
         description="Upload audio files to add to your project. Supported formats: .mp3, .wav, .aiff, .m4a"
+        allowMultiple={true}
+        existingTracks={tracks}
+        currentPlayheadPosition={projectTime}
       />
     </div>
   );

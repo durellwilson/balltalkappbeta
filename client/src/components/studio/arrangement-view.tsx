@@ -313,39 +313,131 @@ export function ArrangementView({
     }
   };
   
-  // Generate tick marks for the timeline
+  // Generate tick marks for the timeline with professional DAW styling
   const generateTimelineTicks = () => {
     const ticks = [];
     const measuresCount = Math.ceil(duration / (secondsPerBeat * beatsPerMeasure));
     
+    // Add time marker background for alternating measures (creates blocks like in pro DAWs)
+    for (let measure = 0; measure <= measuresCount; measure++) {
+      const measureTime = measure * beatsPerMeasure * secondsPerBeat;
+      const measurePixel = timeToPixel(measureTime);
+      const nextMeasurePixel = timeToPixel((measure + 1) * beatsPerMeasure * secondsPerBeat);
+      const width = nextMeasurePixel - measurePixel;
+      
+      // Add alternating background for odd/even measures
+      if (measure % 2 === 0) {
+        ticks.push(
+          <div 
+            key={`measure-bg-${measure}`} 
+            className="absolute top-0 h-full bg-gray-900/60"
+            style={{ 
+              left: `${measurePixel}px`,
+              width: `${width}px`
+            }}
+          />
+        );
+      }
+    }
+    
+    // Add actual tick marks
     for (let measure = 0; measure <= measuresCount; measure++) {
       const measureTime = measure * beatsPerMeasure * secondsPerBeat;
       const measurePixel = timeToPixel(measureTime);
       
+      // Major measure bar with number
       ticks.push(
         <div 
           key={`measure-${measure}`} 
-          className="absolute top-0 h-full border-l border-gray-700"
+          className="absolute top-0 h-full border-l-2 border-gray-500"
           style={{ left: `${measurePixel}px` }}
         >
-          <div className="absolute -left-3 -top-6 text-xs text-gray-400 whitespace-nowrap">
+          <div className="absolute -left-3 -top-6 text-xs text-gray-300 whitespace-nowrap font-semibold">
             {measure + 1}
           </div>
         </div>
       );
+      
+      // Add time marker in MM:SS format at certain intervals
+      if (measure % 4 === 0) {
+        const timeAtMeasure = measureTime;
+        ticks.push(
+          <div 
+            key={`time-${measure}`} 
+            className="absolute -left-8 top-4 text-[8px] text-blue-300 whitespace-nowrap opacity-70"
+            style={{ left: `${measurePixel}px` }}
+          >
+            {formatTime(timeAtMeasure)}
+          </div>
+        );
+      }
       
       // Add beat ticks within each measure
       for (let beat = 1; beat < beatsPerMeasure; beat++) {
         const beatTime = measureTime + beat * secondsPerBeat;
         const beatPixel = timeToPixel(beatTime);
         
+        // Regular beat line (quarter notes)
         ticks.push(
           <div 
             key={`beat-${measure}-${beat}`} 
-            className="absolute top-5 h-3/4 border-l border-gray-800"
+            className="absolute top-0 h-full border-l border-gray-600"
             style={{ left: `${beatPixel}px` }}
+          >
+            {/* Only show beat numbers when sufficiently zoomed in */}
+            {zoom > 0.8 && (
+              <div className="absolute -left-2 -top-5 text-[10px] text-gray-500 whitespace-nowrap">
+                {beat + 1}
+              </div>
+            )}
+          </div>
+        );
+        
+        // Add eighth notes
+        const eighthBeatPixel = timeToPixel(beatTime - secondsPerBeat/2);
+        ticks.push(
+          <div 
+            key={`eighth-${measure}-${beat}`} 
+            className="absolute top-0 h-full border-l border-gray-700/70"
+            style={{ left: `${eighthBeatPixel}px` }}
           />
         );
+        
+        // Add sixteenth note subdivisions when zoomed in
+        if (zoom >= 1.2) { 
+          for (let sub = 1; sub < 4; sub++) {
+            if (sub === 2) continue; // Skip middle one as it's covered by eighth notes
+            
+            const subTime = beatTime + (sub * secondsPerBeat / 4) - secondsPerBeat;
+            const subPixel = timeToPixel(subTime);
+            
+            ticks.push(
+              <div 
+                key={`sub-${measure}-${beat}-${sub}`} 
+                className="absolute top-0 h-full border-l border-gray-800/60"
+                style={{ left: `${subPixel}px` }}
+              />
+            );
+          }
+        }
+        
+        // Add 32nd note subdivisions at highest zoom levels
+        if (zoom >= 2.5) {
+          for (let sub = 1; sub < 8; sub++) {
+            if (sub % 2 === 0) continue; // Skip ones covered by 16th notes and 8th notes
+            
+            const subTime = beatTime + (sub * secondsPerBeat / 8) - secondsPerBeat;
+            const subPixel = timeToPixel(subTime);
+            
+            ticks.push(
+              <div 
+                key={`sub32-${measure}-${beat}-${sub}`} 
+                className="absolute top-0 h-full border-l border-gray-800/30"
+                style={{ left: `${subPixel}px` }}
+              />
+            );
+          }
+        }
       }
     }
     
