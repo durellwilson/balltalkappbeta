@@ -1,8 +1,8 @@
 import {
-  users, tracks, messages, studioSessions, verificationDocs, studioProjects, projectTracks, masteringSettings, trackComments,
-  type User, type Track, type Message, type StudioSession, type VerificationDoc, type StudioProject, type ProjectTrack, type MasteringSettings, type TrackComment,
+  users, tracks, messages, studioSessions, verificationDocs, studioProjects, projectTracks, masteringSettings, trackComments, projectSyncs,
+  type User, type Track, type Message, type StudioSession, type VerificationDoc, type StudioProject, type ProjectTrack, type MasteringSettings, type TrackComment, type ProjectSync,
   type InsertUser, type InsertTrack, type InsertMessage, type InsertStudioSession, type InsertVerificationDoc, 
-  type InsertStudioProject, type InsertProjectTrack, type InsertMasteringSettings, type InsertTrackComment
+  type InsertStudioProject, type InsertProjectTrack, type InsertMasteringSettings, type InsertTrackComment, type InsertProjectSync
 } from "@shared/schema";
 import session from "express-session";
 import { db, pool } from "./db";
@@ -78,6 +78,15 @@ export interface IStorage {
   addTrackComment(comment: InsertTrackComment): Promise<TrackComment>;
   getTrackComments(projectTrackId: number): Promise<TrackComment[]>;
   deleteTrackComment(id: number): Promise<boolean>;
+  
+  // Cloud sync operations
+  createProjectSync(sync: InsertProjectSync): Promise<ProjectSync>;
+  getProjectSyncStatus(projectId: number): Promise<ProjectSync | undefined>;
+  getProjectSyncsByUser(userId: number): Promise<ProjectSync[]>;
+  updateProjectSyncStatus(id: number, status: string, error?: string): Promise<ProjectSync | undefined>;
+  startProjectSync(projectId: number, userId: number): Promise<ProjectSync | undefined>;
+  completeProjectSync(id: number, cloudUrl: string, syncHash: string): Promise<ProjectSync | undefined>;
+  getLatestProjectSync(projectId: number): Promise<ProjectSync | undefined>;
   
   // Session store for authentication
   sessionStore: session.SessionStore;
@@ -524,6 +533,106 @@ export class MemStorage implements IStorage {
   
   async deleteTrackComment(id: number): Promise<boolean> {
     return this.trackComments.delete(id);
+  }
+  
+  // Project Sync operations
+  private projectSyncs = new Map<number, ProjectSync>();
+  private currentProjectSyncId = 1;
+  
+  async createProjectSync(sync: InsertProjectSync): Promise<ProjectSync> {
+    const id = this.currentProjectSyncId++;
+    const now = new Date();
+    
+    const newSync: ProjectSync = {
+      ...sync,
+      id,
+      syncedAt: now,
+      lastError: null
+    };
+    
+    this.projectSyncs.set(id, newSync);
+    return newSync;
+  }
+  
+  async getProjectSyncStatus(projectId: number): Promise<ProjectSync | undefined> {
+    return Array.from(this.projectSyncs.values())
+      .find(sync => sync.projectId === projectId);
+  }
+  
+  async getProjectSyncsByUser(userId: number): Promise<ProjectSync[]> {
+    return Array.from(this.projectSyncs.values())
+      .filter(sync => sync.userId === userId)
+      .sort((a, b) => b.syncedAt.getTime() - a.syncedAt.getTime());
+  }
+  
+  async updateProjectSyncStatus(id: number, status: string, error?: string): Promise<ProjectSync | undefined> {
+    const sync = this.projectSyncs.get(id);
+    if (!sync) return undefined;
+    
+    const updatedSync = {
+      ...sync,
+      status: status as any,
+      syncedAt: new Date(),
+      lastError: error || null
+    };
+    
+    this.projectSyncs.set(id, updatedSync);
+    return updatedSync;
+  }
+  
+  async startProjectSync(projectId: number, userId: number): Promise<ProjectSync | undefined> {
+    // Check if there's an existing sync record
+    let sync = Array.from(this.projectSyncs.values())
+      .find(s => s.projectId === projectId);
+      
+    if (sync) {
+      // Update existing record
+      sync = {
+        ...sync,
+        status: 'syncing' as any,
+        syncedAt: new Date(),
+        lastError: null
+      };
+      this.projectSyncs.set(sync.id, sync);
+      return sync;
+    } else {
+      // Create a new sync record
+      return this.createProjectSync({
+        projectId,
+        userId,
+        status: 'syncing',
+        version: 1,
+        cloudUrl: null,
+        syncHash: null,
+        metadata: null
+      });
+    }
+  }
+  
+  async completeProjectSync(id: number, cloudUrl: string, syncHash: string): Promise<ProjectSync | undefined> {
+    const sync = this.projectSyncs.get(id);
+    if (!sync) return undefined;
+    
+    const updatedSync = {
+      ...sync,
+      status: 'synced' as any,
+      syncedAt: new Date(),
+      cloudUrl,
+      syncHash,
+      version: sync.version + 1,
+      lastError: null
+    };
+    
+    this.projectSyncs.set(id, updatedSync);
+    return updatedSync;
+  }
+  
+  async getLatestProjectSync(projectId: number): Promise<ProjectSync | undefined> {
+    const syncs = Array.from(this.projectSyncs.values())
+      .filter(sync => sync.projectId === projectId)
+      .sort((a, b) => b.version - a.version);
+      
+    return syncs.length > 0 ? syncs[0] : undefined;
   }
 }
 

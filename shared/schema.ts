@@ -135,6 +135,23 @@ export const trackComments = pgTable("track_comments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Project sync statuses for cloud backup
+export const syncStatusEnum = pgEnum('sync_status', ['syncing', 'synced', 'failed', 'pending']);
+
+// Project cloud sync records
+export const projectSyncs = pgTable("project_syncs", {
+  id: serial("id").primaryKey(),
+  projectId: integer("project_id").notNull().references(() => studioProjects.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  syncedAt: timestamp("synced_at").defaultNow(),
+  cloudUrl: text("cloud_url"), // URL to the cloud storage location
+  status: syncStatusEnum("status").default('pending'),
+  version: integer("version").default(1),
+  syncHash: text("sync_hash"), // Checksum to verify data integrity
+  metadata: text("metadata"), // Additional metadata as JSON string
+  lastError: text("last_error"), // Last error message if sync failed
+});
+
 // Create the insert schemas
 export const insertUserSchema = createInsertSchema(users)
   .omit({ id: true, createdAt: true, updatedAt: true });
@@ -163,6 +180,9 @@ export const insertMasteringSettingsSchema = createInsertSchema(masteringSetting
 export const insertTrackCommentSchema = createInsertSchema(trackComments)
   .omit({ id: true, createdAt: true });
 
+export const insertProjectSyncSchema = createInsertSchema(projectSyncs)
+  .omit({ id: true, syncedAt: true, lastError: true });
+
 // Define types from the schemas
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertVerificationDoc = z.infer<typeof insertVerificationDocSchema>;
@@ -173,6 +193,7 @@ export type InsertStudioProject = z.infer<typeof insertStudioProjectSchema>;
 export type InsertProjectTrack = z.infer<typeof insertProjectTrackSchema>;
 export type InsertMasteringSettings = z.infer<typeof insertMasteringSettingsSchema>;
 export type InsertTrackComment = z.infer<typeof insertTrackCommentSchema>;
+export type InsertProjectSync = z.infer<typeof insertProjectSyncSchema>;
 
 export type User = typeof users.$inferSelect;
 export type VerificationDoc = typeof verificationDocs.$inferSelect;
@@ -183,6 +204,7 @@ export type StudioProject = typeof studioProjects.$inferSelect;
 export type ProjectTrack = typeof projectTracks.$inferSelect;
 export type MasteringSettings = typeof masteringSettings.$inferSelect;
 export type TrackComment = typeof trackComments.$inferSelect;
+export type ProjectSync = typeof projectSyncs.$inferSelect;
 
 // Extended schemas for login
 export const loginSchema = z.object({
