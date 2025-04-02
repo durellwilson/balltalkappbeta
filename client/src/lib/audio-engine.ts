@@ -5,6 +5,8 @@ export interface AudioRegion {
   trackId: number;
   start: number;
   end: number;
+  startTime?: number;  // Alias for start
+  duration?: number;   // Alias for (end - start)
   offset: number;
   file?: string;
   buffer?: AudioBuffer;

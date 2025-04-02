@@ -29,8 +29,8 @@ import { toast } from '@/hooks/use-toast';
 import { motion } from 'framer-motion';
 
 // Define interfaces for component props
-import { AudioRegion, Track } from '../../lib/audio-engine';
-export { AudioRegion, Track } from '../../lib/audio-engine';
+import { AudioRegion, Track } from '@/lib/audio-engine';
+export { AudioRegion, Track } from '@/lib/audio-engine';
 import { TrackRegion } from './track-region';
 
 interface ArrangementViewProps {

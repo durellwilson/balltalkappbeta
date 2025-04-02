@@ -65,7 +65,8 @@ import { WaveformVisualizer } from '@/components/ui/waveform-visualizer';
 import { SpectrumAnalyzer } from '@/components/ui/spectrum-analyzer';
 import { FileUploadModal } from '@/components/studio/file-upload-modal';
 import { FileDropZone } from '@/components/studio/file-drop-zone';
-import { ArrangementView, AudioRegion } from '@/components/studio/arrangement-view';
+import { ArrangementView } from '@/components/studio/arrangement-view';
+import { AudioRegion } from '@/lib/audio-engine';
 import { RecordingControls } from '@/components/studio/recording-controls';
 import { EffectsPanel } from '@/components/studio/effects-panel';
 import { MasteringPanel } from '@/components/studio/mastering-panel';
@@ -426,11 +427,12 @@ const EnhancedStudio: React.FC = () => {
           const newRegion: AudioRegion = {
             id: `region-${Date.now()}`,
             trackId: newTrackId,
-            startTime: overlapRecording ? projectTime - recordingDuration : 0,
-            duration: recordingDuration,
+            start: overlapRecording ? projectTime - recordingDuration : 0,
+            end: overlapRecording ? projectTime : recordingDuration,
+            offset: 0,
             name: `Recording ${new Date().toLocaleTimeString()}`,
-            waveformData: Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15),
-            audioUrl: url
+            waveform: Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15),
+            file: url
           };
           
           // Add to regions
@@ -509,22 +511,34 @@ const EnhancedStudio: React.FC = () => {
   
   const handleRegionMove = (regionId: string, trackId: number, startTime: number) => {
     // Update region position in state
-    setRegions(prev => prev.map(r => 
-      r.id === regionId 
-        ? { ...r, trackId, startTime } 
-        : r
-    ));
+    setRegions(prev => prev.map(r => {
+      if (r.id === regionId) {
+        const duration = r.end - r.start;
+        return { 
+          ...r, 
+          trackId, 
+          start: startTime,
+          end: startTime + duration
+        };
+      }
+      return r;
+    }));
     
     // In a real implementation, would also update the region in the audio processor
   };
   
   const handleRegionResize = (regionId: string, startTime: number, duration: number) => {
     // Update region in state
-    setRegions(prev => prev.map(r => 
-      r.id === regionId 
-        ? { ...r, startTime, duration } 
-        : r
-    ));
+    setRegions(prev => prev.map(r => {
+      if (r.id === regionId) {
+        return { 
+          ...r, 
+          start: startTime,
+          end: startTime + duration
+        };
+      }
+      return r;
+    }));
     
     // In a real implementation, would also update the region in the audio processor
   };
@@ -536,7 +550,9 @@ const EnhancedStudio: React.FC = () => {
     const newRegion: AudioRegion = {
       ...regionToCopy,
       id: `region-${Date.now()}`,
-      startTime: regionToCopy.startTime + regionToCopy.duration, // Place after the original
+      start: regionToCopy.start !== undefined ? regionToCopy.start + (regionToCopy.end - regionToCopy.start) : 0,
+      end: regionToCopy.end !== undefined ? regionToCopy.end + (regionToCopy.end - regionToCopy.start) : 0,
+      offset: regionToCopy.offset || 0
     };
     
     setRegions(prev => [...prev, newRegion]);
@@ -562,7 +578,7 @@ const EnhancedStudio: React.FC = () => {
     if (!regionToSplit) return;
     
     // Only split if the split point is within the region
-    if (splitTime <= regionToSplit.startTime || splitTime >= regionToSplit.startTime + regionToSplit.duration) {
+    if (splitTime <= (regionToSplit.start || 0) || splitTime >= (regionToSplit.end || 0)) {
       toast({
         title: "Cannot Split",
         description: "Split point is outside the region",
@@ -575,14 +591,17 @@ const EnhancedStudio: React.FC = () => {
     const firstRegion: AudioRegion = {
       ...regionToSplit,
       id: `region-${Date.now()}-a`,
-      duration: splitTime - regionToSplit.startTime
+      start: regionToSplit.start || 0,
+      end: splitTime,
+      offset: regionToSplit.offset || 0
     };
     
     const secondRegion: AudioRegion = {
       ...regionToSplit,
       id: `region-${Date.now()}-b`,
-      startTime: splitTime,
-      duration: regionToSplit.startTime + regionToSplit.duration - splitTime
+      start: splitTime,
+      end: regionToSplit.end || 0,
+      offset: (regionToSplit.offset || 0) + (splitTime - (regionToSplit.start || 0))
     };
     
     // Replace the original with the two new regions

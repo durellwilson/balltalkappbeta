@@ -8,6 +8,11 @@ import { RecordingControls } from '@/components/studio/recording-controls';
 import { EffectsPanel } from '@/components/studio/effects-panel';
 import { MasteringPanel } from '@/components/studio/mastering-panel';
 import { FileUploadModal } from '@/components/studio/file-upload-modal';
+import { FileDropZone } from '@/components/studio/file-drop-zone';
+import { ArrangementView } from '@/components/studio/arrangement-view';
+import { Track as AudioEngineTrack } from '@/lib/audio-engine';
+import { InteractiveTrack } from '@/components/studio/interactive-track';
+import { ProjectSync } from '@/components/studio/project-sync';
 import { useStudioCollaboration } from '@/hooks/use-studio-collaboration';
 import * as Tone from 'tone';
 import { Button } from '@/components/ui/button';
@@ -483,9 +488,45 @@ export default function StudioPage() {
               </div>
             </div>
 
-            {/* Waveform view */}
-            <div className="h-64 bg-zinc-900 rounded-lg border border-zinc-800">
-              {/* Implement waveform visualization here */}
+            {/* Arrangement view with waveform visualization */}
+            <div className="h-64 bg-zinc-900 rounded-lg border border-zinc-800 overflow-hidden">
+              <ArrangementView
+                tracks={(project?.tracks || []).map(track => ({
+                  id: track.id,
+                  name: track.name,
+                  type: track.type === 'midi' ? 'instrument' : track.type === 'beat' ? 'drum' : track.type,
+                  volume: track.volume,
+                  pan: track.pan,
+                  isMuted: track.isMuted,
+                  isSoloed: track.isSoloed,
+                  isArmed: false
+                }))}
+                currentTime={currentTime}
+                isPlaying={isPlaying}
+                zoom={1}
+                duration={180} // 3 minutes default timeline
+                timeSignature={[4, 4]}
+                bpm={project?.bpm || 120}
+                isRecording={isRecording}
+                onTimeChange={(time) => setCurrentTime(time)}
+                onRegionSelect={() => {}}
+                onRegionMove={() => {}}
+                onRegionResize={() => {}}
+                onRegionDelete={() => {}}
+                onRegionCopy={() => {}}
+                onRegionSplit={() => {}}
+                onTrackVolumeChange={() => {}}
+                onTrackPanChange={() => {}}
+                onTrackMuteToggle={() => {}}
+                onTrackSoloToggle={() => {}}
+                onTrackArmToggle={() => {}}
+                onTrackAdd={() => {}}
+                onTrackDelete={() => {}}
+                onZoomChange={() => {}}
+                onTrackSelect={(trackId) => setSelectedTrackId(trackId)}
+                selectedTrackId={selectedTrackId}
+                regions={[]}
+              />
             </div>
           </div>
         </div>
@@ -496,6 +537,7 @@ export default function StudioPage() {
             <TabsList className="w-full">
               <TabsTrigger value="effects">Effects</TabsTrigger>
               <TabsTrigger value="master">Master</TabsTrigger>
+              <TabsTrigger value="cloud">Cloud</TabsTrigger>
             </TabsList>
 
             <TabsContent value="effects">
@@ -596,6 +638,38 @@ export default function StudioPage() {
                 </div>
               </div>
             </TabsContent>
+            
+            <TabsContent value="cloud">
+              <div className="space-y-4">
+                <h3 className="font-medium">Cloud Sync</h3>
+                
+                <div className="space-y-4">
+                  <ProjectSync projectId={project?.id || 0} />
+                  
+                  <div className="bg-zinc-800/50 rounded-lg p-3 space-y-2">
+                    <h4 className="text-sm font-medium">Project Details</h4>
+                    <div className="text-xs space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400">Project Name:</span>
+                        <span>{project?.title}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400">Created:</span>
+                        <span>{project?.createdAt.toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400">Updated:</span>
+                        <span>{project?.updatedAt.toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-400">Tracks:</span>
+                        <span>{project?.tracks.length}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
           </Tabs>
         </div>
       </div>
@@ -623,7 +697,7 @@ export default function StudioPage() {
                 {effect.icon}
                 <span>{effect.name}</span>
                 {effect.isLuxury && (
-                  <Badge variant="premium">Premium</Badge>
+                  <Badge variant="secondary" className="bg-amber-600 text-white hover:bg-amber-700">Premium</Badge>
                 )}
               </Button>
             ))}
