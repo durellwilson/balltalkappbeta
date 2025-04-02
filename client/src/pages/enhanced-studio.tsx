@@ -69,6 +69,7 @@ import { ArrangementView, AudioRegion } from '@/components/studio/arrangement-vi
 import { RecordingControls } from '@/components/studio/recording-controls';
 import { EffectsPanel } from '@/components/studio/effects-panel';
 import { MasteringPanel } from '@/components/studio/mastering-panel';
+import { ProjectSync } from '@/components/studio/project-sync';
 
 // Hooks and Utils
 import { useToast } from '@/hooks/use-toast';
@@ -129,7 +130,7 @@ const EnhancedStudio: React.FC = () => {
   const [currentUsers, setCurrentUsers] = useState<User[]>([]);
   const [chatMessages, setChatMessages] = useState<{id: string, user: User, text: string, time: string}[]>([]);
   const [newChatMessage, setNewChatMessage] = useState<string>('');
-  const [sidebarTab, setSidebarTab] = useState<'tracks' | 'mixer' | 'collab'>('tracks');
+  const [sidebarTab, setSidebarTab] = useState<'tracks' | 'mixer' | 'collab' | 'cloud'>('tracks');
   const [projectTime, setProjectTime] = useState<number>(0);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
@@ -1111,6 +1112,10 @@ const EnhancedStudio: React.FC = () => {
                       <Users size={14} className="mr-1" />
                       Collab
                     </TabsTrigger>
+                    <TabsTrigger value="cloud" className="flex-1">
+                      <Cloud size={14} className="mr-1" />
+                      Cloud
+                    </TabsTrigger>
                   </TabsList>
                 </div>
                 
@@ -1417,6 +1422,46 @@ const EnhancedStudio: React.FC = () => {
                         </div>
                       </div>
                     </Card>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="cloud" className="m-0">
+                  <div className="p-3">
+                    <h3 className="text-sm font-medium mb-3">Cloud Storage</h3>
+                    <div className="space-y-4">
+                      <ProjectSync projectId={parseInt(project.id)} />
+                      
+                      <Card className="bg-gray-800 border-gray-700">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <Folder className="h-4 w-4" />
+                            Project Details
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="text-sm space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Project Name:</span>
+                            <span className="font-medium">{project.name}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Created:</span>
+                            <span className="font-medium">{new Date(project.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Last Modified:</span>
+                            <span className="font-medium">{new Date(project.updatedAt).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Tracks:</span>
+                            <span className="font-medium">{tracks.length}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">BPM:</span>
+                            <span className="font-medium">{project.bpm}</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
                   </div>
                 </TabsContent>
               </Tabs>
