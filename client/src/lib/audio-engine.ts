@@ -131,18 +131,47 @@ export class AudioEngine {
   getPosition(): number {
     return Tone.Transport.seconds;
   }
+  
+  /**
+   * Alias for getPosition - for compatibility with AudioProcessor interface
+   */
+  getPlaybackPosition(): number {
+    return this.getPosition();
+  }
 
   /**
    * Set the playback position
    */
   setPosition(time: number): void {
+    console.log(`Setting playback position to ${time} seconds`);
+    
+    // First stop transport if needed to avoid any glitches
+    const wasPlaying = Tone.Transport.state === 'started';
+    if (wasPlaying) {
+      Tone.Transport.pause();
+    }
+    
+    // Set the position
     Tone.Transport.seconds = time;
+    
+    // Restart if it was playing
+    if (wasPlaying) {
+      Tone.Transport.start();
+    }
   }
 
   /**
-   * Start playback
+   * Start playback from current position
    */
   play(): void {
+    console.log('Starting playback at position:', Tone.Transport.seconds);
+    
+    // Make sure Tone.js context is running
+    if (Tone.getContext().state !== 'running') {
+      Tone.start();
+    }
+    
+    // Start the transport
     Tone.Transport.start();
   }
 
@@ -150,14 +179,18 @@ export class AudioEngine {
    * Pause playback
    */
   pause(): void {
+    console.log('Pausing playback at position:', Tone.Transport.seconds);
     Tone.Transport.pause();
   }
 
   /**
-   * Stop playback
+   * Stop playback (resets to beginning)
    */
   stop(): void {
+    console.log('Stopping playback and resetting position');
     Tone.Transport.stop();
+    // Reset to beginning (Transport.stop doesn't reset position in Tone.js)
+    Tone.Transport.seconds = 0;
   }
 
   /**
@@ -256,14 +289,25 @@ export class AudioEngine {
       const trackChannel = this.getTrackChannel(region.trackId);
       player.connect(trackChannel);
       
-      // Schedule the player
+      // Schedule the player - use Transport time for accurate timing
+      // Convert seconds to Transport time notation
+      const startTime = Tone.Time(region.start).toTicks();
+      const duration = Tone.Time(region.end - region.start).toTicks();
+      
+      // Use Transport scheduling for accurate playback timing
       player.start(
-        region.start,          // When to start
-        region.offset || 0,    // Where in the sample to start
-        region.end - region.start  // Duration to play
+        startTime,            // When to start (in Transport time)
+        region.offset || 0,   // Where in the sample to start
+        Tone.Ticks(duration).toSeconds()  // Duration to play
       );
       
-      // Store the player
+      console.log(`Scheduled region ${region.id} for playback:`, {
+        start: region.start,
+        end: region.end,
+        duration: region.end - region.start
+      });
+      
+      // Store the player for later reference
       this.players.set(region.id, player);
     }
   }
@@ -585,7 +629,8 @@ export class AudioEngine {
       
       // If overlap recording is enabled, keep playback going
       if (overlapRecording) {
-        if (!Tone.Transport.state === 'started') {
+        if (Tone.Transport.state !== 'started') {
+          // Only start if not already playing
           this.play();
         }
       } else {

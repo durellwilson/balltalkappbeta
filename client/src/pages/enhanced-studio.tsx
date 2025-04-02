@@ -313,15 +313,29 @@ const EnhancedStudio: React.FC = () => {
     }
   }, [chatMessages]);
   
-  // Update timer when playing
+  // Update timer when playing by getting actual position from audio engine
   useEffect(() => {
-    if (isPlaying) {
+    if (isPlaying && audioProcessor.isReady()) {
       const timer = setInterval(() => {
-        setProjectTime(prev => prev + 0.1);
-      }, 100);
+        try {
+          // Get the actual position from the audio engine - use the method from our AudioEngine class
+          const currentTime = audioProcessor.getPlaybackPosition();
+          
+          // Update the UI with the precise position from the audio engine
+          setProjectTime(currentTime);
+          
+          // Log position updates at longer intervals to avoid console spam
+          if (Math.floor(currentTime * 10) % 50 === 0) {
+            console.log(`Playback position: ${currentTime.toFixed(2)}s`);
+          }
+        } catch (error) {
+          console.warn("Could not get playback position:", error);
+        }
+      }, 50); // Increased update frequency for smoother UI
+      
       return () => clearInterval(timer);
     }
-  }, [isPlaying]);
+  }, [isPlaying, audioProcessor]);
   
   // Handle keyboard shortcuts
   const handleKeyPress = useCallback((e: KeyboardEvent) => {
@@ -529,13 +543,31 @@ const EnhancedStudio: React.FC = () => {
     }
   }, [isRecording]);
   
-  // Handle arrangement view interactions
+  // Handle arrangement view interactions and playhead movement
   const handleTimeChange = (time: number) => {
+    console.log(`Time change requested to ${time} seconds`);
+    
+    // Update local state
     setProjectTime(time);
     
     // Update audio processor position if it's ready
     if (audioProcessor.isReady()) {
-      audioProcessor.setPosition(time);
+      try {
+        // Ensure time is within valid bounds
+        const validTime = Math.max(0, time);
+        
+        // Update the playback position in the audio engine
+        audioProcessor.setPosition(validTime);
+        
+        console.log(`Playhead position updated to ${validTime} seconds`);
+      } catch (error) {
+        console.error('Error setting playback position:', error);
+        toast({
+          title: "Playback Error",
+          description: "Could not set the playback position. Please try again.",
+          variant: "destructive"
+        });
+      }
     }
   };
   
