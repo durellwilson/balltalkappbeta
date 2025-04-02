@@ -12,6 +12,7 @@ import { useStudioCollaboration } from '@/hooks/use-studio-collaboration';
 import * as Tone from 'tone';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
