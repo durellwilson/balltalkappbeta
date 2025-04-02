@@ -164,7 +164,7 @@ const EnhancedStudio: React.FC = () => {
   const [currentUsers, setCurrentUsers] = useState<User[]>([]);
   const [chatMessages, setChatMessages] = useState<{id: string, user: User, text: string, time: string}[]>([]);
   const [newChatMessage, setNewChatMessage] = useState<string>('');
-  const [sidebarTab, setSidebarTab] = useState<'tracks' | 'mixer' | 'collab' | 'cloud'>('tracks');
+  const [sidebarTab, setSidebarTab] = useState<'tracks' | 'mixer' | 'collab' | 'cloud' | 'effects' | 'master' | 'ai'>('tracks');
   const [projectTime, setProjectTime] = useState<number>(0);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
@@ -335,7 +335,7 @@ const EnhancedStudio: React.FC = () => {
           });
           console.log('Setting up for recording based on URL parameter');
         } else if (initialAction === 'ai') {
-          setRightPanelTab('ai');
+          setSidebarTab('ai');
           toast({
             title: "AI Generation Ready",
             description: "Use the AI panel to generate a new track.",
