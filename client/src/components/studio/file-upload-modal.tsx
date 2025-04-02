@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -26,8 +26,9 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileDropZone } from './file-drop-zone';
-import { Loader2, Music, Mic, Volume2, FileMusic, Clock, Users } from 'lucide-react';
+import { Loader2, Music, Mic, Volume2, FileMusic, Clock, Users, Wand, Zap, Waves } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -43,6 +44,13 @@ interface FileUploadOptions {
   allowOverlap: boolean;
   normalize: boolean;
   normalizationLevel: number;
+  enhanceAudio?: boolean;
+  enhanceOptions?: {
+    clarity?: number;
+    noiseSuppression?: boolean;
+    bassBoost?: number;
+    stereoWidening?: number;
+  };
 }
 
 interface FileUploadModalProps {
@@ -66,6 +74,11 @@ const uploadFormSchema = z.object({
   allowOverlap: z.boolean().default(true),
   normalize: z.boolean().default(false),
   normalizationLevel: z.number().min(-12).max(0).default(-3),
+  enhanceAudio: z.boolean().default(false),
+  clarity: z.number().min(0).max(100).default(50),
+  noiseSuppression: z.boolean().default(false),
+  bassBoost: z.number().min(0).max(100).default(0),
+  stereoWidening: z.number().min(0).max(100).default(0),
 });
 
 type UploadFormValues = z.infer<typeof uploadFormSchema>;
@@ -95,6 +108,11 @@ export function FileUploadModal({
       allowOverlap: true,
       normalize: false,
       normalizationLevel: -3,
+      enhanceAudio: false,
+      clarity: 50,
+      noiseSuppression: false,
+      bassBoost: 0,
+      stereoWidening: 0,
     },
   });
   
@@ -110,6 +128,11 @@ export function FileUploadModal({
         allowOverlap: true,
         normalize: false,
         normalizationLevel: -3,
+        enhanceAudio: false,
+        clarity: 50,
+        noiseSuppression: false,
+        bassBoost: 0,
+        stereoWidening: 0,
       });
       setFiles([]);
     }
@@ -147,6 +170,13 @@ export function FileUploadModal({
         allowOverlap: data.allowOverlap,
         normalize: data.normalize,
         normalizationLevel: data.normalizationLevel,
+        enhanceAudio: data.enhanceAudio,
+        enhanceOptions: data.enhanceAudio ? {
+          clarity: data.clarity / 100, // Convert to 0-1 range
+          noiseSuppression: data.noiseSuppression,
+          bassBoost: data.bassBoost / 100, // Convert to 0-1 range
+          stereoWidening: data.stereoWidening / 100, // Convert to 0-1 range
+        } : undefined
       };
       
       const success = await onUpload(files, options);
@@ -184,6 +214,7 @@ export function FileUploadModal({
   // Watch form values for conditional rendering
   const createNewTrack = form.watch('createNewTrack');
   const normalize = form.watch('normalize');
+  const enhanceAudio = form.watch('enhanceAudio');
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -481,6 +512,128 @@ export function FileUploadModal({
                       )}
                     />
                   </div>
+                )}
+                
+                {/* Audio Enhancement Section */}
+                <div className="col-span-2 mt-4">
+                  <h3 className="text-sm font-medium mb-2 flex items-center">
+                    <Wand className="h-4 w-4 mr-2 text-purple-400" />
+                    Audio Enhancement
+                  </h3>
+                </div>
+                
+                <div className="col-span-1">
+                  <FormField
+                    control={form.control}
+                    name="enhanceAudio"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 border-gray-800">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm">Enhance Audio</FormLabel>
+                          <FormDescription className="text-xs text-gray-500">
+                            Apply professional audio processing
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                <div className="col-span-1">
+                  <FormField
+                    control={form.control}
+                    name="noiseSuppression"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 border-gray-800" style={{opacity: enhanceAudio ? 1 : 0.5}}>
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm">Noise Suppression</FormLabel>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={!enhanceAudio}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                
+                {enhanceAudio && (
+                  <>
+                    <div className="col-span-2">
+                      <FormField
+                        control={form.control}
+                        name="clarity"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Clarity: {field.value}%</FormLabel>
+                            <FormControl>
+                              <Slider
+                                min={0}
+                                max={100}
+                                step={1}
+                                defaultValue={[field.value]}
+                                onValueChange={(value) => field.onChange(value[0])}
+                                className="pt-2"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="col-span-2">
+                      <FormField
+                        control={form.control}
+                        name="bassBoost"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Bass Boost: {field.value}%</FormLabel>
+                            <FormControl>
+                              <Slider
+                                min={0}
+                                max={100}
+                                step={1}
+                                defaultValue={[field.value]}
+                                onValueChange={(value) => field.onChange(value[0])}
+                                className="pt-2"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
+                    <div className="col-span-2">
+                      <FormField
+                        control={form.control}
+                        name="stereoWidening"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Stereo Widening: {field.value}%</FormLabel>
+                            <FormControl>
+                              <Slider
+                                min={0}
+                                max={100}
+                                step={1}
+                                defaultValue={[field.value]}
+                                onValueChange={(value) => field.onChange(value[0])}
+                                className="pt-2"
+                              />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </>
                 )}
               </div>
             </div>
