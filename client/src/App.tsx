@@ -238,12 +238,14 @@ const Profile = () => (
 // Auth Page
 const AuthPage = () => {
   const { loginMutation } = useAuth();
+  const [username, setUsername] = useState("athlete");
+  const [password, setPassword] = useState("password123");
   
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     loginMutation.mutate({ 
-      username: "athlete", 
-      password: "password123" 
+      username, 
+      password 
     });
   };
   
@@ -270,8 +272,9 @@ const AuthPage = () => {
             <label className="text-sm font-medium text-white">Username</label>
             <input 
               className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded-md text-white" 
-              defaultValue="athlete"
-              disabled
+              value={username}
+              name="username"
+              onChange={(e) => setUsername(e.target.value)}
             />
           </div>
           
@@ -280,8 +283,9 @@ const AuthPage = () => {
             <input 
               className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded-md text-white" 
               type="password" 
-              defaultValue="password123"
-              disabled
+              value={password}
+              name="password"
+              onChange={(e) => setPassword(e.target.value)}
             />
           </div>
           
