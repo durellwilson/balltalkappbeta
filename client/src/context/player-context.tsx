@@ -33,6 +33,8 @@ interface PlayerContextType {
   addToQueue: (track: PlayableTrack) => void;
   removeFromQueue: (trackId: number) => void;
   clearQueue: () => void;
+  getPlayCount: (trackId: number) => number;
+  incrementPlayCount: (trackId: number) => void;
 }
 
 // Creating the context with default values
@@ -55,7 +57,9 @@ const PlayerContext = createContext<PlayerContextType>({
   queue: [],
   addToQueue: () => {},
   removeFromQueue: () => {},
-  clearQueue: () => {}
+  clearQueue: () => {},
+  getPlayCount: () => 0,
+  incrementPlayCount: () => {}
 });
 
 // Provider component that wraps the app
@@ -67,6 +71,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isShuffleOn, setIsShuffleOn] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
   const [queue, setQueue] = useState<PlayableTrack[]>([]);
+  const [playCounts, setPlayCounts] = useState<Record<number, number>>({});
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const intervalRef = useRef<number | null>(null);
@@ -189,8 +194,24 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
     
+    // Increment play count when starting a new track
+    incrementPlayCount(track.id);
+    
     setCurrentTrack(track);
     setIsPlaying(true);
+  };
+  
+  // Get play count for a track
+  const getPlayCount = (trackId: number): number => {
+    return playCounts[trackId] || 0;
+  };
+  
+  // Increment play count for a track
+  const incrementPlayCount = (trackId: number): void => {
+    setPlayCounts(prev => ({
+      ...prev,
+      [trackId]: (prev[trackId] || 0) + 1
+    }));
   };
   
   // Pause the current track
@@ -309,7 +330,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     queue,
     addToQueue,
     removeFromQueue,
-    clearQueue
+    clearQueue,
+    getPlayCount,
+    incrementPlayCount
   };
   
   return (

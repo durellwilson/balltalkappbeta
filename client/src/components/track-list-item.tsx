@@ -10,7 +10,7 @@ interface TrackListItemProps {
 }
 
 export const TrackListItem: React.FC<TrackListItemProps> = ({ track, plays = 0 }) => {
-  const { currentTrack, isPlaying, playTrack, pauseTrack, resumeTrack } = usePlayer();
+  const { currentTrack, isPlaying, playTrack, pauseTrack, resumeTrack, getPlayCount } = usePlayer();
   
   const isCurrentTrack = currentTrack?.id === track.id;
   
@@ -56,7 +56,9 @@ export const TrackListItem: React.FC<TrackListItemProps> = ({ track, plays = 0 }
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-zinc-400 mr-1">
             <path d="M10 3.75a.75.75 0 00-1.264-.546L4.703 7H3.167a.75.75 0 00-.7.48A6.985 6.985 0 002 10c0 .887.165 1.737.468 2.52.111.29.39.48.7.48h1.535l4.033 3.796A.75.75 0 0010 16.25V3.75zM15.95 5.05a.75.75 0 00-1.06 1.061 5.5 5.5 0 011.06 3.389 5.5 5.5 0 01-1.06 3.389.75.75 0 101.06 1.061 7 7 0 001.5-4.45 7 7 0 00-1.5-4.45z" />
           </svg>
-          <span className="text-xs text-zinc-400">{plays.toLocaleString()} plays</span>
+          <span className="text-xs text-zinc-400">
+            {(getPlayCount(track.id) || plays).toLocaleString()} plays
+          </span>
         </div>
       </div>
       <div className="flex items-center space-x-3">
