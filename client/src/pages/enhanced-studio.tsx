@@ -111,6 +111,7 @@ interface Track {
     name: string;
     color: string;
   } | null;
+  creationMethod?: 'recorded' | 'uploaded' | 'ai-generated';
 }
 
 interface EffectParameter {
@@ -489,7 +490,8 @@ const EnhancedStudio: React.FC = () => {
           volume: 0.8,
           pan: 0,
           isMuted: false,
-          isSoloed: false
+          isSoloed: false,
+          creationMethod: 'recorded'
         };
         
         // Create track processor
@@ -806,7 +808,8 @@ const EnhancedStudio: React.FC = () => {
       volume: 0.8,
       pan: 0,
       isMuted: false,
-      isSoloed: false
+      isSoloed: false,
+      creationMethod: 'uploaded' // Default creation method
     };
     
     // Create track in audio processor
@@ -1004,7 +1007,8 @@ const EnhancedStudio: React.FC = () => {
               volume: 0.8,
               pan: 0,
               isMuted: false,
-              isSoloed: false
+              isSoloed: false,
+              creationMethod: 'uploaded'
             };
             
             targetTrackId = newTrackId;
@@ -1956,7 +1960,8 @@ const EnhancedStudio: React.FC = () => {
                             volume: 0.8,
                             pan: 0,
                             isMuted: false,
-                            isSoloed: false
+                            isSoloed: false,
+                            creationMethod: track.creationMethod || 'ai-generated'
                           };
                           
                           // Create track processor

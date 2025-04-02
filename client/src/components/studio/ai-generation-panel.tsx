@@ -27,6 +27,7 @@ interface Track {
     name: string;
     color: string;
   } | null;
+  creationMethod?: 'recorded' | 'uploaded' | 'ai-generated';
 }
 
 interface AudioRegion {
@@ -91,6 +92,7 @@ interface AIGenerationPanelProps {
     type?: 'audio' | 'instrument' | 'vocal' | 'drum' | 'mix';
     duration?: number;
     waveform?: number[];
+    creationMethod?: 'recorded' | 'uploaded' | 'ai-generated';
   }) => void;
   activeTrack?: Track;
   selectedRegions?: AudioRegion[];
@@ -258,7 +260,8 @@ export function AIGenerationPanel({
                  activeTab === 'vocal' ? 'vocal' : 
                  activeTab === 'speech' ? 'vocal' : 'audio',
             duration: generationSettings.parameters.duration,
-            waveform: Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15)
+            waveform: Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15),
+            creationMethod: 'ai-generated'
           });
         }
       };
@@ -361,7 +364,8 @@ export function AIGenerationPanel({
                activeTab === 'vocal' ? 'vocal' : 
                activeTab === 'speech' ? 'vocal' : 'audio',
           duration: duration,
-          waveform: Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15)
+          waveform: Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15),
+          creationMethod: 'ai-generated'
         });
       }
     };

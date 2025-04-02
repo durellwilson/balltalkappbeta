@@ -58,6 +58,7 @@ interface InteractiveTrackProps {
   color?: string;
   collaborator?: { id: string; name: string; color: string } | null;
   className?: string;
+  creationMethod?: 'recorded' | 'uploaded' | 'ai-generated';
 }
 
 /**
@@ -87,6 +88,7 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
   color = '#3b82f6',
   collaborator = null,
   className,
+  creationMethod,
 }) => {
   const [expanded, setExpanded] = useState<boolean>(false);
   const [visualizationType, setVisualizationType] = useState<'waveform' | 'spectrum'>('waveform');
@@ -171,8 +173,21 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
     }
   };
 
-  // Get track color based on type
+  // Get track color based on creation method (if specified) or type as fallback
   const getTrackTypeColor = () => {
+    // If creation method is specified, use that for coloring
+    if (creationMethod) {
+      switch (creationMethod) {
+        case 'recorded':
+          return 'from-red-500 to-rose-500'; // Red/Rose for recorded tracks
+        case 'uploaded':
+          return 'from-blue-500 to-sky-500'; // Blue/Sky for uploaded tracks
+        case 'ai-generated':
+          return 'from-purple-500 to-fuchsia-500'; // Purple/Fuchsia for AI-generated tracks
+      }
+    }
+    
+    // Fall back to type-based coloring if no creation method specified
     switch (type) {
       case 'vocal':
         return 'from-rose-500 to-pink-500';
@@ -263,7 +278,16 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
               <div 
                 className={`w-3 h-full min-h-[2rem] rounded-sm bg-gradient-to-b ${getTrackTypeColor()}`}
               ></div>
-              <h3 className="text-sm font-medium truncate">{name}</h3>
+              <div className="flex flex-col">
+                <h3 className="text-sm font-medium truncate">{name}</h3>
+                {creationMethod && (
+                  <span className="text-xs text-gray-400">
+                    {creationMethod === 'recorded' && 'Recorded'}
+                    {creationMethod === 'uploaded' && 'Uploaded'}
+                    {creationMethod === 'ai-generated' && 'AI Generated'}
+                  </span>
+                )}
+              </div>
               {isRecording && (
                 <div className="flex items-center space-x-1">
                   <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
