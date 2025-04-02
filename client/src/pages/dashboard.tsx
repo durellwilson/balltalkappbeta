@@ -27,7 +27,8 @@ import {
   Mic, 
   Upload, 
   Headphones, 
-  CreditCard 
+  CreditCard,
+  Sparkles
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
@@ -100,14 +101,35 @@ export default function Dashboard() {
         </div>
         
         {isAthlete && (
-          <div className="flex gap-3">
-            <Button onClick={() => navigate('/uploads')} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 border-0 shadow-lg hover:shadow-purple-500/30 transition-all">
+          <div className="flex flex-wrap gap-3">
+            <Button 
+              onClick={() => navigate('/enhanced-studio?action=record')} 
+              className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 border-0 shadow-lg hover:shadow-red-500/30 transition-all"
+            >
+              <Mic className="mr-2 h-4 w-4" />
+              Record Track
+            </Button>
+            <Button 
+              onClick={() => navigate('/enhanced-studio?action=upload')} 
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 border-0 shadow-lg hover:shadow-purple-500/30 transition-all"
+            >
               <Upload className="mr-2 h-4 w-4" />
               Upload Track
             </Button>
-            <Button variant="outline" onClick={() => navigate('/enhanced-studio')} className="border border-zinc-700 bg-black/40 hover:bg-black/60 shadow-lg">
-              <Mic className="mr-2 h-4 w-4" />
-              Studio
+            <Button 
+              onClick={() => navigate('/enhanced-studio?action=ai')} 
+              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 border-0 shadow-lg hover:shadow-emerald-500/30 transition-all"
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              AI Generate
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => navigate('/enhanced-studio')} 
+              className="border border-zinc-700 bg-black/40 hover:bg-black/60 shadow-lg"
+            >
+              <Music className="mr-2 h-4 w-4" />
+              Open Studio
             </Button>
           </div>
         )}

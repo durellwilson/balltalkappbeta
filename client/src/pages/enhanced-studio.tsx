@@ -140,6 +140,11 @@ interface User {
 }
 
 const EnhancedStudio: React.FC = () => {
+  // Get query parameters to check for initial actions
+  const [location] = useLocation();
+  const queryParams = new URLSearchParams(location.split('?')[1]);
+  const initialAction = queryParams.get('action');
+  
   // State
   const [project, setProject] = useState<Project>({
     id: 'new-project',
@@ -312,6 +317,36 @@ const EnhancedStudio: React.FC = () => {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages]);
+  
+  // Handle initial actions from URL parameters
+  useEffect(() => {
+    // Wait a bit to ensure audio engine is ready
+    const timer = setTimeout(() => {
+      if (initialAction) {
+        if (initialAction === 'upload') {
+          setIsUploadModalOpen(true);
+          console.log('Opening upload modal based on URL parameter');
+        } else if (initialAction === 'record') {
+          // Focus on the recording controls - we can't auto-start recording due to browser security
+          setRightPanelTab('effects');
+          toast({
+            title: "Recording Ready",
+            description: "Click the Record button to start recording your track.",
+          });
+          console.log('Setting up for recording based on URL parameter');
+        } else if (initialAction === 'ai') {
+          setRightPanelTab('ai');
+          toast({
+            title: "AI Generation Ready",
+            description: "Use the AI panel to generate a new track.",
+          });
+          console.log('Setting up AI generation based on URL parameter');
+        }
+      }
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [initialAction]);
   
   // Update timer when playing by getting actual position from audio engine
   useEffect(() => {
