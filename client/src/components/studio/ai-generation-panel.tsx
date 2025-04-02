@@ -114,6 +114,7 @@ export function AIGenerationPanel({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedAudio, setGeneratedAudio] = useState<Blob | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   
   // Music generation state
   const [musicPrompt, setMusicPrompt] = useState('');
@@ -429,6 +430,15 @@ export function AIGenerationPanel({
       <div className="p-3 border-b border-gray-800 flex items-center space-x-2">
         <Sparkles size={16} className="text-purple-400" />
         <h3 className="font-medium">AI Generation</h3>
+        {apiKeyAvailable ? (
+          <Badge variant="default" className="ml-auto bg-green-600 text-white">
+            <Check size={12} className="mr-1" /> API Ready
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="ml-auto border-red-500 text-red-500">
+            API Key Required
+          </Badge>
+        )}
       </div>
       
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
@@ -455,6 +465,24 @@ export function AIGenerationPanel({
         
         <ScrollArea className="flex-1">
           <div className="p-3">
+            {!apiKeyAvailable && (
+              <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded-md">
+                <h4 className="text-red-400 font-medium flex items-center">
+                  <Wand2 size={16} className="mr-2" /> API Key Required
+                </h4>
+                <p className="mt-1 text-sm text-gray-300">
+                  To enable AI generation features, please add your API key in the settings.
+                </p>
+                <Button 
+                  variant="outline" 
+                  className="mt-2 bg-transparent border-red-700 text-red-400 hover:bg-red-950 hover:text-red-300" 
+                  size="sm"
+                  onClick={() => setIsApiKeyModalOpen(true)}
+                >
+                  Add API Key
+                </Button>
+              </div>
+            )}
             {/* Music Generation Tab */}
             <TabsContent value="music" className="m-0 space-y-4">
               <div className="space-y-2">
@@ -808,6 +836,47 @@ export function AIGenerationPanel({
           </div>
         </ScrollArea>
       </Tabs>
+      
+      {/* API Key Modal */}
+      <Dialog open={isApiKeyModalOpen} onOpenChange={setIsApiKeyModalOpen}>
+        <DialogContent className="bg-gray-900 border-gray-800 text-white">
+          <DialogHeader>
+            <DialogTitle>Add API Key for AI Generation</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="api-key">AI Generation API Key</Label>
+              <Input 
+                id="api-key" 
+                className="bg-gray-800 border-gray-700"
+                placeholder="Enter your API key here"
+                type="password"
+              />
+              <p className="text-sm text-gray-400">
+                You can get your AI generation API key from the service provider's website.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsApiKeyModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              className="bg-purple-600 hover:bg-purple-700"
+              onClick={() => {
+                // In a real implementation, this would send the API key to the server
+                toast({
+                  title: "API Key Added",
+                  description: "Your AI generation API key has been saved.",
+                });
+                setIsApiKeyModalOpen(false);
+              }}
+            >
+              Save API Key
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

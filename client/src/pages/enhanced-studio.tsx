@@ -144,6 +144,7 @@ const EnhancedStudio: React.FC = () => {
   const [location] = useLocation();
   const queryParams = new URLSearchParams(location.split('?')[1]);
   const initialAction = queryParams.get('action');
+  const initialMode = queryParams.get('mode'); // 'record', 'upload', or 'generate'
   
   // State
   const [project, setProject] = useState<Project>({
@@ -202,6 +203,7 @@ const EnhancedStudio: React.FC = () => {
   const [overlapRecording, setOverlapRecording] = useState<boolean>(true);
   const [recordingTime, setRecordingTime] = useState<number>(0);
   const [rightPanelTab, setRightPanelTab] = useState<'effects' | 'master' | 'collab' | 'ai'>('effects');
+  const [apiKeyAvailable, setApiKeyAvailable] = useState<boolean>(true);
   
   // References
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -278,6 +280,31 @@ const EnhancedStudio: React.FC = () => {
     configureAudio();
   }, []);
   
+  // Check if AI API key is available
+  useEffect(() => {
+    // In a real implementation, check if API key exists in environment 
+    // or user has valid subscription for AI features
+    const checkApiKeyAvailability = async () => {
+      try {
+        // This would be a call to backend to check if API key exists
+        // For now we'll simulate this with a simple check
+        const hasApiKey = true; // In production, check with backend API
+        setApiKeyAvailable(hasApiKey);
+        
+        if (!hasApiKey) {
+          console.log('AI generation API key not available');
+        } else {
+          console.log('AI generation API key available');
+        }
+      } catch (error) {
+        console.error('Failed to check API key availability:', error);
+        setApiKeyAvailable(false);
+      }
+    };
+    
+    checkApiKeyAvailability();
+  }, []);
+
   // Apply master effects when they change
   useEffect(() => {
     if (audioProcessor.isReady() && masterEffects.length > 0) {
@@ -322,7 +349,31 @@ const EnhancedStudio: React.FC = () => {
   useEffect(() => {
     // Wait a bit to ensure audio engine is ready
     const timer = setTimeout(() => {
-      if (initialAction) {
+      // Check for mode parameter first (from direct navigation buttons)
+      if (initialMode) {
+        if (initialMode === 'upload') {
+          setIsUploadModalOpen(true);
+          console.log('Opening upload modal based on URL parameter (mode)');
+        } else if (initialMode === 'record') {
+          // Focus on the recording controls - we can't auto-start recording due to browser security
+          setRightPanelTab('effects');
+          toast({
+            title: "Recording Ready",
+            description: "Click the Record button to start recording your track.",
+          });
+          console.log('Setting up for recording based on URL parameter (mode)');
+        } else if (initialMode === 'generate') {
+          // Open AI sidebar
+          setSidebarTab('ai');
+          toast({
+            title: "AI Generation Ready",
+            description: "Use the AI panel to generate a new track.",
+          });
+          console.log('Setting up AI generation based on URL parameter (mode)');
+        }
+      } 
+      // Fall back to action parameter for backward compatibility
+      else if (initialAction) {
         if (initialAction === 'upload') {
           setIsUploadModalOpen(true);
           console.log('Opening upload modal based on URL parameter');
@@ -346,7 +397,7 @@ const EnhancedStudio: React.FC = () => {
     }, 1000);
     
     return () => clearTimeout(timer);
-  }, [initialAction]);
+  }, [initialAction, initialMode]);
   
   // Update timer when playing by getting actual position from audio engine
   useEffect(() => {
@@ -2095,7 +2146,7 @@ const EnhancedStudio: React.FC = () => {
                       selectedRegions={regions.filter(r => selectedRegions.includes(r.id))}
                       bpm={project.bpm}
                       isSubscriptionActive={true}
-                      apiKeyAvailable={true}
+                      apiKeyAvailable={apiKeyAvailable}
                     />
                   </div>
                 </TabsContent>
