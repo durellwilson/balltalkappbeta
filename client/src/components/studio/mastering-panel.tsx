@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Sliders, 
   Plus, 
@@ -13,6 +13,14 @@ import {
   Music,
   Headphones
 } from 'lucide-react';
+
+interface Effect {
+  id: string;
+  type: string;
+  name: string;
+  enabled: boolean;
+  parameters: Record<string, any>;
+}
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
@@ -24,21 +32,23 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 interface MasteringPanelProps {
-  masterVolume: number;
-  onMasterVolumeChange: (volume: number) => void;
+  masterVolume?: number;
+  onMasterVolumeChange?: (volume: number) => void;
   masterPan?: number;
   onMasterPanChange?: (pan: number) => void;
   inputLevel?: number;
   outputLevel?: number;
+  onEffectsChange?: (effects: Effect[]) => void;
 }
 
 export function MasteringPanel({
-  masterVolume,
-  onMasterVolumeChange,
+  masterVolume = 0.8,
+  onMasterVolumeChange = () => {},
   masterPan = 0,
   onMasterPanChange,
   inputLevel = 0,
-  outputLevel = 0
+  outputLevel = 0,
+  onEffectsChange
 }: MasteringPanelProps) {
   // Local state for the mastering panel
   const [effectsEnabled, setEffectsEnabled] = useState(true);
@@ -249,6 +259,69 @@ export function MasteringPanel({
     setSelectedPreset(preset);
     applyPreset(preset);
   };
+  
+  // Generate and update effects when settings change
+  useEffect(() => {
+    if (onEffectsChange) {
+      const effects: Effect[] = [];
+      
+      // Only add effects if master effects are enabled
+      if (effectsEnabled) {
+        // Add EQ effect if enabled
+        if (eqEnabled) {
+          effects.push({
+            id: 'master-eq',
+            type: 'eq',
+            name: 'Parametric EQ',
+            enabled: true,
+            parameters: eqSettings
+          });
+        }
+        
+        // Add compressor effect if enabled
+        if (compressorEnabled) {
+          effects.push({
+            id: 'master-compressor',
+            type: 'compressor',
+            name: 'Compressor',
+            enabled: true,
+            parameters: compressorSettings
+          });
+        }
+        
+        // Add limiter effect if enabled
+        if (limiterEnabled) {
+          effects.push({
+            id: 'master-limiter',
+            type: 'limiter',
+            name: 'Limiter',
+            enabled: true,
+            parameters: limiterSettings
+          });
+        }
+        
+        // Add reverb effect if enabled
+        if (reverbEnabled) {
+          effects.push({
+            id: 'master-reverb',
+            type: 'reverb',
+            name: 'Reverb',
+            enabled: true,
+            parameters: reverbSettings
+          });
+        }
+      }
+      
+      onEffectsChange(effects);
+    }
+  }, [
+    onEffectsChange, 
+    effectsEnabled, 
+    eqEnabled, eqSettings, 
+    compressorEnabled, compressorSettings, 
+    limiterEnabled, limiterSettings, 
+    reverbEnabled, reverbSettings
+  ]);
   
   // Format number with fixed decimal places
   const formatNumber = (value: number, decimals: number = 1): string => {

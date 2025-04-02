@@ -97,6 +97,23 @@ interface Track {
   } | null;
 }
 
+interface EffectParameter {
+  name: string;
+  value: number | string | boolean;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: string[];
+}
+
+interface Effect {
+  id: string;
+  type: string;
+  name: string;
+  enabled: boolean;
+  parameters: Record<string, any>;
+}
+
 interface Project {
   id: string;
   name: string;
@@ -138,6 +155,8 @@ const EnhancedStudio: React.FC = () => {
   const [duration, setDuration] = useState<number>(120); // Total timeline duration in seconds
   const [audioInputLevel, setAudioInputLevel] = useState<number>(0);
   const [audioOutputLevel, setAudioOutputLevel] = useState<number>(0);
+  const [trackEffects, setTrackEffects] = useState<Record<number, Effect[]>>({});
+
   const [microphoneAccess, setMicrophoneAccess] = useState<boolean>(false);
   const [inputDevices, setInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedInputDevice, setSelectedInputDevice] = useState<string>('');
@@ -262,6 +281,31 @@ const EnhancedStudio: React.FC = () => {
     
     configureAudio();
   }, []);
+  
+  // Apply master effects when they change
+  useEffect(() => {
+    if (audioProcessor.isReady() && masterEffects.length > 0) {
+      console.log('Applying master effects:', masterEffects);
+      // Apply each effect to the master channel
+      // In a real implementation, this would call proper audio engine methods
+      // based on the effect types and parameters
+      masterEffects.forEach(effect => {
+        if (effect.type === 'eq' && effect.enabled) {
+          console.log('Applying EQ effect with parameters:', effect.parameters);
+          // audioProcessor.applyMasterEQ(effect.parameters);
+        } else if (effect.type === 'compressor' && effect.enabled) {
+          console.log('Applying compressor effect with parameters:', effect.parameters);
+          // audioProcessor.applyMasterCompressor(effect.parameters);
+        } else if (effect.type === 'limiter' && effect.enabled) {
+          console.log('Applying limiter effect with parameters:', effect.parameters);
+          // audioProcessor.applyMasterLimiter(effect.parameters);
+        } else if (effect.type === 'reverb' && effect.enabled) {
+          console.log('Applying reverb effect with parameters:', effect.parameters);
+          // audioProcessor.applyMasterReverb(effect.parameters);
+        }
+      });
+    }
+  }, [masterEffects]);
   
   // Auto-scroll chat to bottom when new messages arrive
   useEffect(() => {
@@ -997,7 +1041,44 @@ const EnhancedStudio: React.FC = () => {
         {/* Main editor area */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {/* Timeline and arrange view */}
-          <div className="flex-1 bg-gray-900 p-4 overflow-auto">
+          <div className="flex-1 bg-gray-900 overflow-hidden">
+            <ArrangementView
+              tracks={tracks.map(track => ({
+                id: track.id,
+                name: track.name,
+                type: track.type || 'audio',
+                volume: track.volume,
+                pan: track.pan,
+                isMuted: track.isMuted,
+                isSoloed: track.isSoloed,
+                isArmed: false
+              }))}
+              regions={regions || []}
+              currentTime={projectTime}
+              duration={300} // 5 minutes
+              bpm={project.bpm}
+              timeSignature={[4, 4]}
+              isPlaying={isPlaying}
+              isRecording={isRecording}
+              onTimeChange={handleTimeChange}
+              onRegionSelect={handleRegionSelect}
+              onRegionMove={handleRegionMove}
+              onRegionResize={handleRegionResize}
+              onRegionDelete={handleRegionDelete}
+              onRegionCopy={handleRegionCopy}
+              onRegionSplit={handleRegionSplit}
+              onTrackVolumeChange={handleTrackVolumeChange}
+              onTrackPanChange={handleTrackPanChange}
+              onTrackMuteToggle={handleTrackMuteToggle}
+              onTrackSoloToggle={handleTrackSoloToggle}
+              onTrackArmToggle={() => {}}
+              onTrackAdd={handleAddTrack}
+              onTrackDelete={handleDeleteTrack}
+              onZoomChange={setZoomLevel}
+              zoom={zoomLevel}
+              selectedTrackId={activeTrackId}
+              onTrackSelect={setActiveTrackId}
+            />
             <div className="mb-4">
               <h2 className="text-xl font-semibold mb-2">Arrangement</h2>
               
@@ -1123,6 +1204,14 @@ const EnhancedStudio: React.FC = () => {
                     <TabsTrigger value="tracks" className="flex-1">
                       <LayoutPanelLeft size={14} className="mr-1" />
                       Tracks
+                    </TabsTrigger>
+                    <TabsTrigger value="effects" className="flex-1">
+                      <Sliders size={14} className="mr-1" />
+                      Effects
+                    </TabsTrigger>
+                    <TabsTrigger value="master" className="flex-1">
+                      <Wand2 size={14} className="mr-1" />
+                      Master
                     </TabsTrigger>
                     <TabsTrigger value="mixer" className="flex-1">
                       <Settings size={14} className="mr-1" />
@@ -1286,6 +1375,50 @@ const EnhancedStudio: React.FC = () => {
                         )}
                       </div>
                     </ScrollArea>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="effects" className="m-0">
+                  <div className="p-3">
+                    <h3 className="text-sm font-medium mb-3">Track Effects</h3>
+                    
+                    {activeTrackId ? (
+                      <EffectsPanel
+                        trackId={activeTrackId}
+                        trackName={tracks.find(t => t.id === activeTrackId)?.name || 'Selected Track'}
+                        trackType={tracks.find(t => t.id === activeTrackId)?.type || 'audio'}
+                        effects={trackEffects[activeTrackId] || []}
+                        onEffectsChange={(effects) => {
+                          setTrackEffects(prev => ({
+                            ...prev,
+                            [activeTrackId]: effects
+                          }));
+                        }}
+                        inputLevel={0.7}
+                        outputLevel={0.8}
+                      />
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <Sliders size={32} className="mx-auto mb-2 opacity-30" />
+                        <p className="text-sm">Select a track to edit effects</p>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
+                
+                <TabsContent value="master" className="m-0">
+                  <div className="p-3">
+                    <h3 className="text-sm font-medium mb-3">Mastering</h3>
+                    
+                    <MasteringPanel
+                      masterVolume={masterVolume}
+                      onMasterVolumeChange={handleMasterVolumeChange}
+                      inputLevel={audioInputLevel}
+                      outputLevel={audioOutputLevel}
+                      onEffectsChange={(effects) => {
+                        setMasterEffects(effects);
+                      }}
+                    />
                   </div>
                 </TabsContent>
                 
