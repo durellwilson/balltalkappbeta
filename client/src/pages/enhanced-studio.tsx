@@ -387,6 +387,7 @@ const EnhancedStudio: React.FC = () => {
           console.log('Setting up for recording based on URL parameter');
         } else if (initialAction === 'ai') {
           setSidebarTab('ai');
+          setShowSidebar(true); // Force sidebar to be visible
           toast({
             title: "AI Generation Ready",
             description: "Use the AI panel to generate a new track.",
