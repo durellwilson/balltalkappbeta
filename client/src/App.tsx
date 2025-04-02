@@ -482,10 +482,10 @@ function App() {
             </ProtectedRoute>
           </Route>
           
-          {/* Redirect enhanced-studio to main studio */}
+          {/* Enhanced Studio route */}
           <Route path="/enhanced-studio">
             <ProtectedRoute>
-              <StudioPage />
+              <EnhancedStudio />
             </ProtectedRoute>
           </Route>
           

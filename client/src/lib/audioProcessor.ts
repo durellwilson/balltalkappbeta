@@ -289,6 +289,13 @@ class AudioProcessor {
   getBpm(): number {
     return Tone.Transport.bpm.value;
   }
+  
+  /**
+   * Set the playback position
+   */
+  setPosition(time: number): void {
+    Tone.Transport.seconds = time;
+  }
 
   /**
    * Set the master volume (0-1)

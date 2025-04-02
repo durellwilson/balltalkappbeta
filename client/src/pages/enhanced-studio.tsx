@@ -156,7 +156,8 @@ const EnhancedStudio: React.FC = () => {
   const [audioInputLevel, setAudioInputLevel] = useState<number>(0);
   const [audioOutputLevel, setAudioOutputLevel] = useState<number>(0);
   const [trackEffects, setTrackEffects] = useState<Record<number, Effect[]>>({});
-
+  const [masterEffects, setMasterEffects] = useState<Effect[]>([]);
+  
   const [microphoneAccess, setMicrophoneAccess] = useState<boolean>(false);
   const [inputDevices, setInputDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedInputDevice, setSelectedInputDevice] = useState<string>('');

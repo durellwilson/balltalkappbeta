@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Settings, 
   BarChart3, 
-  Waveform, 
+  Activity, // Using Activity instead of Waveform which doesn't exist in current lucide version
   Sliders, 
   Plus, 
   X, 
@@ -778,8 +778,8 @@ export function EffectsPanel({
                 Spectrum
               </TabsTrigger>
               <TabsTrigger value="waveform" className="text-xs">
-                <Waveform size={12} className="mr-1" />
-                Waveform
+                <Activity size={12} className="mr-1" />
+                Audio Analysis
               </TabsTrigger>
               <TabsTrigger value="meter" className="text-xs">
                 <Sliders size={12} className="mr-1" />
@@ -810,8 +810,8 @@ export function EffectsPanel({
                 {/* Waveform visualization would go here */}
                 <div className="bg-gray-900 w-full h-64 rounded flex items-center justify-center text-gray-400">
                   <div className="text-center">
-                    <Waveform size={32} className="mx-auto mb-2 opacity-40" />
-                    <p className="text-sm">Waveform Visualization</p>
+                    <Activity size={32} className="mx-auto mb-2 opacity-40" />
+                    <p className="text-sm">Audio Visualization</p>
                     <p className="text-xs mt-1">Displays real-time audio waveform</p>
                   </div>
                 </div>
