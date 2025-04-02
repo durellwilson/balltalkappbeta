@@ -105,7 +105,7 @@ export default function Dashboard() {
               <Upload className="mr-2 h-4 w-4" />
               Upload Track
             </Button>
-            <Button variant="outline" onClick={() => navigate('/studio')} className="border border-zinc-700 bg-black/40 hover:bg-black/60 shadow-lg">
+            <Button variant="outline" onClick={() => navigate('/enhanced-studio')} className="border border-zinc-700 bg-black/40 hover:bg-black/60 shadow-lg">
               <Mic className="mr-2 h-4 w-4" />
               Studio
             </Button>
@@ -310,7 +310,7 @@ export default function Dashboard() {
                       <Button 
                         variant="outline" 
                         className="border-zinc-800 bg-black/30 hover:bg-zinc-800 text-white"
-                        onClick={() => navigate('/studio')}
+                        onClick={() => navigate('/enhanced-studio')}
                       >
                         Create New Project
                       </Button>
@@ -319,7 +319,7 @@ export default function Dashboard() {
                 </CardContent>
                 {projects && projects.length > 0 && (
                   <CardFooter className="pt-0 pb-5 px-5">
-                    <Button variant="outline" size="sm" className="w-full border-zinc-800 bg-black/30 hover:bg-zinc-800" onClick={() => navigate('/studio')}>
+                    <Button variant="outline" size="sm" className="w-full border-zinc-800 bg-black/30 hover:bg-zinc-800" onClick={() => navigate('/enhanced-studio')}>
                       <Plus className="mr-2 h-4 w-4" />
                       New Project
                     </Button>
@@ -394,7 +394,7 @@ export default function Dashboard() {
                       <Button 
                         variant="outline" 
                         className="border-zinc-800 bg-black/30 hover:bg-zinc-800 text-white"
-                        onClick={() => navigate('/studio')}
+                        onClick={() => navigate('/enhanced-studio')}
                       >
                         Schedule Session
                       </Button>
@@ -403,7 +403,7 @@ export default function Dashboard() {
                 </CardContent>
                 {sessions && sessions.length > 0 && (
                   <CardFooter className="pt-0 pb-5 px-5">
-                    <Button variant="outline" size="sm" className="w-full border-zinc-800 bg-black/30 hover:bg-zinc-800" onClick={() => navigate('/studio')}>
+                    <Button variant="outline" size="sm" className="w-full border-zinc-800 bg-black/30 hover:bg-zinc-800" onClick={() => navigate('/enhanced-studio')}>
                       Manage Sessions
                     </Button>
                   </CardFooter>

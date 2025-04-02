@@ -1,149 +1,134 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 
 interface WaveformDisplayProps {
-  waveformData?: number[]; // Normalized amplitude data (0-1)
+  waveform: Float32Array | number[];
   color?: string;
-  height: number;
-  width?: number | string;
-  barWidth?: number;
-  barGap?: number;
+  backgroundColor?: string;
+  width?: number;
+  height?: number;
+  lineWidth?: number;
   animated?: boolean;
-  progress?: number; // 0-1 value for playback progress
-  gain?: number; // Amplification factor for better visualization
-  onClick?: (position: number) => void; // Returns normalized position (0-1)
-  className?: string;
 }
 
 export function WaveformDisplay({
-  waveformData = [],
-  color = '#3b82f6',
+  waveform,
+  color = 'rgba(59, 130, 246, 0.8)',
+  backgroundColor = 'rgba(0, 0, 0, 0.1)',
+  width,
   height,
-  width = '100%',
-  barWidth = 2,
-  barGap = 1,
-  animated = false,
-  progress = 0,
-  gain = 1.5,
-  onClick,
-  className = '',
+  lineWidth = 2,
+  animated = false
 }: WaveformDisplayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>(0);
+  const animationRef = useRef<number>();
+  const startTimeRef = useRef<number>(Date.now());
   
-  // Generate random waveform data if none provided
-  const data = waveformData.length > 0 
-    ? waveformData 
-    : Array.from({ length: 100 }, () => Math.random() * 0.5 + 0.1);
-    
   // Draw the waveform on the canvas
-  useEffect(() => {
+  const drawWaveform = (ctx: CanvasContext, time = 0) => {
+    if (!canvasRef.current) return;
+    
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const { width: canvasWidth, height: canvasHeight } = canvas;
     
-    const context = canvas.getContext('2d');
-    if (!context) return;
+    // Clear canvas
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
+    // Draw background
+    if (backgroundColor) {
+      ctx.fillStyle = backgroundColor;
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+    }
     
-    // Set the canvas size accounting for device pixel ratio
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    context.scale(dpr, dpr);
+    // Calculate animation phase if animated
+    let animPhase = 0;
+    if (animated) {
+      animPhase = (time % 2000) / 2000; // 2 second cycle
+    }
     
-    const renderWidth = rect.width;
-    const renderHeight = rect.height;
+    // Set line style
+    ctx.lineWidth = lineWidth;
+    ctx.strokeStyle = color;
     
-    // Clear the canvas
-    context.clearRect(0, 0, renderWidth, renderHeight);
+    // Start drawing path
+    ctx.beginPath();
     
-    // Calculate the number of bars that will fit in the available width
-    const totalBars = Math.floor(renderWidth / (barWidth + barGap));
-    const step = Math.max(1, Math.floor(data.length / totalBars));
+    // Calculate step size to skip samples if needed
+    const step = Math.max(1, Math.floor(waveform.length / canvasWidth));
     
-    // Draw the waveform
-    const drawWaveform = (animOffset = 0) => {
-      context.clearRect(0, 0, renderWidth, renderHeight);
+    // Draw waveform
+    for (let i = 0; i < canvasWidth; i++) {
+      const index = Math.min(Math.floor(i * step), waveform.length - 1);
+      let value = waveform[index] || 0;
       
-      // Draw background/progress
-      if (progress > 0) {
-        context.fillStyle = `${color}20`; // Very transparent background
-        context.fillRect(0, 0, renderWidth, renderHeight);
-        
-        context.fillStyle = `${color}40`; // Progress background
-        context.fillRect(0, 0, renderWidth * progress, renderHeight);
+      // Apply subtle animation if animated
+      if (animated) {
+        const oscillation = Math.sin(i / 10 + animPhase * Math.PI * 2) * 0.1;
+        value = Math.max(-1, Math.min(1, value * (1 + oscillation)));
       }
       
-      // Draw each bar
-      for (let i = 0; i < totalBars; i++) {
-        // Get data point, using step to sample the data array
-        const dataIndex = Math.min(data.length - 1, Math.floor(i * step));
-        let amplitude = data[dataIndex] * gain; // Apply gain for better visualization
-        if (amplitude > 1) amplitude = 1; // Clamp to 1
-        
-        // Add a small animation offset if animated
-        if (animated) {
-          const offset = Math.sin((i * 0.2) + animOffset) * 0.1;
-          amplitude = Math.max(0.02, amplitude + offset);
-        }
-        
-        const barHeight = amplitude * renderHeight;
-        const x = i * (barWidth + barGap);
-        const y = (renderHeight - barHeight) / 2;
-        
-        // Determine color based on position relative to playback progress
-        const barPosition = x / renderWidth;
-        if (barPosition <= progress) {
-          context.fillStyle = color; // Active part
-        } else {
-          context.fillStyle = `${color}80`; // Inactive part (semi-transparent)
-        }
-        
-        // Draw the bar
-        context.fillRect(x, y, barWidth, barHeight);
+      // Convert value to Y coordinate (centered in the middle)
+      const y = (0.5 + value / -2) * canvasHeight;
+      
+      if (i === 0) {
+        ctx.moveTo(i, y);
+      } else {
+        ctx.lineTo(i, y);
+      }
+    }
+    
+    // Draw the path
+    ctx.stroke();
+    
+    // Request next animation frame if animated
+    if (animated) {
+      animationRef.current = requestAnimationFrame((timestamp) => drawWaveform(ctx, timestamp - startTimeRef.current));
+    }
+  };
+  
+  // Initialize and update canvas
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return;
+    
+    // Set canvas dimensions to match container if not explicitly provided
+    if (!width || !height) {
+      const container = canvas.parentElement;
+      if (container) {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+      }
+    }
+    
+    // Start animation or draw static waveform
+    if (animated) {
+      startTimeRef.current = Date.now();
+      animationRef.current = requestAnimationFrame((timestamp) => 
+        drawWaveform(ctx, timestamp - startTimeRef.current)
+      );
+    } else {
+      drawWaveform(ctx);
+    }
+    
+    // Clean up animation on unmount
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
       }
     };
-    
-    // Initial draw
-    drawWaveform();
-    
-    // Animation loop for the waveform
-    if (animated) {
-      let animOffset = 0;
-      const animate = () => {
-        animOffset += 0.05;
-        drawWaveform(animOffset);
-        animationRef.current = requestAnimationFrame(animate);
-      };
-      
-      animate();
-      
-      // Cleanup animation
-      return () => cancelAnimationFrame(animationRef.current);
-    }
-  }, [data, color, height, barWidth, barGap, animated, progress, gain]);
-  
-  // Handle click on the waveform
-  const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!onClick) return;
-    
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const position = x / rect.width;
-    
-    onClick(position);
-  };
+  }, [waveform, color, backgroundColor, width, height, lineWidth, animated]);
   
   return (
     <canvas
       ref={canvasRef}
+      width={width}
       height={height}
-      style={{ width, height, display: 'block' }}
-      className={`waveform-display ${className}`}
-      onClick={onClick ? handleClick : undefined}
+      className="w-full h-full"
     />
   );
 }
+
+type CanvasContext = CanvasRenderingContext2D;
