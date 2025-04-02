@@ -207,8 +207,8 @@ const Dashboard = () => {
             asChild 
             className="bg-gradient-to-r from-blue-600 to-purple-600 text-white border-none font-medium"
           >
-            <Link href="/studio">
-              Studio
+            <Link href="/enhanced-studio">
+              Enhanced Studio
               <span className="ml-1 text-xs animate-pulse">✨</span>
             </Link>
           </Button>
@@ -416,7 +416,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
             </svg>
             <span className="text-xs mt-0.5">Discover</span>
           </Link>
-          <Link href="/studio" 
+          <Link href="/enhanced-studio" 
             className={`flex flex-col items-center py-2 ${activeTab === 'live' ? 'text-primary' : 'text-zinc-400'}`}
             onClick={() => setActiveTab('live')}
           >
@@ -495,9 +495,11 @@ function App() {
             </ProtectedRoute>
           </Route>
           
-          {/* Redirect legacy /enhanced-studio to /studio for unified experience */}
+          {/* Route for enhanced studio with AI features */}
           <Route path="/enhanced-studio">
-            <RedirectComponent to="/studio" />
+            <ProtectedRoute>
+              <EnhancedStudio />
+            </ProtectedRoute>
           </Route>
           
           {/* Profile */}
