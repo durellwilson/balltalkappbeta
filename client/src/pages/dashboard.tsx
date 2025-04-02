@@ -32,6 +32,9 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
+import { TrackListItem } from '@/components/track-list-item';
+import { TrackDemoSection } from '@/components/track-demo-section';
+import { sampleTracks } from '@/data/sample-tracks';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -191,6 +194,11 @@ export default function Dashboard() {
       
       {/* Content section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Player Demo */}
+        <div className="lg:col-span-3 mb-8">
+          <TrackDemoSection />
+        </div>
+        
         {/* Recent releases */}
         <Card className="lg:col-span-2 border-0 shadow-xl bg-zinc-900/50 backdrop-blur-sm">
           <CardHeader className="border-b border-zinc-800/70">

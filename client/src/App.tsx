@@ -14,6 +14,8 @@ const RedirectComponent = ({ to }: { to: string }) => {
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
+import { PlayerProvider } from "./context/player-context";
+import { NowPlayingBar } from "./components/player/now-playing-bar";
 import { Button } from "@/components/ui/button";
 
 // Import pages
@@ -365,35 +367,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       
       {/* Now Playing Bar (if a track is playing) - hidden in studio pages */}
       {!/studio|enhanced-studio/.test(location) && (
-        <div className="fixed bottom-16 left-0 right-0 bg-zinc-900 border-t border-zinc-800 py-2 px-4">
-          <div className="flex items-center">
-            <div className="w-10 h-10 bg-zinc-800 rounded-md mr-3 flex-shrink-0"></div>
-            <div className="flex-grow min-w-0">
-              <p className="font-medium text-sm truncate">Game Day Vibes</p>
-              <p className="text-xs text-zinc-400 truncate">Marcus Thompson</p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <button className="text-zinc-400 hover:text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 16.811c0 .864-.933 1.405-1.683.977l-7.108-4.062a1.125 1.125 0 010-1.953l7.108-4.062A1.125 1.125 0 0121 8.688v8.123zM11.25 16.811c0 .864-.933 1.405-1.683.977l-7.108-4.062a1.125 1.125 0 010-1.953L9.567 7.71a1.125 1.125 0 011.683.977v8.123z" />
-                </svg>
-              </button>
-              <button className="bg-primary text-black h-8 w-8 rounded-full flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
-                </svg>
-              </button>
-              <button className="text-zinc-400 hover:text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062A1.125 1.125 0 013 16.81V8.688zM12.75 8.688c0-.864.933-1.405 1.683-.977l7.108 4.062a1.125 1.125 0 010 1.953l-7.108 4.062a1.125 1.125 0 01-1.683-.977V8.688z" />
-                </svg>
-              </button>
-              <button className="text-zinc-400 hover:text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-                </svg>
-              </button>
-            </div>
+        <div className="fixed bottom-16 left-0 right-0 bg-gradient-to-r from-zinc-900 to-black border-t border-zinc-800 py-2 backdrop-blur-sm">
+          <div className="max-w-screen-xl mx-auto px-4">
+            <NowPlayingBar />
           </div>
         </div>
       )}
@@ -471,67 +447,70 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Switch>
-          {/* Auth route */}
-          <Route path="/auth">
-            <AuthRedirect>
-              <AuthPage />
-            </AuthRedirect>
-          </Route>
-          
-          {/* Dashboard */}
-          <Route path="/">
-            <ProtectedRoute>
-              <DashboardPage />
-            </ProtectedRoute>
-          </Route>
-          
-          {/* Studio Routes - Unified Experience */}
-          <Route path="/studio">
-            <ProtectedRoute>
-              <EnhancedStudio />
-            </ProtectedRoute>
-          </Route>
-          
-          <Route path="/studio/:projectId">
-            <ProtectedRoute>
-              <EnhancedStudio />
-            </ProtectedRoute>
-          </Route>
-          
-          {/* Route for enhanced studio with AI features */}
-          <Route path="/enhanced-studio">
-            <ProtectedRoute>
-              <EnhancedStudio />
-            </ProtectedRoute>
-          </Route>
-          
-          {/* Profile */}
-          <Route path="/profile">
-            <ProtectedRoute>
-              <ProfilePage />
-            </ProtectedRoute>
-          </Route>
-          
-          {/* Discover */}
-          <Route path="/discover">
-            <ProtectedRoute>
-              <DiscoverPage />
-            </ProtectedRoute>
-          </Route>
-          
-          {/* 404 Not Found */}
-          <Route>
-            <div className="p-8 bg-black text-white min-h-screen">
-              <h1 className="text-2xl font-bold mb-4">404 - Not Found</h1>
-              <p>The page you're looking for doesn't exist.</p>
-              <Button className="mt-4 bg-primary text-black" asChild>
-                <Link href="/">Back to Dashboard</Link>
-              </Button>
-            </div>
-          </Route>
-        </Switch>
-        <Toaster />
+        <PlayerProvider>
+          <Switch>
+            {/* Auth route */}
+            <Route path="/auth">
+              <AuthRedirect>
+                <AuthPage />
+              </AuthRedirect>
+            </Route>
+            
+            {/* Dashboard */}
+            <Route path="/">
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            </Route>
+            
+            {/* Studio Routes - Unified Experience */}
+            <Route path="/studio">
+              <ProtectedRoute>
+                <EnhancedStudio />
+              </ProtectedRoute>
+            </Route>
+            
+            <Route path="/studio/:projectId">
+              <ProtectedRoute>
+                <EnhancedStudio />
+              </ProtectedRoute>
+            </Route>
+            
+            {/* Route for enhanced studio with AI features */}
+            <Route path="/enhanced-studio">
+              <ProtectedRoute>
+                <EnhancedStudio />
+              </ProtectedRoute>
+            </Route>
+            
+            {/* Profile */}
+            <Route path="/profile">
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            </Route>
+            
+            {/* Discover */}
+            <Route path="/discover">
+              <ProtectedRoute>
+                <DiscoverPage />
+              </ProtectedRoute>
+            </Route>
+            
+            {/* 404 Not Found */}
+            <Route>
+              <div className="p-8 bg-black text-white min-h-screen">
+                <h1 className="text-2xl font-bold mb-4">404 - Not Found</h1>
+                <p>The page you're looking for doesn't exist.</p>
+                <Button className="mt-4 bg-primary text-black" asChild>
+                  <Link href="/">Back to Dashboard</Link>
+                </Button>
+              </div>
+            </Route>
+          </Switch>
+          <NowPlayingBar />
+          <Toaster />
+        </PlayerProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
