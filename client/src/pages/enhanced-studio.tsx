@@ -142,8 +142,8 @@ interface User {
 const EnhancedStudio: React.FC = () => {
   // State
   const [project, setProject] = useState<Project>({
-    id: 'demo-1',
-    name: 'My Project',
+    id: 'new-project',
+    name: 'Untitled Project',
     bpm: 120,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -251,48 +251,7 @@ const EnhancedStudio: React.FC = () => {
           audioProcessor.setBpm(project.bpm);
         }
         
-        // Initialize demo tracks
-        const demoTracks: Track[] = [
-          {
-            id: 1,
-            name: 'Vocals',
-            type: 'vocal',
-            volume: 0.8,
-            pan: 0,
-            isMuted: false,
-            isSoloed: false
-          },
-          {
-            id: 2,
-            name: 'Guitar',
-            type: 'instrument',
-            volume: 0.7,
-            pan: -0.3,
-            isMuted: false,
-            isSoloed: false
-          },
-          {
-            id: 3,
-            name: 'Drums',
-            type: 'drum',
-            volume: 0.75,
-            pan: 0.1,
-            isMuted: false,
-            isSoloed: false
-          }
-        ];
-        
-        // Create tracks in the audio processor
-        demoTracks.forEach(track => {
-          audioProcessor.createTrack(track.id, {
-            volume: track.volume,
-            pan: track.pan,
-            muted: track.isMuted,
-            soloed: track.isSoloed
-          });
-        });
-        
-        setTracks(demoTracks);
+        // Start with empty project - no demo tracks
         
         // Add listener for esc key to stop playback
         window.addEventListener('keydown', handleKeyPress);
@@ -517,7 +476,7 @@ const EnhancedStudio: React.FC = () => {
             end: overlapRecording ? projectTime : recordingDuration,
             offset: 0,
             name: `Recording ${new Date().toLocaleTimeString()}`,
-            waveform: Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15),
+            waveform: audioProcessor.getTrack(newTrackId)?.getWaveform() || [],
             file: url
           };
           
@@ -1261,10 +1220,11 @@ const EnhancedStudio: React.FC = () => {
               className="bg-transparent border-none text-lg font-medium h-7 p-0 focus-visible:ring-0 focus-visible:ring-offset-0"
             />
             <div className="flex items-center space-x-2 text-xs text-gray-400">
-              <span>Last saved: 2 mins ago</span>
-              <Badge variant="outline" className="text-emerald-400 border-emerald-800">
-                Collaborating ({currentUsers.length + 1})
-              </Badge>
+              {currentUsers.length > 0 && (
+                <Badge variant="outline" className="text-emerald-400 border-emerald-800">
+                  Collaborating ({currentUsers.length + 1})
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -1985,7 +1945,7 @@ const EnhancedStudio: React.FC = () => {
                             end: track.duration || 10,
                             offset: 0,
                             name: track.name || 'AI Generated',
-                            waveform: track.waveform || Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15),
+                            waveform: track.waveform || audioProcessor.getTrack(newTrackId)?.getWaveform() || [],
                             file: url
                           };
                           
