@@ -11,6 +11,34 @@ import {
   Check,
   Download
 } from 'lucide-react';
+
+// Import Track and AudioRegion types from the parent component
+interface Track {
+  id: number;
+  name: string;
+  type: 'audio' | 'instrument' | 'vocal' | 'drum' | 'mix';
+  volume: number;
+  pan: number;
+  isMuted: boolean;
+  isSoloed: boolean;
+  createdBy?: string;
+  collaborator?: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
+}
+
+interface AudioRegion {
+  id: string;
+  trackId: number;
+  start: number;
+  end: number;
+  offset: number;
+  name: string;
+  waveform: number[];
+  file: string;
+}
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,14 +85,26 @@ interface HistoryItem {
 
 // Component props
 interface AIGenerationPanelProps {
-  onGenerateAudio: (audioBlob: Blob, settings: GenerationSettings) => void;
-  onAddToProject: (audioBlob: Blob, settings: GenerationSettings) => void;
+  onGenerateTrack: (track: {
+    buffer: ArrayBuffer;
+    name?: string;
+    type?: 'audio' | 'instrument' | 'vocal' | 'drum' | 'mix';
+    duration?: number;
+    waveform?: number[];
+  }) => void;
+  activeTrack?: Track;
+  selectedRegions?: AudioRegion[];
+  bpm?: number;
+  isSubscriptionActive?: boolean;
   apiKeyAvailable?: boolean;
 }
 
 export function AIGenerationPanel({
-  onGenerateAudio,
-  onAddToProject,
+  onGenerateTrack,
+  activeTrack,
+  selectedRegions,
+  bpm = 120,
+  isSubscriptionActive = false,
   apiKeyAvailable = false
 }: AIGenerationPanelProps) {
   // State
@@ -206,7 +246,22 @@ export function AIGenerationPanel({
       setHistory(prev => [historyItem, ...prev.slice(0, 9)]);
       
       // Call the callback
-      onGenerateAudio(mockAudioBlob, generationSettings);
+      // Convert Blob to ArrayBuffer
+      const reader = new FileReader();
+      reader.readAsArrayBuffer(mockAudioBlob);
+      reader.onloadend = () => {
+        if (reader.result) {
+          onGenerateTrack({
+            buffer: reader.result as ArrayBuffer,
+            name: `Generated ${activeTab} - ${new Date().toLocaleTimeString()}`,
+            type: activeTab === 'music' ? 'audio' : 
+                 activeTab === 'vocal' ? 'vocal' : 
+                 activeTab === 'speech' ? 'vocal' : 'audio',
+            duration: generationSettings.parameters.duration,
+            waveform: Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15)
+          });
+        }
+      };
       
       toast({
         title: 'Generation Complete',
@@ -230,6 +285,7 @@ export function AIGenerationPanel({
     
     // Build settings object
     let settings: GenerationSettings;
+    let duration = 0;
     
     switch (activeTab) {
       case 'music':
@@ -244,6 +300,7 @@ export function AIGenerationPanel({
             duration: musicDuration
           }
         };
+        duration = musicDuration;
         break;
         
       case 'vocal':
@@ -258,6 +315,7 @@ export function AIGenerationPanel({
             duration: vocalDuration
           }
         };
+        duration = vocalDuration;
         break;
         
       case 'speech':
@@ -272,6 +330,7 @@ export function AIGenerationPanel({
             duration: Math.ceil(speechText.length / 15)
           }
         };
+        duration = Math.ceil(speechText.length / 15);
         break;
         
       case 'sfx':
@@ -286,11 +345,26 @@ export function AIGenerationPanel({
             duration: sfxDuration
           }
         };
+        duration = sfxDuration;
         break;
     }
     
-    // Call the callback
-    onAddToProject(generatedAudio, settings);
+    // Convert Blob to ArrayBuffer and call onGenerateTrack
+    const reader = new FileReader();
+    reader.readAsArrayBuffer(generatedAudio);
+    reader.onloadend = () => {
+      if (reader.result) {
+        onGenerateTrack({
+          buffer: reader.result as ArrayBuffer,
+          name: `Generated ${activeTab} - ${new Date().toLocaleTimeString()}`,
+          type: activeTab === 'music' ? 'audio' : 
+               activeTab === 'vocal' ? 'vocal' : 
+               activeTab === 'speech' ? 'vocal' : 'audio',
+          duration: duration,
+          waveform: Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15)
+        });
+      }
+    };
     
     toast({
       title: 'Added to Project',
