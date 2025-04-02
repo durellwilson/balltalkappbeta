@@ -154,12 +154,13 @@ const EnhancedStudio: React.FC = () => {
   // Hooks
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
   
   // Initialize collaboration
   const collaboration = useStudioCollaboration({
     projectId: project.id,
-    userId: 'current-user',
-    username: 'Current User',
+    userId: user ? user.id.toString() : 'guest-user',
+    username: user ? user.username : 'Guest User',
     onUserJoin: (user) => {
       setCurrentUsers(prev => [...prev, user]);
       toast({
@@ -1228,8 +1229,20 @@ const EnhancedStudio: React.FC = () => {
                               
                               setTracks(newTracks);
                               // Sync with collaboration if available
-                              if (collaboration?.syncTracks) {
-                                collaboration.syncTracks(newTracks);
+                              // Add tracks to collaboration system one by one
+                              if (collaboration) {
+                                try {
+                                  newTracks.forEach(track => {
+                                    collaboration.addTrack({
+                                      id: track.id.toString(),
+                                      name: track.name,
+                                      type: track.type,
+                                      createdBy: user?.id?.toString() || 'unknown'
+                                    });
+                                  });
+                                } catch (error) {
+                                  console.warn('Error adding tracks to collaboration:', error);
+                                }
                               }
                             }
                           }

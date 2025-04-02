@@ -145,25 +145,42 @@ class StudioCollaboration {
     // Calculate WebSocket URL if not provided
     if (!wsUrl) {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      // Use window.location.host but fallback to a specific port if needed
-      // This ensures we have a valid WebSocket URL even in development environments where host may be incomplete
-      const host = window.location.host || (window.location.hostname + ':5000');
-      wsUrl = `${protocol}//${host}/ws`;
+      // Use current host for WebSocket connection
+      wsUrl = `${protocol}//${window.location.host}/ws`;
       console.log('WebSocket URL:', wsUrl); // Log for debugging
     }
     
+    // Check for proper session ID and user info
+    if (!projectId || !userId) {
+      throw new Error('Project ID and User ID must be provided for collaboration');
+    }
+    
     try {
+      console.log(`Connecting to WebSocket: ${wsUrl} for project: ${projectId}`);
       // Connect to WebSocket server with enhanced error handling and binary protocol support
-      this.provider = new WebsocketProvider(wsUrl, `studio-${projectId}`, this.doc, {
-        connect: true,
-        awareness: {
-          // Send client info when connecting
-          clientID: userId as unknown as number, // Will be used internally by y-websocket
-          name: this.username
-        },
-        resyncInterval: 10000, // Resync every 10 seconds to ensure consistency
-        maxBackoffTime: 5000 // Maximum reconnection delay
-      });
+      this.provider = new WebsocketProvider(wsUrl, `studio-${projectId}`, this.doc);
+      
+      // Add proper error handling for websocket events
+      const ws = this.provider.ws;
+      if (ws) {
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          this.connectionStatus = 'disconnected';
+          if (this.onConnectionStatusCallback) {
+            this.onConnectionStatusCallback('disconnected');
+          }
+        };
+        
+        ws.onclose = () => {
+          console.log('WebSocket closed');
+          this.connectionStatus = 'disconnected';
+          if (this.onConnectionStatusCallback) {
+            this.onConnectionStatusCallback('disconnected');
+          }
+        };
+      } else {
+        console.warn('WebSocket not initialized properly');
+      }
       
       // Set up awareness (for user presence) with device info
       this.awareness = this.provider.awareness;
@@ -256,14 +273,27 @@ class StudioCollaboration {
   /**
    * Force a state sync with all peers, using binary encoding for efficiency
    */
-  private forceSyncState(): void {
-    if (this.connectionStatus === 'connected') {
+  forceSyncState(): void {
+    if (this.connectionStatus === 'connected' && this.provider && this.provider.ws) {
       try {
-        this.provider.emit('sync', {});
-        this.lastSyncTime = Date.now();
+        // Use the proper sync method based on y-websocket documentation
+        const update = Y.encodeStateAsUpdate(this.doc);
+        // Use the underlying WebSocket instead
+        if (this.provider.ws.readyState === WebSocket.OPEN) {
+          this.provider.ws.send(JSON.stringify({ 
+            type: 'sync', 
+            update: Array.from(update),
+            sessionId: this.projectId
+          }));
+          this.lastSyncTime = Date.now();
+        } else {
+          console.warn('WebSocket is not in OPEN state');
+        }
       } catch (error) {
         console.error('Error during sync:', error);
       }
+    } else {
+      console.warn('Cannot sync - not connected or provider not initialized');
     }
   }
   

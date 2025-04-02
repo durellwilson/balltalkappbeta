@@ -12,9 +12,21 @@ const connectionUsers = new Map<WebSocket, { userId: number, username: string }>
 
 export function setupWebSocketServer(httpServer: Server) {
   // Create WebSocket server on a specific path to avoid conflicts with Vite's HMR
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  const wss = new WebSocketServer({ 
+    server: httpServer, 
+    path: '/ws',
+    perMessageDeflate: false, // Disable compression for simplicity
+    clientTracking: true // Track connected clients
+  });
   
   console.log('WebSocket server set up on path /ws');
+  
+  // Log server info
+  httpServer.on('listening', () => {
+    const addr = httpServer.address();
+    const port = typeof addr === 'string' ? addr : addr?.port;
+    console.log(`WebSocket server available on port ${port}`);
+  });
 
   wss.on('connection', (ws: WebSocket) => {
     console.log('WebSocket connection received');
