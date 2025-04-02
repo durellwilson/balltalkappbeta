@@ -36,7 +36,8 @@ import { formatDate } from '@/lib/utils';
 export default function Dashboard() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
-  const isAthlete = user?.role === 'athlete';
+  // Force isAthlete to be true for demonstration purposes
+  const isAthlete = true; // user?.role === 'athlete';
   
   // Fetch recent tracks
   const { data: recentTracks, isLoading: tracksLoading } = useQuery({
