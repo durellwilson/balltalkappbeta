@@ -29,36 +29,8 @@ import { toast } from '@/hooks/use-toast';
 import { motion } from 'framer-motion';
 
 // Define interfaces for component props
-export interface AudioRegion {
-  id: string;
-  trackId: number;
-  start: number;
-  end: number;
-  offset: number;
-  file?: string;
-  name: string;
-  color?: string;
-  waveform?: number[];
-  locked?: boolean;
-  selected?: boolean;
-}
-
-export interface Track {
-  id: number;
-  name: string;
-  type: 'audio' | 'instrument' | 'vocal' | 'drum' | 'mix';
-  volume: number;
-  pan: number;
-  isMuted: boolean;
-  isSoloed: boolean;
-  isArmed?: boolean;
-  createdBy?: string;
-  collaborator?: {
-    id: string;
-    name: string;
-    color: string;
-  } | null;
-}
+import { AudioRegion, Track } from '../../lib/audio-engine';
+import { TrackRegion } from './track-region';
 
 interface ArrangementViewProps {
   tracks: Track[];
@@ -601,77 +573,27 @@ export function ArrangementView({
                     {regions
                       .filter(region => region.trackId === track.id)
                       .map(region => (
-                        <motion.div
+                        <TrackRegion
                           key={region.id}
-                          layout
-                          initial={{ opacity: 0, scale: 0.95 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          className={`absolute h-20 top-2 rounded cursor-pointer ${
-                            region.selected 
-                              ? 'ring-2 ring-blue-500 z-10' 
-                              : 'hover:ring-1 hover:ring-gray-400'
-                          } ${region.locked ? 'opacity-70' : ''}`}
-                          style={{
-                            left: `${timeToPixel(region.start)}px`,
-                            width: `${timeToPixel(region.end - region.start)}px`,
-                            backgroundColor: region.color || '#3b82f6'
+                          region={region}
+                          selected={!!region.selected}
+                          pixelsPerSecond={pixelsPerSecond}
+                          height={90}  // Slightly shorter than the track height for padding
+                          onSelect={onRegionSelect}
+                          onMoveStart={(regionId, e) => handleRegionMouseDown(e, region, 'move')}
+                          onResizeLeftStart={(regionId, e) => handleRegionMouseDown(e, region, 'resizeLeft')}
+                          onResizeRightStart={(regionId, e) => handleRegionMouseDown(e, region, 'resizeRight')}
+                          onCopy={onRegionCopy}
+                          onDelete={onRegionDelete}
+                          onSplit={(regionId) => onRegionSplit(regionId, currentTime)}
+                          onToggleLock={(regionId, locked) => {
+                            // Create a new region with updated locked state
+                            const updatedRegion = { ...region, locked };
+                            onRegionResize(regionId, region.start, region.end);
                           }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRegionSelect(region.id);
-                          }}
-                        >
-                          {/* Resize handle (left) */}
-                          {!region.locked && (
-                            <div 
-                              className="absolute left-0 top-0 w-2 h-full cursor-col-resize"
-                              onMouseDown={(e) => handleRegionMouseDown(e, region, 'resizeLeft')}
-                            />
-                          )}
-                          
-                          {/* Resize handle (right) */}
-                          {!region.locked && (
-                            <div 
-                              className="absolute right-0 top-0 w-2 h-full cursor-col-resize"
-                              onMouseDown={(e) => handleRegionMouseDown(e, region, 'resizeRight')}
-                            />
-                          )}
-                          
-                          {/* Region content */}
-                          <div 
-                            className="h-full p-1 flex flex-col"
-                            onMouseDown={(e) => handleRegionMouseDown(e, region, 'move')}
-                          >
-                            {/* Region header */}
-                            <div className="flex items-center justify-between mb-1">
-                              <div className="text-xs font-medium text-white truncate pr-1 flex-1">
-                                {region.name}
-                              </div>
-                              
-                              {region.locked && (
-                                <Lock size={10} className="text-white opacity-70" />
-                              )}
-                            </div>
-                            
-                            {/* Waveform visualization */}
-                            <div className="flex-1 relative">
-                              {region.waveform ? (
-                                <div className="absolute inset-0">
-                                  {/* Render waveform here */}
-                                </div>
-                              ) : (
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <div className="w-full h-1/3 bg-white/20 rounded-full" />
-                                </div>
-                              )}
-                            </div>
-                            
-                            {/* Region duration */}
-                            <div className="text-[10px] text-white/70 text-right">
-                              {formatTime(region.end - region.start)}
-                            </div>
-                          </div>
-                        </motion.div>
+                          currentTime={currentTime}
+                          trackColor={getTrackTypeColor(track.type)}
+                        />
                       ))}
                   </div>
                 </div>
