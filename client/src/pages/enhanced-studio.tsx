@@ -1393,7 +1393,7 @@ const EnhancedStudio: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+    <div className="h-screen bg-gray-950 text-white flex flex-col overflow-hidden">
       {/* Audio initialization overlay - shown when audio is not initialized */}
       {!audioProcessor.isReady() && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
@@ -1759,32 +1759,32 @@ const EnhancedStudio: React.FC = () => {
             >
               <Tabs value={sidebarTab} onValueChange={(value) => setSidebarTab(value as any)}>
                 <div className="p-3 border-b border-gray-800">
-                  <TabsList className="w-full bg-gray-800">
-                    <TabsTrigger value="tracks" className="flex-1">
+                  <TabsList className="w-full bg-gray-800 flex flex-wrap gap-1">
+                    <TabsTrigger value="tracks" className="flex-auto">
                       <LayoutPanelLeft size={14} className="mr-1" />
                       Tracks
                     </TabsTrigger>
-                    <TabsTrigger value="effects" className="flex-1">
+                    <TabsTrigger value="effects" className="flex-auto">
                       <Sliders size={14} className="mr-1" />
                       Effects
                     </TabsTrigger>
-                    <TabsTrigger value="master" className="flex-1">
+                    <TabsTrigger value="master" className="flex-auto">
                       <Wand2 size={14} className="mr-1" />
                       Master
                     </TabsTrigger>
-                    <TabsTrigger value="mixer" className="flex-1">
+                    <TabsTrigger value="mixer" className="flex-auto">
                       <Settings size={14} className="mr-1" />
-                      Mixer
+                      Mix
                     </TabsTrigger>
-                    <TabsTrigger value="collab" className="flex-1">
+                    <TabsTrigger value="collab" className="flex-auto">
                       <Users size={14} className="mr-1" />
                       Collab
                     </TabsTrigger>
-                    <TabsTrigger value="cloud" className="flex-1">
+                    <TabsTrigger value="cloud" className="flex-auto">
                       <Cloud size={14} className="mr-1" />
                       Cloud
                     </TabsTrigger>
-                    <TabsTrigger value="ai" className="flex-1">
+                    <TabsTrigger value="ai" className="flex-auto">
                       <Sparkles size={14} className="mr-1" />
                       AI
                     </TabsTrigger>
@@ -2026,7 +2026,7 @@ const EnhancedStudio: React.FC = () => {
                       
                       <div>
                         <h4 className="text-xs font-medium text-gray-400 mb-2">Track Faders</h4>
-                        <div className="flex space-x-3 overflow-x-auto pb-2">
+                        <div className="flex space-x-3 overflow-x-auto pb-2 flex-wrap gap-y-2">
                           {tracks.map(track => (
                             <Card key={track.id} className="bg-gray-800 border-gray-700 min-w-[70px] relative">
                               {track.isMuted && (
