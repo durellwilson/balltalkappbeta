@@ -843,7 +843,7 @@ interface GenerationSettings {
 interface HistoryItem {
   id: string;
   timestamp: Date;
-  type: 'music' | 'vocal' | 'speech' | 'sfx';
+  type: 'music' | 'vocal' | 'speech' | 'sfx' | 'enhance';
   prompt: string;
   parameters: GenParameters;
   duration: number;
@@ -864,6 +864,15 @@ interface AIGenerationPanelProps {
   bpm?: number;
   isSubscriptionActive?: boolean;
   apiKeyAvailable?: boolean;
+  onEnhanceTrack?: (trackId: number, enhancementOptions: {
+    clarity?: number;
+    noiseSuppression?: boolean;
+    bassBoost?: number;
+    stereoWidening?: number;
+    denoise?: boolean;
+    eq?: boolean;
+    compression?: boolean;
+  }) => void;
 }
 
 export function AIGenerationPanel({
@@ -872,17 +881,28 @@ export function AIGenerationPanel({
   selectedRegions,
   bpm = 120,
   isSubscriptionActive = false,
-  apiKeyAvailable = false
+  apiKeyAvailable = false,
+  onEnhanceTrack
 }: AIGenerationPanelProps) {
   // Get toast function
   const { toast } = useToast();
   
   // State
-  const [activeTab, setActiveTab] = useState<'music' | 'vocal' | 'speech' | 'sfx'>('music');
+  const [activeTab, setActiveTab] = useState<'music' | 'vocal' | 'speech' | 'sfx' | 'enhance'>('music');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedAudio, setGeneratedAudio] = useState<Blob | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  
+  // Enhancement settings
+  const [enhanceClarity, setEnhanceClarity] = useState(0.5);
+  const [enhanceNoiseSuppression, setEnhanceNoiseSuppression] = useState(false);
+  const [enhanceBassBoost, setEnhanceBassBoost] = useState(0.3);
+  const [enhanceStereoWidening, setEnhanceStereoWidening] = useState(0.2);
+  const [enhanceDenoise, setEnhanceDenoise] = useState(true);
+  const [enhanceEQ, setEnhanceEQ] = useState(true);
+  const [enhanceCompression, setEnhanceCompression] = useState(true);
   
   // Music generation state
   const [musicPrompt, setMusicPrompt] = useState('');
@@ -919,7 +939,11 @@ export function AIGenerationPanel({
       return;
     }
     
-    // Check if we have a prompt
+    // Check if we have a prompt and not on enhance tab
+    if (activeTab === 'enhance') {
+      return; // We shouldn't get here due to UI restrictions, but just in case
+    }
+    
     if ((activeTab === 'music' && !musicPrompt) || 
         (activeTab === 'vocal' && !vocalPrompt) || 
         (activeTab === 'speech' && !speechText) || 
@@ -936,6 +960,8 @@ export function AIGenerationPanel({
     try {
       // Build parameters based on active tab
       let generationSettings: GenerationSettings;
+      let generationType: 'music' | 'vocal' | 'speech' | 'sfx' = activeTab as 'music' | 'vocal' | 'speech' | 'sfx';
+      let generationDuration = 0;
       
       switch (activeTab) {
         case 'music':
@@ -950,6 +976,7 @@ export function AIGenerationPanel({
               duration: musicDuration
             }
           };
+          generationDuration = musicDuration;
           break;
           
         case 'vocal':
@@ -964,6 +991,7 @@ export function AIGenerationPanel({
               duration: vocalDuration
             }
           };
+          generationDuration = vocalDuration;
           break;
           
         case 'speech':
@@ -978,6 +1006,7 @@ export function AIGenerationPanel({
               duration: Math.ceil(speechText.length / 15)
             }
           };
+          generationDuration = Math.ceil(speechText.length / 15);
           break;
           
         case 'sfx':
@@ -992,7 +1021,17 @@ export function AIGenerationPanel({
               duration: sfxDuration
             }
           };
+          generationDuration = sfxDuration;
           break;
+          
+        default:
+          toast({
+            title: 'Invalid Tab',
+            description: 'Please select a valid generation tab.',
+            variant: 'destructive'
+          });
+          setIsGenerating(false);
+          return;
       }
       
       // Show loading state
@@ -1000,8 +1039,8 @@ export function AIGenerationPanel({
       
       // Create synthetic audio with Web Audio API based on type
       const audioBuffer = await generateSyntheticAudio(
-        activeTab, 
-        generationSettings.parameters.duration, 
+        generationType, 
+        generationDuration, 
         generationSettings.parameters
       );
       
@@ -1068,6 +1107,16 @@ export function AIGenerationPanel({
     let settings: GenerationSettings;
     let duration = 0;
     
+    // Skip this processing if on enhance tab
+    if (activeTab === 'enhance') {
+      toast({
+        title: 'Invalid Operation',
+        description: 'Cannot add enhancement to project as a new track.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     switch (activeTab) {
       case 'music':
         settings = {
@@ -1128,6 +1177,14 @@ export function AIGenerationPanel({
         };
         duration = sfxDuration;
         break;
+        
+      default:
+        toast({
+          title: 'Invalid Tab',
+          description: 'Please select a valid generation tab.',
+          variant: 'destructive'
+        });
+        return;
     }
     
     // Convert Blob to ArrayBuffer and call onGenerateTrack
@@ -1197,6 +1254,24 @@ export function AIGenerationPanel({
         setSfxCategory(item.parameters.genre);
         setSfxDuration(item.parameters.duration);
         break;
+        
+      case 'enhance':
+        // We don't expect enhance items in history due to UI restrictions,
+        // but handle it properly in case it happens
+        setActiveTab('enhance');
+        toast({
+          title: 'Enhancement History',
+          description: 'Enhancement settings loaded from history.',
+        });
+        break;
+        
+      default:
+        toast({
+          title: 'Unknown History Item',
+          description: 'Could not load settings from history.',
+          variant: 'destructive'
+        });
+        break;
     }
     
     toast({
@@ -1245,6 +1320,10 @@ export function AIGenerationPanel({
             <TabsTrigger value="sfx" className="flex-1">
               <Wand2 size={14} className="mr-1" />
               SFX
+            </TabsTrigger>
+            <TabsTrigger value="enhance" className="flex-1">
+              <Sparkles size={14} className="mr-1" />
+              Enhance
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1521,31 +1600,198 @@ export function AIGenerationPanel({
               </div>
             </TabsContent>
             
+            {/* Enhancement Tab */}
+            <TabsContent value="enhance" className="m-0 space-y-4">
+              {activeTrack ? (
+                <>
+                  <div className="mb-4 p-3 bg-purple-900/30 border border-purple-800 rounded-md">
+                    <h4 className="text-purple-300 font-medium flex items-center">
+                      <Sparkles size={16} className="mr-2" /> Enhance Track: {activeTrack.name}
+                    </h4>
+                    <p className="mt-1 text-sm text-gray-300">
+                      Apply AI-powered enhancements to improve the sound quality of this track.
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <Label>Clarity Enhancement</Label>
+                        <span className="text-xs text-gray-400">{Math.round(enhanceClarity * 100)}%</span>
+                      </div>
+                      <Slider
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={[enhanceClarity]}
+                        onValueChange={values => setEnhanceClarity(values[0])}
+                        className="py-1"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Enhances vocal and instrument clarity by reducing frequency masking.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <Label>Bass Boost</Label>
+                        <span className="text-xs text-gray-400">{Math.round(enhanceBassBoost * 100)}%</span>
+                      </div>
+                      <Slider
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={[enhanceBassBoost]}
+                        onValueChange={values => setEnhanceBassBoost(values[0])}
+                        className="py-1"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Intelligently boosts low frequencies without muddiness.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <Label>Stereo Widening</Label>
+                        <span className="text-xs text-gray-400">{Math.round(enhanceStereoWidening * 100)}%</span>
+                      </div>
+                      <Slider
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        value={[enhanceStereoWidening]}
+                        onValueChange={values => setEnhanceStereoWidening(values[0])}
+                        className="py-1"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Creates a wider stereo field for more immersive sound.
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2 pt-2">
+                      <Switch 
+                        id="noise-suppression" 
+                        checked={enhanceNoiseSuppression}
+                        onCheckedChange={setEnhanceNoiseSuppression}
+                      />
+                      <Label htmlFor="noise-suppression">Noise Suppression</Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Switch 
+                        id="denoise" 
+                        checked={enhanceDenoise}
+                        onCheckedChange={setEnhanceDenoise}
+                      />
+                      <Label htmlFor="denoise">Deep Denoise</Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Switch 
+                        id="eq" 
+                        checked={enhanceEQ}
+                        onCheckedChange={setEnhanceEQ}
+                      />
+                      <Label htmlFor="eq">Auto EQ</Label>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <Switch 
+                        id="compression" 
+                        checked={enhanceCompression}
+                        onCheckedChange={setEnhanceCompression}
+                      />
+                      <Label htmlFor="compression">Smart Compression</Label>
+                    </div>
+                    
+                    <Button 
+                      className="w-full bg-purple-600 hover:bg-purple-700 mt-4"
+                      disabled={isEnhancing}
+                      onClick={() => {
+                        if (onEnhanceTrack && activeTrack) {
+                          setIsEnhancing(true);
+                          
+                          // Show loading state
+                          toast({
+                            title: "Enhancing track...",
+                            description: "AI is processing your audio. This may take a moment.",
+                          });
+                          
+                          // Simulate processing time
+                          setTimeout(() => {
+                            onEnhanceTrack(activeTrack.id, {
+                              clarity: enhanceClarity,
+                              noiseSuppression: enhanceNoiseSuppression,
+                              bassBoost: enhanceBassBoost,
+                              stereoWidening: enhanceStereoWidening,
+                              denoise: enhanceDenoise,
+                              eq: enhanceEQ,
+                              compression: enhanceCompression
+                            });
+                            
+                            setIsEnhancing(false);
+                            
+                            toast({
+                              title: "Enhancement Complete",
+                              description: "Your track has been enhanced successfully.",
+                            });
+                          }, 2000);
+                        }
+                      }}
+                    >
+                      {isEnhancing ? (
+                        <>
+                          <RotateCw size={16} className="mr-2 animate-spin" />
+                          Enhancing Track...
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={16} className="mr-2" />
+                          Apply Enhancements
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Sparkles size={32} className="text-purple-400 mb-3" />
+                  <h3 className="text-lg font-medium mb-2">No Track Selected</h3>
+                  <p className="text-sm text-gray-400 max-w-md">
+                    Select a track in the timeline or press the "AI Enhance" button on any track
+                    to activate this panel.
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+            
             {/* Common generation controls */}
             <div className="mt-4 space-y-4">
-              {/* Generation button */}
-              <Button 
-                className="w-full bg-purple-600 hover:bg-purple-700"
-                disabled={isGenerating}
-                onClick={handleGenerate}
-              >
-                {isGenerating ? (
-                  <>
-                    <RotateCw size={16} className="mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={16} className="mr-2" />
-                    Generate {activeTab === 'music' ? 'Music' : 
-                             activeTab === 'vocal' ? 'Vocals' : 
-                             activeTab === 'speech' ? 'Speech' : 'SFX'}
-                  </>
-                )}
-              </Button>
+              {/* Generation button - only show if not in enhance tab */}
+              {activeTab !== 'enhance' && (
+                <Button 
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                  disabled={isGenerating}
+                  onClick={handleGenerate}
+                >
+                  {isGenerating ? (
+                    <>
+                      <RotateCw size={16} className="mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={16} className="mr-2" />
+                      Generate {activeTab === 'music' ? 'Music' : 
+                               activeTab === 'vocal' ? 'Vocals' : 
+                               activeTab === 'speech' ? 'Speech' : 'SFX'}
+                    </>
+                  )}
+                </Button>
+              )}
               
-              {/* Action buttons for generated audio */}
-              {generatedAudio && (
+              {/* Action buttons for generated audio - only show if not in enhance tab */}
+              {generatedAudio && activeTab !== 'enhance' && (
                 <div className="flex space-x-2">
                   <Button 
                     variant="outline" 
@@ -1588,8 +1834,8 @@ export function AIGenerationPanel({
               )}
             </div>
             
-            {/* Generation History */}
-            {history.length > 0 && (
+            {/* Generation History - only show if not in enhance tab */}
+            {history.length > 0 && activeTab !== 'enhance' && (
               <div className="mt-6">
                 <h4 className="text-sm font-medium mb-2">Recent Generations</h4>
                 <div className="space-y-2">

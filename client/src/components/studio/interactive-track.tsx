@@ -32,7 +32,8 @@ import {
   Copy,
   LayoutGrid,
   Scissors,
-  Hammer
+  Hammer,
+  Sparkles
 } from 'lucide-react';
 
 interface InteractiveTrackProps {
@@ -53,6 +54,7 @@ interface InteractiveTrackProps {
   onRecordStop?: (id: number) => void;
   onPlay?: (id: number) => void;
   onStop?: (id: number) => void;
+  onAiEnhance?: (id: number) => void;
   volume?: number;
   pan?: number;
   color?: string;
@@ -83,6 +85,7 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
   onRecordStop,
   onPlay,
   onStop,
+  onAiEnhance,
   volume = 0.8,
   pan = 0,
   color = '#3b82f6',
@@ -324,6 +327,18 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
+                className={cn(
+                  "h-7 w-7 text-purple-400 hover:text-purple-300"
+                )}
+                onClick={() => onAiEnhance && onAiEnhance(id)}
+                title="AI Enhance"
+              >
+                <Sparkles size={16} />
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="icon"
                 className="h-7 w-7"
                 onClick={() => setExpanded(!expanded)}
               >
@@ -383,6 +398,16 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
                         <Activity size={14} className="mr-2" />
                       }
                       <span>Switch View</span>
+                    </Button>
+                    
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="justify-start h-8 text-purple-400 hover:text-purple-300 hover:bg-purple-950"
+                      onClick={() => onAiEnhance && onAiEnhance(id)}
+                    >
+                      <Sparkles size={14} className="mr-2" />
+                      <span>AI Enhance</span>
                     </Button>
                     
                     <hr className="border-gray-700 my-1" />

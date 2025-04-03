@@ -65,7 +65,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 
 // Custom Components
@@ -78,7 +79,7 @@ import { ArrangementView } from '@/components/studio/arrangement-view';
 import type { AudioRegion } from '@/lib/audio-engine';
 import { RecordingControls } from '@/components/studio/recording-controls';
 import { EffectsPanel } from '@/components/studio/effects-panel';
-import type { Effect as StudioEffect, EffectType as StudioEffectType } from '@/components/studio/effects-panel';
+import type { Effect, EffectType } from '@/components/studio/effects-panel';
 import { MasteringPanel } from '@/components/studio/mastering-panel';
 import { AIGenerationPanel } from '@/components/studio/ai-generation-panel';
 import { ProjectSync } from '@/components/studio/project-sync';
@@ -994,6 +995,22 @@ const EnhancedStudio: React.FC = () => {
     }
   };
   
+  // Handle AI enhancement for a track
+  const handleAiEnhance = (trackId: number) => {
+    // First, make sure the sidebar is visible and set to AI tab
+    setShowSidebar(true);
+    setSidebarTab('ai');
+    
+    // Set the active track to the one being enhanced
+    setActiveTrackId(trackId);
+    
+    // Show a toast to guide the user
+    toast({
+      title: "AI Enhancement",
+      description: "Select enhancement options in the AI panel to enhance this track",
+    });
+  };
+  
   const handleMasterVolumeChange = (volume: number) => {
     setMasterVolume(volume);
     audioProcessor.setMasterVolume(volume);
@@ -1741,6 +1758,16 @@ const EnhancedStudio: React.FC = () => {
                             <Disc size={14} className="mr-2" />
                             Drum Track
                           </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            className="text-purple-400 hover:text-purple-300 hover:bg-purple-950"
+                            onClick={() => {
+                              setShowSidebar(true);
+                              setSidebarTab('ai');
+                            }}>
+                            <Sparkles size={14} className="mr-2" />
+                            AI Generate Track
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -1850,6 +1877,7 @@ const EnhancedStudio: React.FC = () => {
                                 onVolumeChange={handleTrackVolumeChange}
                                 onPanChange={handleTrackPanChange}
                                 onDelete={handleDeleteTrack}
+                                onAiEnhance={handleAiEnhance}
                               />
                             </div>
                           ))
