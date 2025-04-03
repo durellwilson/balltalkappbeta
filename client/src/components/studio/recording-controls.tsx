@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Play, 
   Pause, 
@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
+import { WaveformVisualizer } from '@/components/ui/waveform-visualizer';
 
 // Component props interface
 interface RecordingControlsProps {
@@ -79,6 +80,8 @@ export function RecordingControls({
 }: RecordingControlsProps) {
   // Local state
   const [showSettings, setShowSettings] = useState(false);
+  const [waveformData, setWaveformData] = useState<number[]>([]);
+  const animationRef = useRef<number | null>(null);
   
   // Format recording time as mm:ss.ms
   const formatTime = (seconds: number): string => {
@@ -90,6 +93,46 @@ export function RecordingControls({
   
   // Get the number of armed tracks
   const armedTracksCount = tracks.filter(track => track.isArmed).length;
+  
+  // Update waveform data with random values for visualization during recording
+  useEffect(() => {
+    if (isRecording) {
+      // Create a function to update waveform data
+      const updateWaveform = () => {
+        // Generate waveform data based on audioInputLevel
+        const waveformLength = 100;
+        const newWaveformData = [];
+        const baseLevel = Math.max(0.05, audioInputLevel);
+        
+        for (let i = 0; i < waveformLength; i++) {
+          // Create a dynamic waveform that responds to input level
+          // Random variation to simulate a real waveform
+          const randomVariation = Math.random() * 0.3;
+          // Sine wave pattern for a more realistic look
+          const sinePattern = Math.sin(i / 5) * 0.3 * baseLevel;
+          // Combine the patterns with the input level
+          const value = baseLevel * (0.7 + randomVariation + sinePattern);
+          newWaveformData.push(Math.max(0, Math.min(1, value)));
+        }
+        
+        setWaveformData(newWaveformData);
+        animationRef.current = requestAnimationFrame(updateWaveform);
+      };
+      
+      // Start the animation
+      updateWaveform();
+      
+      // Clean up animation on unmount or when recording stops
+      return () => {
+        if (animationRef.current) {
+          cancelAnimationFrame(animationRef.current);
+        }
+      };
+    } else {
+      // Clear waveform data when not recording
+      setWaveformData([]);
+    }
+  }, [isRecording, audioInputLevel]);
   
   return (
     <div className="flex flex-col">
@@ -120,20 +163,38 @@ export function RecordingControls({
           
           {/* Recording time and level indicator */}
           {isRecording && (
-            <div className="bg-gray-900 rounded-md p-2 flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Circle className="text-red-500 animate-pulse" size={12} />
-                <span className="font-mono text-lg">{formatTime(timeElapsed)}</span>
+            <div className="bg-gray-900 rounded-md p-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Circle className="text-red-500 animate-pulse" size={12} />
+                  <span className="font-mono text-lg">{formatTime(timeElapsed)}</span>
+                </div>
+                
+                <div className="w-32 h-4 bg-gray-950 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full transition-all duration-100"
+                    style={{ 
+                      width: `${Math.min(100, Math.max(audioInputLevel * 100, 1))}%`,
+                      background: `linear-gradient(90deg, #10b981 0%, #10b981 70%, #eab308 70%, #eab308 85%, #ef4444 85%, #ef4444 100%)`
+                    }}
+                  />
+                </div>
               </div>
               
-              <div className="w-32 h-4 bg-gray-950 rounded-full overflow-hidden">
-                <div 
-                  className="h-full transition-all duration-100"
-                  style={{ 
-                    width: `${Math.min(100, Math.max(audioInputLevel * 100, 1))}%`,
-                    background: `linear-gradient(90deg, #10b981 0%, #10b981 70%, #eab308 70%, #eab308 85%, #ef4444 85%, #ef4444 100%)`
-                  }}
-                />
+              {/* Live waveform visualization */}
+              <div className="relative h-20 bg-gray-950 rounded-md border border-gray-800 overflow-hidden">
+                <div className="absolute top-0 right-1 bg-gray-900/50 py-0.5 px-1.5 rounded text-xs font-semibold">
+                  LIVE
+                </div>
+                <div className="p-1 h-full">
+                  <WaveformVisualizer 
+                    waveform={waveformData} 
+                    color="#f43f5e" 
+                    height={70} 
+                    animated={true}
+                    showPlayhead={false}
+                  />
+                </div>
               </div>
             </div>
           )}

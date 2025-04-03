@@ -13,6 +13,7 @@ interface WaveformVisualizerProps extends React.HTMLAttributes<HTMLDivElement> {
   trackId?: number;
   buffer?: AudioBuffer;  // For backward compatibility
   audioBuffer?: AudioBuffer; // Preferred naming
+  waveform?: number[];  // Raw waveform data
   color?: string;
   gradientColors?: string[];
   height?: number;
@@ -38,6 +39,7 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   trackId,
   buffer,
   audioBuffer,
+  waveform,
   color = 'rgba(59, 130, 246, 0.8)',
   gradientColors,
   height = 80,
@@ -76,35 +78,41 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     // Get waveform data from AudioProcessor - use either track-specific or master
     let waveformData: number[] = [];
     
-    // Check if we have an audio buffer provided directly
-    const bufferToUse = audioBuffer || buffer;
-    
-    if (bufferToUse) {
-      // Extract waveform data from the provided AudioBuffer
-      const channelData = bufferToUse.getChannelData(0); // Use first channel
+    // First check if we have direct waveform data
+    if (waveform && waveform.length > 0) {
+      // Use the directly provided waveform data
+      waveformData = waveform;
+    } else {
+      // Check if we have an audio buffer provided directly
+      const bufferToUse = audioBuffer || buffer;
       
-      // Downsample the data if it's too large
-      const maxPoints = Math.min(canvas.width * 2, channelData.length);
-      const samplingRate = Math.floor(channelData.length / maxPoints);
-      
-      waveformData = [];
-      for (let i = 0; i < channelData.length; i += samplingRate) {
-        // Get peak value in each segment 
-        let maxVal = 0;
-        const end = Math.min(i + samplingRate, channelData.length);
-        for (let j = i; j < end; j++) {
-          maxVal = Math.max(maxVal, Math.abs(channelData[j]));
+      if (bufferToUse) {
+        // Extract waveform data from the provided AudioBuffer
+        const channelData = bufferToUse.getChannelData(0); // Use first channel
+        
+        // Downsample the data if it's too large
+        const maxPoints = Math.min(canvas.width * 2, channelData.length);
+        const samplingRate = Math.floor(channelData.length / maxPoints);
+        
+        waveformData = [];
+        for (let i = 0; i < channelData.length; i += samplingRate) {
+          // Get peak value in each segment 
+          let maxVal = 0;
+          const end = Math.min(i + samplingRate, channelData.length);
+          for (let j = i; j < end; j++) {
+            maxVal = Math.max(maxVal, Math.abs(channelData[j]));
+          }
+          waveformData.push(maxVal);
         }
-        waveformData.push(maxVal);
-      }
-    } else if (isMaster) {
-      // Full master waveform is a Float32Array, convert to numbers
-      const masterData = audioProcessor.getWaveform();
-      waveformData = Array.from(masterData).map(v => Math.abs(v));
-    } else if (trackId !== undefined) {
-      const track = audioProcessor.getTrack(trackId);
-      if (track) {
-        waveformData = track.getFullWaveform();
+      } else if (isMaster) {
+        // Full master waveform is a Float32Array, convert to numbers
+        const masterData = audioProcessor.getWaveform();
+        waveformData = Array.from(masterData).map(v => Math.abs(v));
+      } else if (trackId !== undefined) {
+        const track = audioProcessor.getTrack(trackId);
+        if (track) {
+          waveformData = track.getFullWaveform();
+        }
       }
     }
 
@@ -122,7 +130,7 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       drawTimeMarkers(ctx, canvas.width, canvas.height, duration);
     }
 
-  }, [trackId, color, gradientColors, height, width, gain, showTimeMarkers, duration, isMaster, buffer, audioBuffer]);
+  }, [trackId, color, gradientColors, height, width, gain, showTimeMarkers, duration, isMaster, buffer, audioBuffer, waveform]);
 
   // Render playhead position
   useEffect(() => {
@@ -168,9 +176,12 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
       // Get real-time data for animation
-      let waveformData: Float32Array;
+      let waveformData: Float32Array | number[];
       
-      if (isMaster) {
+      // Use the directly provided waveform data if available
+      if (waveform && waveform.length > 0) {
+        waveformData = waveform;
+      } else if (isMaster) {
         waveformData = audioProcessor.getWaveform();
       } else if (trackId !== undefined) {
         const track = audioProcessor.getTrack(trackId);
@@ -190,7 +201,13 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       }
       
       // Draw animated waveform
-      drawAnimatedWaveform(ctx, waveformData, canvas.width, canvas.height, color, gradientColors, gain);
+      if (Array.isArray(waveformData)) {
+        // If it's a number[] array, use it directly
+        drawAnimatedWaveform(ctx, waveformData, canvas.width, canvas.height, color, gradientColors, gain);
+      } else {
+        // If it's a Float32Array, convert it to an array first
+        drawAnimatedWaveform(ctx, Array.from(waveformData), canvas.width, canvas.height, color, gradientColors, gain);
+      }
       
       // Request next frame
       animationRef.current = requestAnimationFrame(renderFrame);
@@ -207,7 +224,7 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [animated, trackId, color, gradientColors, gain, isMaster]);
+  }, [animated, trackId, color, gradientColors, gain, isMaster, waveform]);
 
   // Handle responsive resizing
   useEffect(() => {
@@ -456,7 +473,7 @@ const drawTimeMarkers = (
 // Helper function to draw an animated waveform
 const drawAnimatedWaveform = (
   ctx: CanvasRenderingContext2D, 
-  data: Float32Array, 
+  data: number[], 
   width: number, 
   height: number,
   color: string,
