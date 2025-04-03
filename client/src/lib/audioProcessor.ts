@@ -118,6 +118,14 @@ class AudioProcessor {
    * Initialize the audio processor and start the audio context
    * This must be called from a user interaction (click, tap) to comply with browser autoplay policies
    */
+  async init(): Promise<void> {
+    return this.initialize();
+  }
+  
+  /**
+   * Initialize the audio processor and start the audio context
+   * This must be called from a user interaction (click, tap) to comply with browser autoplay policies
+   */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
       // If already initialized, ensure audio context is running
@@ -616,7 +624,9 @@ class TrackProcessor {
   private muted: boolean = false;
   private soloed: boolean = false;
   private audioBuffer: AudioBuffer | null = null;
+  private recordingBuffer: AudioBuffer | null = null;
   private context: Tone.Context['rawContext'];
+  private isPlaying: boolean = false;
 
   constructor(context: Tone.Context['rawContext'], options: TrackProcessorOptions = {}) {
     this.context = context;
@@ -915,6 +925,28 @@ class TrackProcessor {
    */
   getWaveform(): Float32Array {
     return this.analyzer.getValue() as Float32Array;
+  }
+  
+  /**
+   * Get the current recording buffer
+   * @returns The current recording buffer or null if no recording exists
+   */
+  getRecordingBuffer(): AudioBuffer | null {
+    return this.recordingBuffer;
+  }
+  
+  /**
+   * Toggle playback for the track
+   * Starts playback if stopped, stops if playing
+   */
+  togglePlayback(): void {
+    if (this.isPlaying) {
+      this.stop();
+      this.isPlaying = false;
+    } else {
+      this.play();
+      this.isPlaying = true;
+    }
   }
 
   /**
