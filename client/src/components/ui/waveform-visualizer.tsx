@@ -314,7 +314,6 @@ const drawStaticWaveform = (
   gain: number = 1.0
 ) => {
   const centerY = height / 2;
-  const step = Math.max(1, Math.floor(data.length / width));
   
   // Create gradient if colors are provided
   let fillStyle: string | CanvasGradient = color;
@@ -331,19 +330,65 @@ const drawStaticWaveform = (
   
   ctx.fillStyle = fillStyle;
   
-  // Draw the waveform as a series of vertical bars
-  for (let x = 0; x < width; x++) {
-    const index = Math.floor(x * step);
-    const dataIndex = Math.min(data.length - 1, index);
-    const value = data[dataIndex] * gain;
+  // For high-resolution waveforms, use a more detailed drawing approach
+  if (data.length > width) {
+    // For higher resolution data, we need to downsample
+    const step = Math.max(1, Math.floor(data.length / width));
     
-    // Calculate bar height, ensure it's at least 1px
-    const barHeight = Math.max(1, Math.min(height, value * height));
+    // Draw the waveform as a series of vertical bars
+    for (let x = 0; x < width; x++) {
+      // Find the maximum value in this step range
+      let maxValue = 0;
+      const startIdx = Math.floor(x * step);
+      const endIdx = Math.min(data.length, startIdx + step);
+      
+      for (let i = startIdx; i < endIdx; i++) {
+        maxValue = Math.max(maxValue, data[i]);
+      }
+      
+      // Apply gain and ensure we have a reasonable value
+      const value = Math.min(1, maxValue * gain);
+      
+      // Calculate bar height, ensure it's at least 1px
+      const barHeight = Math.max(1, Math.min(height, value * height));
+      
+      // Draw symmetric from center
+      const top = centerY - barHeight / 2;
+      
+      ctx.fillRect(x, top, 1, barHeight);
+    }
+  } else {
+    // For low-resolution data, interpolate between points for a smoother look
+    ctx.beginPath();
+    ctx.moveTo(0, centerY);
     
-    // Draw symmetric from center
-    const top = centerY - barHeight / 2;
+    // Map each data point to the display width
+    const widthStep = width / Math.max(1, data.length - 1);
     
-    ctx.fillRect(x, top, 1, barHeight);
+    // Top half of the waveform
+    for (let i = 0; i < data.length; i++) {
+      const x = i * widthStep;
+      const value = Math.min(1, data[i] * gain);
+      const y = centerY - (value * height / 2);
+      
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    
+    // Bottom half of the waveform (mirror image)
+    for (let i = data.length - 1; i >= 0; i--) {
+      const x = i * widthStep;
+      const value = Math.min(1, data[i] * gain);
+      const y = centerY + (value * height / 2);
+      
+      ctx.lineTo(x, y);
+    }
+    
+    ctx.closePath();
+    ctx.fill();
   }
 };
 
@@ -372,31 +417,96 @@ const drawAnimatedWaveform = (
     fillStyle = gradient;
   }
   
+  // Create a secondary gradient for peak highlights
+  let highlightStyle: string | CanvasGradient = 'rgba(255, 255, 255, 0.5)';
+  if (gradientColors && gradientColors.length >= 2) {
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.7)');
+    gradient.addColorStop(1, 'rgba(200, 200, 255, 0.3)');
+    highlightStyle = gradient;
+  }
+  
   ctx.fillStyle = fillStyle;
   
   // Draw waveform with smoothing between points and mirrored about center
   const sliceWidth = width / data.length;
   
-  // Draw path from center out
+  // Draw path from center out with a smoother approach
   ctx.beginPath();
+  
+  // Start at the center on the left side
   ctx.moveTo(0, centerY);
   
-  for (let i = 0; i < data.length; i++) {
-    const x = i * sliceWidth;
-    // Apply gain and make sure value is within range
-    const value = Math.min(1, Math.abs(data[i]) * gain);
-    const y = centerY + (centerY * value * 0.95);
+  // Enhanced drawing approach for cleaner visualization
+  // For high-resolution waveform (more data points than pixels)
+  if (data.length > width) {
+    // Use the peak values for each pixel column
+    const step = Math.max(1, Math.floor(data.length / width));
     
-    ctx.lineTo(x, y);
-  }
-  
-  // Mirror the path back to the start
-  for (let i = data.length - 1; i >= 0; i--) {
-    const x = i * sliceWidth;
-    const value = Math.min(1, Math.abs(data[i]) * gain);
-    const y = centerY - (centerY * value * 0.95);
+    let prevY = centerY;
     
-    ctx.lineTo(x, y);
+    for (let x = 0; x < width; x++) {
+      // Find peak amplitudes in this segment
+      let maxVal = 0;
+      const startIdx = Math.floor(x * step);
+      const endIdx = Math.min(data.length, startIdx + step);
+      
+      for (let i = startIdx; i < endIdx; i++) {
+        maxVal = Math.max(maxVal, Math.abs(data[i]));
+      }
+      
+      // Apply gain and clamp value
+      const value = Math.min(1, maxVal * gain * 1.2); // Slightly boost for visibility
+      
+      // Use a smoothed approach with previous point
+      const y = centerY + (centerY * value * 0.9);
+      
+      // Smoothly interpolate for more pleasing curves
+      if (x === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        const cpx = x - sliceWidth / 2;
+        const cpy = (prevY + y) / 2;
+        ctx.quadraticCurveTo(cpx, cpy, x, y);
+      }
+      
+      prevY = y;
+    }
+    
+    // Mirror for the bottom half with the same smooth approach
+    for (let x = width - 1; x >= 0; x--) {
+      const startIdx = Math.floor(x * step);
+      const endIdx = Math.min(data.length, startIdx + step);
+      let maxVal = 0;
+      
+      for (let i = startIdx; i < endIdx; i++) {
+        maxVal = Math.max(maxVal, Math.abs(data[i]));
+      }
+      
+      const value = Math.min(1, maxVal * gain * 1.2);
+      const y = centerY - (centerY * value * 0.9);
+      
+      ctx.lineTo(x, y);
+    }
+  } else {
+    // For lower-resolution data, draw a smoother curve
+    for (let i = 0; i < data.length; i++) {
+      const x = i * sliceWidth;
+      // Apply gain and make sure value is within range
+      const value = Math.min(1, Math.abs(data[i]) * gain);
+      const y = centerY + (centerY * value * 0.95);
+      
+      ctx.lineTo(x, y);
+    }
+    
+    // Mirror the path back to the start
+    for (let i = data.length - 1; i >= 0; i--) {
+      const x = i * sliceWidth;
+      const value = Math.min(1, Math.abs(data[i]) * gain);
+      const y = centerY - (centerY * value * 0.95);
+      
+      ctx.lineTo(x, y);
+    }
   }
   
   ctx.closePath();
@@ -406,18 +516,48 @@ const drawAnimatedWaveform = (
   ctx.beginPath();
   ctx.moveTo(0, centerY);
   
-  for (let i = 0; i < data.length; i++) {
-    const x = i * sliceWidth;
-    const value = Math.min(1, Math.abs(data[i]) * gain);
-    const y = centerY + (centerY * value * 0.85);
+  // Draw a subtle highlight line for peak detection
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.lineWidth = 1.5;
+  
+  // Get peak values for a highlight line
+  let prevX = 0;
+  let prevY = centerY;
+  const peakStep = Math.max(1, Math.floor(data.length / (width / 3)));
+  
+  for (let i = 0; i < data.length; i += peakStep) {
+    const x = (i / data.length) * width;
+    const value = Math.min(1, Math.abs(data[i]) * gain * 1.2);
+    const y = centerY - (value * height * 0.4);
     
-    ctx.lineTo(x, y);
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      // Use a bezier curve for smoother highlights
+      const cx = (prevX + x) / 2;
+      ctx.quadraticCurveTo(cx, prevY, x, y);
+    }
+    
+    prevX = x;
+    prevY = y;
   }
   
-  // Add a subtle glow
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-  ctx.lineWidth = 1;
   ctx.stroke();
+  
+  // Add some brighter peak markers for key points
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+  const markerStep = Math.floor(data.length / 8);
+  
+  for (let i = 0; i < data.length; i += markerStep) {
+    const value = Math.abs(data[i]) * gain;
+    if (value > 0.7) { // Only show for significant peaks
+      const x = (i / data.length) * width;
+      const markerSize = Math.min(4, value * 5);
+      ctx.beginPath();
+      ctx.arc(x, centerY - (value * height * 0.4), markerSize, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 };
 
 // Helper function to draw time markers

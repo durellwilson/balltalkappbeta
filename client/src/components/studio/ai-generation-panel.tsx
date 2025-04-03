@@ -930,6 +930,16 @@ export function AIGenerationPanel({
   
   // Handle generate button click
   const handleGenerate = async () => {
+    // Ensure audio context is started from user interaction
+    try {
+      await import('@/lib/audioProcessor').then(module => {
+        const audioProcessor = module.default;
+        return audioProcessor.ensureAudioContextRunning();
+      });
+    } catch (error) {
+      console.error('Failed to start audio context:', error);
+    }
+    
     if (!apiKeyAvailable) {
       toast({
         title: 'API Key Required',
@@ -1796,11 +1806,28 @@ export function AIGenerationPanel({
                   <Button 
                     variant="outline" 
                     className="flex-1 bg-gray-800 border-gray-700"
-                    onClick={() => {
+                    onClick={async () => {
+                      // Ensure audio context is started from user interaction
+                      try {
+                        await import('@/lib/audioProcessor').then(module => {
+                          const audioProcessor = module.default;
+                          return audioProcessor.ensureAudioContextRunning();
+                        });
+                      } catch (error) {
+                        console.error('Failed to start audio context:', error);
+                      }
+                      
                       // Play the audio
                       const audioURL = URL.createObjectURL(generatedAudio);
                       const audio = new Audio(audioURL);
-                      audio.play();
+                      audio.play().catch(err => {
+                        console.error('Failed to play audio:', err);
+                        toast({
+                          title: 'Playback Error',
+                          description: 'Could not play the audio. Please try again or reload the page.',
+                          variant: 'destructive'
+                        });
+                      });
                     }}
                   >
                     <Music size={16} className="mr-2" />
@@ -1819,12 +1846,27 @@ export function AIGenerationPanel({
                   <Button 
                     variant="outline"
                     className="flex-1 bg-gray-800 border-gray-700"
-                    onClick={() => {
+                    onClick={async () => {
+                      // Ensure audio context is started from user interaction
+                      try {
+                        await import('@/lib/audioProcessor').then(module => {
+                          const audioProcessor = module.default;
+                          return audioProcessor.ensureAudioContextRunning();
+                        });
+                      } catch (error) {
+                        console.error('Failed to start audio context:', error);
+                      }
+                      
                       const audioURL = URL.createObjectURL(generatedAudio);
                       const a = document.createElement('a');
                       a.href = audioURL;
                       a.download = `generated-${activeTab}-${Date.now()}.mp3`;
                       a.click();
+                      
+                      toast({
+                        title: 'Download Started',
+                        description: 'Your audio file is being downloaded.'
+                      });
                     }}
                   >
                     <Download size={16} className="mr-2" />

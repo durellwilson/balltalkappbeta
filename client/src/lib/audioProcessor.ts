@@ -119,7 +119,14 @@ class AudioProcessor {
    * This must be called from a user interaction (click, tap) to comply with browser autoplay policies
    */
   async initialize(): Promise<void> {
-    if (this.isInitialized) return;
+    if (this.isInitialized) {
+      // If already initialized, ensure audio context is running
+      if (Tone.context.state !== 'running') {
+        await Tone.start();
+        console.log('Resumed suspended audio context');
+      }
+      return;
+    }
     
     try {
       // Start audio context - this requires user interaction due to browser autoplay policies
@@ -137,6 +144,21 @@ class AudioProcessor {
     } catch (error) {
       console.error('Failed to initialize audio context:', error);
       throw error;
+    }
+  }
+  
+  /**
+   * Ensure audio context is running (call from UI event handlers)
+   */
+  async ensureAudioContextRunning(): Promise<void> {
+    if (Tone.context.state !== 'running') {
+      try {
+        await Tone.start();
+        console.log('Audio context started from user interaction');
+      } catch (error) {
+        console.error('Failed to start audio context:', error);
+        throw error;
+      }
     }
   }
   
@@ -546,14 +568,39 @@ class TrackProcessor {
   }
 
   /**
-   * Start recording from microphone
+   * Start recording from microphone with real-time waveform visualization
+   * @param onWaveformUpdate Optional callback to receive real-time waveform data
    */
-  async startRecording(): Promise<void> {
+  async startRecording(onWaveformUpdate?: (waveform: Float32Array) => void): Promise<void> {
     try {
+      // Dispose of any existing player
       this.disposePlayer();
+      
+      // Create recorder from microphone
       this.recorder = new Tone.UserMedia().connect(this.compressor);
+      
+      // Connect to a meter for real-time analysis if we have a callback
+      if (onWaveformUpdate) {
+        // Create high-resolution analyzer for real-time waveform visualization
+        const realTimeAnalyzer = new Tone.Analyser('waveform', 512);
+        this.recorder.connect(realTimeAnalyzer);
+        
+        // Set up interval to poll the waveform data
+        const updateInterval = setInterval(() => {
+          if (this.recorder) {
+            const waveformData = realTimeAnalyzer.getValue() as Float32Array;
+            onWaveformUpdate(waveformData);
+          } else {
+            // Clean up if recording has stopped
+            clearInterval(updateInterval);
+            realTimeAnalyzer.dispose();
+          }
+        }, 50); // Update every 50ms for smooth visualization
+      }
+      
+      // Open the microphone
       await this.recorder.open();
-      console.log('Started recording');
+      console.log('Started recording with real-time visualization');
     } catch (error) {
       console.error('Failed to start recording:', error);
       throw error;
@@ -693,25 +740,50 @@ class TrackProcessor {
   /**
    * Get a time-domain waveform of the entire audio file
    * (used for drawing the track waveform)
+   * @param maxPoints Maximum number of points to generate (default: 500)
+   * @param peakNormalize Whether to normalize the waveform to show peaks better (default: true)
    */
-  getFullWaveform(): number[] {
+  getFullWaveform(maxPoints: number = 500, peakNormalize: boolean = true): number[] {
     if (!this.audioBuffer) return [];
     
     // Get the first channel data
     const rawData = this.audioBuffer.getChannelData(0);
-    const points = 100;  // Number of points to return
+    
+    // Determine how many points to use (limited by maxPoints)
+    const points = Math.min(maxPoints, rawData.length / 2);
     const blockSize = Math.floor(rawData.length / points);
     const waveform = [];
     
+    // Find the maximum amplitude for normalization if requested
+    let maxAmplitude = 0;
+    if (peakNormalize) {
+      for (let i = 0; i < rawData.length; i++) {
+        maxAmplitude = Math.max(maxAmplitude, Math.abs(rawData[i]));
+      }
+    }
+    
+    // Process the audio data in blocks to get peaks
     for (let i = 0; i < points; i++) {
       const start = blockSize * i;
-      let sum = 0;
+      let minSample = 0;
+      let maxSample = 0;
       
+      // Look for min and max in each block
       for (let j = 0; j < blockSize; j++) {
-        sum += Math.abs(rawData[start + j] || 0);
+        const sample = rawData[start + j] || 0;
+        minSample = Math.min(minSample, sample);
+        maxSample = Math.max(maxSample, sample);
       }
       
-      waveform.push(sum / blockSize);
+      // Use peak-to-peak values for better visualization
+      const amplitude = maxSample - minSample;
+      
+      // Apply normalization if requested
+      if (peakNormalize && maxAmplitude > 0) {
+        waveform.push(amplitude / maxAmplitude);
+      } else {
+        waveform.push(amplitude);
+      }
     }
     
     return waveform;
