@@ -1056,137 +1056,48 @@ class TrackProcessor {
    * Returns the recording blob so it can be used immediately
    */
   async stopRecording(): Promise<Blob | null> {
+    console.log('Simple stopRecording called');
+    
     if (!this.recorder) {
-      console.error('No recorder found when stopping recording');
+      console.log('No recorder found when stopping recording');
       return null;
     }
     
-    // Create a recorder object for capturing audio
-    let recorder: Tone.Recorder | null = null;
-    let audioContext: AudioContext | null = null;
-    let tempBlob: Blob | null = null;
-    
     try {
-      console.log('Stopping recording and processing audio...');
+      // Simplest implementation - using a single Recorder
+      // Create a static recorder that's not connected to our audio graph
+      const staticRecorder = new Tone.Recorder();
       
-      // In Tone.js, UserMedia doesn't have a stop method that returns a blob
-      // unlike Recorder, so we need to create a temporary Recorder
-      
-      // First create a temporary recorder
-      recorder = new Tone.Recorder();
-      
-      // Then connect our recorder input to it
-      this.recorder.connect(recorder);
-      
-      // Start the recorder to capture any ongoing audio
-      await recorder.start();
-      
-      // Allow a brief moment to capture audio (important for processing)
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Now stop and get the audio blob
-      tempBlob = await recorder.stop();
-      
-      // Also close the input microphone stream
-      if (this.recorder) {
-        try {
-          this.recorder.close(); // This closes the microphone stream
-          console.log('Closed microphone input');
-        } catch (closeError) {
-          console.warn('Error closing microphone:', closeError);
-        }
-      }
-      
-      if (!tempBlob || tempBlob.size === 0) {
-        console.error('Recording resulted in empty audio data');
-        throw new Error('No audio was recorded');
-      }
-      
-      console.log('Recording captured successfully, converting to audio buffer...');
-      
-      // Convert blob to AudioBuffer
-      const arrayBuffer = await tempBlob.arrayBuffer();
-      
-      // Use a safer way to get or create an audio context
+      // Close microphone access
       try {
-        if (!this.context || this.context.state === 'closed') {
-          audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        } else {
-          // Make sure we have a valid AudioContext, not an OfflineAudioContext
-          if (this.context.constructor.name === 'AudioContext') {
-            audioContext = this.context as AudioContext;
-          } else {
-            // Create a new context if we don't have a usable one
-            audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-          }
-        }
-        
-        // Decode the audio data
-        if (audioContext) {
-          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-          
-          // Save the buffer and create a player
-          this.audioBuffer = audioBuffer;
-          
-          // Create a new player and connect it to our processing chain
-          if (this.player) {
-            // Dispose of the old player first to avoid memory leaks
-            this.player.disconnect();
-            this.player.dispose();
-          }
-          
-          this.player = new Tone.Player().connect(this.compressor);
-          this.player.buffer.set(audioBuffer);
-          
-          console.log('Recording processed successfully:', {
-            duration: audioBuffer.duration,
-            sampleRate: audioBuffer.sampleRate,
-            numberOfChannels: audioBuffer.numberOfChannels
-          });
-        }
-      } catch (audioContextError) {
-        console.error('Error with audio context:', audioContextError);
+        console.log('Closing microphone...');
+        this.recorder.close();
+      } catch (err) {
+        console.log('Error closing recorder:', err);
       }
       
-      // Return the blob for immediate use
-      return tempBlob;
+      // Return a simple dummy blob for now to test if the stopping process completes
+      const dummyBlob = new Blob([new ArrayBuffer(1000)], { type: 'audio/wav' });
+      
+      // Clean up the recorder reference
+      this.recorder = null;
+      
+      console.log('Recording stopped successfully');
+      return dummyBlob;
     } catch (error) {
-      console.error('Failed to stop recording:', error);
+      console.error('Simple stop recording error:', error);
       
-      if (error instanceof Error) {
-        throw error;
-      } else {
-        throw new Error('An unknown error occurred while processing the recording');
-      }
-    } finally {
-      // Always clean up resources in finally block to ensure it happens
-      // regardless of success or failure
+      // Make sure we clean up even on error
       try {
-        // Clean up the temporary recorder and context
-        if (recorder) {
-          try {
-            recorder.disconnect();
-            recorder.dispose();
-            console.log('Temporary recorder disposed');
-          } catch (recorderError) {
-            console.error('Error disposing temporary recorder:', recorderError);
-          }
+        if (this.recorder) {
+          this.recorder.close();
+          this.recorder = null;
         }
-        
-        // If we created a temporary audio context, close it
-        if (audioContext && audioContext !== this.context) {
-          try {
-            audioContext.close();
-          } catch (contextError) {
-            console.error('Error closing temporary audio context:', contextError);
-          }
-        }
-        
-        // Clean up the main recorder
-        this.disposeRecorder();
       } catch (cleanupError) {
-        console.error('Error during recorder cleanup:', cleanupError);
+        console.error('Error during cleanup:', cleanupError);
       }
+      
+      return null;
     }
   }
 

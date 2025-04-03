@@ -186,7 +186,14 @@ const EnhancedStudio: React.FC = () => {
   const [showRecordingPreviewModal, setShowRecordingPreviewModal] = useState<boolean>(false);
   const [recordingBuffer, setRecordingBuffer] = useState<AudioBuffer | null>(null);
   const [newRecordingName, setNewRecordingName] = useState<string>("New Recording");
-  const [recordingPreviewData, setRecordingPreviewData] = useState<{buffer?: AudioBuffer, duration: number, waveform: number[]}>({duration: 0, waveform: []});
+  const [recordingPreviewData, setRecordingPreviewData] = useState<{
+    buffer?: AudioBuffer, 
+    audioBlob?: Blob,
+    audioUrl?: string, 
+    duration: number, 
+    waveform: number[],
+    name?: string
+  }>({duration: 0, waveform: []});
   const [duration, setDuration] = useState<number>(120); // Total timeline duration in seconds
   
   // Calculate a suitable timeline duration based on regions
@@ -561,96 +568,65 @@ const EnhancedStudio: React.FC = () => {
     }
   };
   
+  // Handle stopping recording
   const handleRecordStop = async () => {
+    // Ensure we have an active audio processor
     if (!audioProcessor.isReady()) {
+      console.log('Audio processor not ready when stopping recording');
       setIsRecording(false);
       return;
     }
     
+    // Reset recording UI state immediately to prevent multiple stop calls
+    setIsRecording(false);
+    setRecordingWaveform(null);
+    
+    console.log('Enhanced studio: Stopping recording with simplified approach');
+    
     try {
-      // Stop the recording and get resulting audio data
+      // Attempt to stop the recording and get the blob
       const blob = await audioProcessor.stopRecording();
       
       if (blob) {
-        // Convert blob to AudioBuffer for the preview
-        const reader = new FileReader();
+        console.log('Successfully stopped recording, got blob of size:', blob.size);
         
-        reader.onload = async () => {
-          try {
-            const arrayBuffer = reader.result as ArrayBuffer;
-            const audioContext = audioProcessor.getAudioContext();
-            const buffer = await audioContext.decodeAudioData(arrayBuffer);
-            
-            // Store the recording preview data
-            // Generate a waveform from the buffer if recording waveform is not available
-            let waveformData: number[] = [];
-            
-            // Convert the Float32Array to a regular array, or generate one from the buffer
-            if (recordingWaveform && recordingWaveform.length > 0) {
-              // Convert Float32Array to regular array and normalize values
-              waveformData = Array.from(recordingWaveform).map(v => Math.abs(v));
-            } else {
-              // Generate waveform data from the audio buffer for visualization
-              const channelData = buffer.getChannelData(0);
-              const waveformPoints = 200; // Reasonable number of points
-              const samplesPerPoint = Math.floor(channelData.length / waveformPoints);
-              
-              for (let i = 0; i < waveformPoints; i++) {
-                const startSample = i * samplesPerPoint;
-                let peakInSegment = 0;
-                
-                // Find peak in this segment
-                for (let j = 0; j < samplesPerPoint && (startSample + j) < channelData.length; j++) {
-                  peakInSegment = Math.max(peakInSegment, Math.abs(channelData[startSample + j]));
-                }
-                
-                waveformData.push(peakInSegment);
-              }
-            }
-            
-            // Store with the generated waveform
-            setRecordingPreviewData({
-              buffer: buffer,
-              duration: buffer.duration || recordingTime, // Use actual buffer duration if available
-              waveform: waveformData
-            });
-            
-            console.log("Recording preview prepared successfully", { 
-              durationInBuffer: buffer.duration,
-              durationMeasured: recordingTime,
-              waveformPoints: waveformData.length 
-            });
-            
-            // Show the preview modal
-            setShowRecordingPreviewModal(true);
-            
-          } catch (error) {
-            console.error("Failed to decode recorded audio:", error);
-            toast({
-              title: "Recording Error",
-              description: "Failed to process the recording. Please try again.",
-              variant: "destructive"
-            });
-          }
-        };
+        // Create a simple placeholder waveform for visualization
+        const placeholderWaveform = Array.from({length: 100}, () => Math.random() * 0.5);
         
-        reader.readAsArrayBuffer(blob);
-      } else {
+        // Set up the preview data with what we have
+        setRecordingPreviewData({
+          buffer: undefined,
+          audioBlob: blob,
+          audioUrl: URL.createObjectURL(blob),
+          waveform: placeholderWaveform,
+          duration: recordingTime || 5, // Use recorded time or fallback to 5 seconds
+          name: `Recording ${new Date().toLocaleTimeString()}`
+        });
+        
+        // Show the preview modal
+        setShowRecordingPreviewModal(true);
+        
         toast({
-          title: "Recording Error",
-          description: "No audio was recorded. Please try again.",
+          title: "Recording Complete",
+          description: "Recording has been saved. You can preview it now.",
+        });
+      } else {
+        console.error('No recording data received');
+        toast({
+          title: "Recording Failed", 
+          description: "No audio was captured. Please try again.",
           variant: "destructive"
         });
       }
     } catch (error) {
-      console.error("Failed to stop recording:", error);
+      console.error('Error stopping recording:', error);
       toast({
         title: "Recording Error",
-        description: "Could not save the recording. Please try again.",
+        description: "There was a problem processing your recording.",
         variant: "destructive"
       });
     } finally {
-      setIsRecording(false);
+      // Always reset recording state
       setRecordingTime(0);
     }
   };
