@@ -1314,28 +1314,30 @@ export function AIGenerationPanel({
       
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 flex flex-col">
         <div className="p-2 border-b border-gray-800">
-          <TabsList className="w-full bg-gray-800">
-            <TabsTrigger value="music" className="flex-1">
-              <Music size={14} className="mr-1" />
-              Music
-            </TabsTrigger>
-            <TabsTrigger value="vocal" className="flex-1">
-              <Mic size={14} className="mr-1" />
-              Vocal
-            </TabsTrigger>
-            <TabsTrigger value="speech" className="flex-1">
-              <MessageSquare size={14} className="mr-1" />
-              Speech
-            </TabsTrigger>
-            <TabsTrigger value="sfx" className="flex-1">
-              <Wand2 size={14} className="mr-1" />
-              SFX
-            </TabsTrigger>
-            <TabsTrigger value="enhance" className="flex-1">
-              <Sparkles size={14} className="mr-1" />
-              Enhance
-            </TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto scrollbar-hide">
+            <TabsList className="w-full bg-gray-800 inline-flex whitespace-nowrap min-w-max">
+              <TabsTrigger value="music" className="flex-1">
+                <Music size={14} className="mr-1" />
+                Music
+              </TabsTrigger>
+              <TabsTrigger value="vocal" className="flex-1">
+                <Mic size={14} className="mr-1" />
+                Vocal
+              </TabsTrigger>
+              <TabsTrigger value="speech" className="flex-1">
+                <MessageSquare size={14} className="mr-1" />
+                Speech
+              </TabsTrigger>
+              <TabsTrigger value="sfx" className="flex-1">
+                <Wand2 size={14} className="mr-1" />
+                SFX
+              </TabsTrigger>
+              <TabsTrigger value="enhance" className="flex-1">
+                <Sparkles size={14} className="mr-1" />
+                Enhance
+              </TabsTrigger>
+            </TabsList>
+          </div>
         </div>
         
         <ScrollArea className="flex-1">
