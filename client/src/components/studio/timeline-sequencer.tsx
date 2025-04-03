@@ -160,33 +160,87 @@ export function TimelineSequencer({
     if (!timelineRef.current || isDraggingPlayhead) return;
     
     const rect = timelineRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
+    const scrollOffset = containerRef.current ? containerRef.current.scrollLeft : 0;
+    
+    // Include scroll position in the calculation for precise positioning
+    const clickX = (e.clientX - rect.left) + scrollOffset;
+    
+    // Calculate time based on pixels
     const rawTime = pixelsToSeconds(clickX);
+    
+    // Apply snap if enabled
     const newTime = snapEnabled ? snapToGrid(rawTime) : rawTime;
     
-    onTimeChange(Math.max(0, newTime));
+    // Ensure time is within bounds
+    onTimeChange(Math.max(0, Math.min(duration, newTime)));
   };
   
   // Handle playhead drag start
-  const handlePlayheadDragStart = () => {
-    setIsDraggingPlayhead(true);
+  const handlePlayheadDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Store initial click position for more accurate dragging
+    if (timelineRef.current) {
+      const rect = timelineRef.current.getBoundingClientRect();
+      const initialX = e.clientX;
+      
+      // Store the initial state to have a reference point
+      setIsDraggingPlayhead(true);
+      
+      // Dispatch a custom event with additional data
+      window.dispatchEvent(new CustomEvent('playhead-drag-start', { 
+        detail: { initialX, currentTime } 
+      }));
+    }
   };
   
   // Handle playhead drag
   const handlePlayheadDrag = (e: MouseEvent) => {
-    if (!isDraggingPlayhead || !timelineRef.current) return;
+    if (!isDraggingPlayhead || !timelineRef.current || !containerRef.current) return;
     
     const rect = timelineRef.current.getBoundingClientRect();
-    const dragX = e.clientX - rect.left;
-    const rawTime = pixelsToSeconds(dragX);
+    const scrollOffset = containerRef.current.scrollLeft;
+    
+    // Include scroll position for accurate positioning
+    const dragX = (e.clientX - rect.left) + scrollOffset;
+    
+    // Prevent negative positions and positions beyond duration
+    const boundedDragX = Math.max(0, Math.min(dragX, duration * pixelsPerSecond));
+    
+    // Calculate time based on pixels with high precision
+    const rawTime = pixelsToSeconds(boundedDragX);
+    
+    // Apply snap if enabled
     const newTime = snapEnabled ? snapToGrid(rawTime) : rawTime;
     
+    // Prevent any time jumps outside permissible bounds
     onTimeChange(Math.max(0, Math.min(duration, newTime)));
+    
+    // Auto-scroll if the cursor is near the edges
+    const containerWidth = containerRef.current.clientWidth;
+    const edgeThreshold = 50; // pixels from edge to trigger scroll
+    
+    if (e.clientX - rect.left < edgeThreshold) {
+      // Near left edge, scroll left
+      containerRef.current.scrollLeft = Math.max(0, scrollOffset - 15);
+    } else if (rect.right - e.clientX < edgeThreshold) {
+      // Near right edge, scroll right
+      containerRef.current.scrollLeft = Math.min(
+        timelineWidth - containerWidth,
+        scrollOffset + 15
+      );
+    }
   };
   
   // Handle playhead drag end
   const handlePlayheadDragEnd = () => {
-    setIsDraggingPlayhead(false);
+    if (isDraggingPlayhead) {
+      setIsDraggingPlayhead(false);
+      
+      // Dispatch a custom event to notify that dragging has ended
+      window.dispatchEvent(new CustomEvent('playhead-drag-end'));
+    }
   };
   
   // Attach global mouse event listeners for playhead dragging
@@ -222,21 +276,42 @@ export function TimelineSequencer({
   // Auto-scroll to keep playhead visible when playing
   useEffect(() => {
     if (containerRef.current && playheadRef.current && currentTime > 0) {
+      // Only auto-scroll if we're not actively dragging the playhead
+      if (isDraggingPlayhead) return;
+      
       const container = containerRef.current;
       const playhead = playheadRef.current;
       
-      // Get positions
-      const containerRect = container.getBoundingClientRect();
-      const playheadRect = playhead.getBoundingClientRect();
+      // Calculate the position of the playhead in pixels
+      const playheadPosition = secondsToPixels(currentTime);
       
-      // Check if playhead is outside visible area
-      if (playheadRect.left < containerRect.left || playheadRect.right > containerRect.right) {
-        // Calculate scroll position to center playhead
-        const scrollLeft = playheadRect.left - containerRect.left - (containerRect.width / 2);
-        container.scrollLeft += scrollLeft;
+      // Get the visible area of the container
+      const scrollLeft = container.scrollLeft;
+      const containerWidth = container.clientWidth;
+      const viewportRightEdge = scrollLeft + containerWidth;
+      
+      // Define a margin for smoother scrolling experience
+      const scrollMargin = containerWidth * 0.2; // 20% of container width
+      
+      // Check if playhead is approaching the right edge of the viewport
+      if (playheadPosition > viewportRightEdge - scrollMargin) {
+        // Smooth scroll to keep the playhead in view with some lead space
+        container.scrollTo({
+          left: playheadPosition - containerWidth + scrollMargin,
+          behavior: 'smooth'
+        });
+      }
+      
+      // Check if playhead is approaching the left edge of the viewport
+      else if (playheadPosition < scrollLeft + scrollMargin) {
+        // Smooth scroll to keep the playhead in view with some lead space
+        container.scrollTo({
+          left: Math.max(0, playheadPosition - scrollMargin),
+          behavior: 'smooth'
+        });
       }
     }
-  }, [currentTime]);
+  }, [currentTime, isDraggingPlayhead, pixelsPerSecond]);
   
   // Render time axis markers (bars and beats)
   const renderTimeMarkers = () => {

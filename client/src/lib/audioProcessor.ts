@@ -533,6 +533,9 @@ class AudioProcessor {
    */
   async stopRecording(): Promise<Blob | null> {
     try {
+      // Immediately silence all inputs to prevent potential feedback
+      this.stopAllInputs();
+      
       // Find the recording track (should be the last one created)
       const trackIds = this.getTrackIds();
       
@@ -562,6 +565,15 @@ class AudioProcessor {
         try {
           // Get recording from the track
           console.log('Stopping recording on track:', recordingTrackId);
+          
+          // Disconnect the track from the master chain temporarily to prevent feedback
+          try {
+            recordingTrack.disconnectFromMaster();
+          } catch (disconnectError) {
+            console.warn('Could not disconnect track from master:', disconnectError);
+          }
+          
+          // Now safely stop the recording
           recordingBlob = await recordingTrack.stopRecording();
           console.log('Successfully captured recording from track, blob size:', recordingBlob?.size);
           
@@ -572,9 +584,24 @@ class AudioProcessor {
             console.log('Removed recording track:', removed ? 'success' : 'failed');
           } else {
             console.warn('Got empty recording from track, keeping track for diagnostics');
+            
+            // Reconnect the track if we're keeping it
+            try {
+              recordingTrack.connectToMaster();
+            } catch (reconnectError) {
+              console.warn('Could not reconnect track to master:', reconnectError);
+            }
           }
         } catch (trackError) {
           console.error('Failed to get recording from track:', trackError);
+          
+          // On error, ensure track is cleanly disconnected and removed
+          try {
+            this.removeTrack(recordingTrackId);
+            console.log('Removed failed recording track due to error');
+          } catch (cleanupError) {
+            console.error('Failed to remove track after error:', cleanupError);
+          }
         }
       } else {
         console.warn('Recording track not found:', recordingTrackId);
@@ -611,7 +638,69 @@ class AudioProcessor {
           this.recorder = null;
         }
       }
+      
+      // Make sure we're in a clean state for future operations
+      this.resetState();
     }
+  }
+  
+  /**
+   * Stop all audio inputs to prevent feedback loops
+   */
+  private stopAllInputs(): void {
+    // Iterate through all tracks and stop their inputs
+    this.tracks.forEach(track => {
+      try {
+        // Instead of directly accessing the recorder property, call a method
+        // that will properly handle stopping any ongoing recording
+        try {
+          if (track instanceof TrackProcessor) {
+            // This will clean up any recording state
+            track.stopRecording().catch(e => {
+              // Silence errors, as the track might not be recording
+              console.log('Track was not recording or already stopped');
+            });
+          }
+        } catch (e) {
+          // Ignore errors here as the track might not be recording
+          console.warn('Error stopping track recording:', e);
+        }
+        
+        // Disconnect the track from the master chain temporarily
+        try {
+          if (track instanceof TrackProcessor) {
+            track.disconnectFromMaster();
+            console.log('Disconnected track from master during input shutdown');
+          }
+        } catch (disconnectError) {
+          console.warn('Could not disconnect track from master:', disconnectError);
+        }
+      } catch (trackError) {
+        console.warn('Error stopping inputs for track:', trackError);
+      }
+    });
+    
+    // Also mute any master inputs
+    if (this.masterGain) {
+      const originalGain = this.masterGain.gain.value;
+      // Temporarily mute the master
+      this.masterGain.gain.value = 0;
+      
+      // Schedule gain restoration after a short delay
+      setTimeout(() => {
+        if (this.masterGain) {
+          this.masterGain.gain.value = originalGain;
+        }
+      }, 500);
+    }
+  }
+  
+  /**
+   * Reset processor state after operations
+   */
+  private resetState(): void {
+    // Reset any internal state flags
+    this.processingActive = false;
   }
 
   /**
@@ -974,50 +1063,93 @@ class TrackProcessor {
     
     // Create a recorder object for capturing audio
     let recorder: Tone.Recorder | null = null;
+    let audioContext: AudioContext | null = null;
+    let tempBlob: Blob | null = null;
     
     try {
       console.log('Stopping recording and processing audio...');
       
-      // Create a recorder connected to our UserMedia source
+      // In Tone.js, UserMedia doesn't have a stop method that returns a blob
+      // unlike Recorder, so we need to create a temporary Recorder
+      
+      // First create a temporary recorder
       recorder = new Tone.Recorder();
       
-      // Connect our recorder to the audio source
+      // Then connect our recorder input to it
       this.recorder.connect(recorder);
       
       // Start the recorder to capture any ongoing audio
-      recorder.start();
+      await recorder.start();
       
-      // Allow a moment to capture audio (important for mobile)
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Allow a brief moment to capture audio (important for processing)
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Stop recording and get blob
-      const blob = await recorder.stop();
-      console.log('Recording captured successfully, converting to audio buffer...');
+      // Now stop and get the audio blob
+      tempBlob = await recorder.stop();
       
-      if (!blob || blob.size === 0) {
+      // Also close the input microphone stream
+      if (this.recorder) {
+        try {
+          this.recorder.close(); // This closes the microphone stream
+          console.log('Closed microphone input');
+        } catch (closeError) {
+          console.warn('Error closing microphone:', closeError);
+        }
+      }
+      
+      if (!tempBlob || tempBlob.size === 0) {
         console.error('Recording resulted in empty audio data');
         throw new Error('No audio was recorded');
       }
       
+      console.log('Recording captured successfully, converting to audio buffer...');
+      
       // Convert blob to AudioBuffer
-      const arrayBuffer = await blob.arrayBuffer();
+      const arrayBuffer = await tempBlob.arrayBuffer();
       
-      // Decode the audio data
-      const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
-      
-      // Save the buffer and create a player
-      this.audioBuffer = audioBuffer;
-      this.player = new Tone.Player().connect(this.compressor);
-      this.player.buffer.set(audioBuffer);
-      
-      console.log('Recording processed successfully:', {
-        duration: audioBuffer.duration,
-        sampleRate: audioBuffer.sampleRate,
-        numberOfChannels: audioBuffer.numberOfChannels
-      });
+      // Use a safer way to get or create an audio context
+      try {
+        if (!this.context || this.context.state === 'closed') {
+          audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        } else {
+          // Make sure we have a valid AudioContext, not an OfflineAudioContext
+          if (this.context.constructor.name === 'AudioContext') {
+            audioContext = this.context as AudioContext;
+          } else {
+            // Create a new context if we don't have a usable one
+            audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          }
+        }
+        
+        // Decode the audio data
+        if (audioContext) {
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          
+          // Save the buffer and create a player
+          this.audioBuffer = audioBuffer;
+          
+          // Create a new player and connect it to our processing chain
+          if (this.player) {
+            // Dispose of the old player first to avoid memory leaks
+            this.player.disconnect();
+            this.player.dispose();
+          }
+          
+          this.player = new Tone.Player().connect(this.compressor);
+          this.player.buffer.set(audioBuffer);
+          
+          console.log('Recording processed successfully:', {
+            duration: audioBuffer.duration,
+            sampleRate: audioBuffer.sampleRate,
+            numberOfChannels: audioBuffer.numberOfChannels
+          });
+        }
+      } catch (audioContextError) {
+        console.error('Error with audio context:', audioContextError);
+      }
       
       // Return the blob for immediate use
-      return blob;
+      return tempBlob;
     } catch (error) {
       console.error('Failed to stop recording:', error);
       
@@ -1030,13 +1162,23 @@ class TrackProcessor {
       // Always clean up resources in finally block to ensure it happens
       // regardless of success or failure
       try {
-        // Clean up the temporary recorder
+        // Clean up the temporary recorder and context
         if (recorder) {
           try {
+            recorder.disconnect();
             recorder.dispose();
             console.log('Temporary recorder disposed');
           } catch (recorderError) {
             console.error('Error disposing temporary recorder:', recorderError);
+          }
+        }
+        
+        // If we created a temporary audio context, close it
+        if (audioContext && audioContext !== this.context) {
+          try {
+            audioContext.close();
+          } catch (contextError) {
+            console.error('Error closing temporary audio context:', contextError);
           }
         }
         
@@ -1257,6 +1399,38 @@ class TrackProcessor {
    */
   getWaveform(): Float32Array {
     return this.analyzer.getValue() as Float32Array;
+  }
+  
+  /**
+   * Disconnect the track from the master output temporarily
+   * Used to prevent feedback loops during recording operations
+   */
+  disconnectFromMaster(): void {
+    try {
+      if (this.volume) {
+        this.volume.disconnect();
+        console.log('Disconnected track from master output');
+      }
+    } catch (error) {
+      console.error('Error disconnecting track from master:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Reconnect the track to the master output
+   * Used after disconnectFromMaster() to restore normal signal flow
+   */
+  connectToMaster(): void {
+    try {
+      if (this.volume && this.output) {
+        this.volume.connect(this.output);
+        console.log('Reconnected track to master output');
+      }
+    } catch (error) {
+      console.error('Error reconnecting track to master:', error);
+      throw error;
+    }
   }
   
   /**
