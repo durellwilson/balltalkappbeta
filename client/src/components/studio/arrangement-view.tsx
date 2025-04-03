@@ -98,6 +98,7 @@ export function ArrangementView({
   const [gridSize, setGridSize] = useState(0.25); // Quarter note by default
   const [showLabels, setShowLabels] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true); // Auto-scroll enabled by default
   const [dragData, setDragData] = useState<{
     regionId: string;
     type: 'move' | 'resizeLeft' | 'resizeRight';
@@ -136,9 +137,28 @@ export function ArrangementView({
   // Update playhead position when currentTime changes
   useEffect(() => {
     if (playheadRef.current) {
-      playheadRef.current.style.left = `${timeToPixel(currentTime)}px`;
+      const pixelPosition = timeToPixel(currentTime);
+      playheadRef.current.style.left = `${pixelPosition}px`;
+      
+      // Auto-scroll to follow playhead during playback
+      if (autoScroll && isPlaying && tracksContainerRef.current) {
+        const container = tracksContainerRef.current;
+        const containerWidth = container.clientWidth;
+        const visibleLeftEdge = container.scrollLeft;
+        const visibleRightEdge = visibleLeftEdge + containerWidth;
+        const buffer = containerWidth * 0.15; // 15% buffer on each side
+        
+        // Only scroll if the playhead is outside the middle portion of the visible area
+        if (pixelPosition < visibleLeftEdge + buffer || pixelPosition > visibleRightEdge - buffer) {
+          // Center the playhead in the visible area with smooth scrolling
+          container.scrollTo({
+            left: pixelPosition - containerWidth / 2,
+            behavior: 'smooth'
+          });
+        }
+      }
     }
-  }, [currentTime, pixelsPerSecond]);
+  }, [currentTime, pixelsPerSecond, autoScroll, isPlaying]);
   
   // Handle click on timeline to change position
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -506,6 +526,17 @@ export function ArrangementView({
               <option value="0.125">1/8</option>
               <option value="0.0625">1/16</option>
             </select>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-7 px-2 ml-1 ${autoScroll ? 'text-green-400 bg-green-950/20' : ''}`}
+              onClick={() => setAutoScroll(!autoScroll)}
+              title={autoScroll ? "Auto-scrolling enabled" : "Auto-scrolling disabled"}
+            >
+              <ChevronRight size={14} className={`mr-1 ${autoScroll ? '' : 'opacity-50'}`} />
+              Follow
+            </Button>
           </div>
           
           <div className="text-xs text-gray-200 font-mono">
