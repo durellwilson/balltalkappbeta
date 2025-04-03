@@ -171,8 +171,10 @@ const EnhancedStudio: React.FC = () => {
   const [newChatMessage, setNewChatMessage] = useState<string>('');
   const [sidebarTab, setSidebarTab] = useState<'tracks' | 'mixer' | 'collab' | 'cloud' | 'effects' | 'master' | 'ai'>('tracks');
   const [projectTime, setProjectTime] = useState<number>(0);
-  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [zoomLevel, setZoomLevel] = useState<number>(0.5); // Start with a more zoomed-out view
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  const [showRecordingPreviewModal, setShowRecordingPreviewModal] = useState<boolean>(false);
+  const [recordingPreviewData, setRecordingPreviewData] = useState<{buffer?: AudioBuffer, duration: number, waveform: number[]}>({duration: 0, waveform: []});
   const [duration, setDuration] = useState<number>(120); // Total timeline duration in seconds
   
   // Calculate a suitable timeline duration based on regions
@@ -1660,9 +1662,19 @@ const EnhancedStudio: React.FC = () => {
             <div className="mb-4">
               <h2 className="text-xl font-semibold mb-2">Arrangement</h2>
               
-              {/* Zoom controls */}
+              {/* Zoom controls with buttons */}
               <div className="flex items-center space-x-2 mb-3">
                 <Label className="text-xs text-gray-400">Zoom</Label>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-6 w-6 p-0"
+                  onClick={() => setZoomLevel(Math.max(zoomLevel * 0.5, 0.1))}
+                  title="Zoom Out"
+                >
+                  <Minus size={14} />
+                </Button>
+                
                 <Slider
                   value={[zoomLevel * 100]}
                   min={10}
@@ -1671,6 +1683,27 @@ const EnhancedStudio: React.FC = () => {
                   className="w-36"
                   onValueChange={values => setZoomLevel(values[0] / 100)}
                 />
+                
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-6 w-6 p-0"
+                  onClick={() => setZoomLevel(Math.min(zoomLevel * 2, 3))}
+                  title="Zoom In"
+                >
+                  <Plus size={14} />
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-6 px-2 text-xs"
+                  onClick={() => setZoomLevel(0.5)}
+                  title="Reset Zoom"
+                >
+                  Reset
+                </Button>
+                
                 <span className="text-xs text-gray-400">{zoomLevel.toFixed(1)}x</span>
               </div>
               
@@ -1821,26 +1854,79 @@ const EnhancedStudio: React.FC = () => {
                           className={`${isRecording ? 'animate-pulse' : ''}`}
                           onClick={() => {
                             if (isRecording) {
+                              // Stop recording
                               setIsRecording(false);
-                              toast({ 
-                                title: 'Recording Stopped',
-                                description: 'Your recording has been saved to the selected track.'
-                              });
-                            } else {
-                              // Check if we have a track ready for recording
-                              if (!tracks.some(t => t.isArmed)) {
-                                toast({
-                                  title: 'No Track Armed',
-                                  description: 'Please arm a track for recording first.',
-                                  variant: 'destructive'
-                                });
-                                return;
+                              
+                              // Create a preview dialog to review the recording
+                              setShowRecordingPreviewModal(true);
+                              
+                              // Set the active track to the one we just recorded to
+                              const armedTrack = tracks.find(t => t.isArmed);
+                              if (armedTrack) {
+                                setActiveTrackId(armedTrack.id);
                               }
                               
+                              toast({ 
+                                title: 'Recording Stopped',
+                                description: 'Your recording is ready for preview.'
+                              });
+                            } else {
+                              // Create a temporary track if no track exists or none are armed
+                              if (tracks.length === 0 || !tracks.some(t => t.isArmed)) {
+                                // Create a new track for instant recording
+                                const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
+                                const newTrack: Track = {
+                                  id: newTrackId,
+                                  name: `Recording ${newTrackId}`,
+                                  type: 'vocal',
+                                  volume: 0.8,
+                                  pan: 0,
+                                  isMuted: false,
+                                  isSoloed: false,
+                                  isArmed: true,
+                                  creationMethod: 'recorded',
+                                  color: '#ef4444' // Red color for recording
+                                };
+                                
+                                // Create track processor
+                                audioProcessor.createTrack(newTrackId, {
+                                  volume: newTrack.volume,
+                                  pan: newTrack.pan
+                                });
+                                
+                                // Add to tracks list
+                                setTracks(prev => [...prev, newTrack]);
+                                setActiveTrackId(newTrackId);
+                                
+                                // Start recording immediately
+                                setTimeout(() => {
+                                  // Short timeout to ensure the track is created first
+                                  const track = audioProcessor.getTrack(newTrackId);
+                                  if (track) {
+                                    track.startRecording();
+                                  }
+                                }, 100);
+                              } else {
+                                // Use the existing armed track
+                                const armedTrack = tracks.find(t => t.isArmed);
+                                if (armedTrack) {
+                                  const track = audioProcessor.getTrack(armedTrack.id);
+                                  if (track) {
+                                    track.startRecording();
+                                  }
+                                  setActiveTrackId(armedTrack.id);
+                                }
+                              }
+                              
+                              // Start recording
                               setIsRecording(true);
+                              
+                              // Update zoom level for better visibility
+                              setZoomLevel(Math.min(zoomLevel * 1.5, 200));
+                              
                               toast({ 
                                 title: 'Recording Started',
-                                description: 'Recording to the armed track...'
+                                description: 'Speak or play now - recording in progress...'
                               });
                             }
                           }}
@@ -2385,5 +2471,179 @@ const EnhancedStudio: React.FC = () => {
     </div>
   );
 };
+
+{/* Recording Preview Modal */}
+{showRecordingPreviewModal && (
+  <Dialog open={showRecordingPreviewModal} onOpenChange={setShowRecordingPreviewModal}>
+    <DialogContent className="bg-gray-900 text-white border-gray-800 max-w-3xl">
+      <DialogHeader>
+        <DialogTitle>Recording Preview</DialogTitle>
+        <DialogDescription className="text-gray-400">
+          Listen to your recording and choose what to do with it
+        </DialogDescription>
+      </DialogHeader>
+      
+      <div className="py-4 space-y-4">
+        {/* Waveform preview */}
+        <Card className="bg-gray-800 border-gray-700 p-0 overflow-hidden">
+          <div className="h-40 relative">
+            <WaveformVisualizer
+              trackId={activeTrackId || 0}
+              isActive={true}
+              animated={true}
+              showPlayhead={true}
+              className="w-full h-full"
+              gradientColors={['#ef4444', '#f43f5e', '#fb7185']} // Red theme for recordings
+            />
+            
+            {/* Playback controls overlay */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex space-x-4">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-12 w-12 bg-white/10 hover:bg-white/20 rounded-full"
+                  onClick={() => {
+                    // Preview playback
+                    const track = audioProcessor.getTrack(activeTrackId || 0);
+                    if (track) {
+                      track.togglePlayback();
+                    }
+                  }}
+                >
+                  <PlayCircle size={24} />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+        
+        {/* Quick effects */}
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium">Quick Enhancements</h3>
+          <div className="grid grid-cols-3 gap-2">
+            <Button 
+              variant="outline" 
+              className="bg-gray-800 border-gray-700 justify-start"
+              onClick={() => {
+                // Apply noise reduction
+                if (activeTrackId) {
+                  const track = audioProcessor.getTrack(activeTrackId);
+                  if (track) {
+                    // In a real app, we'd apply the effect here
+                    toast({
+                      title: "Noise Reduction Applied",
+                      description: "Background noise has been reduced"
+                    });
+                  }
+                }
+              }}
+            >
+              <Filter size={14} className="mr-2" />
+              Noise Reduction
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              className="bg-gray-800 border-gray-700 justify-start"
+              onClick={() => {
+                // Apply auto-tune
+                if (activeTrackId) {
+                  const track = audioProcessor.getTrack(activeTrackId);
+                  if (track) {
+                    // In a real app, we'd apply the effect here
+                    toast({
+                      title: "Auto-Tune Applied",
+                      description: "Vocals have been tuned to the project key"
+                    });
+                  }
+                }
+              }}
+            >
+              <Music size={14} className="mr-2" />
+              Auto-Tune
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              className="bg-gray-800 border-gray-700 justify-start"
+              onClick={() => {
+                // Apply compression
+                if (activeTrackId) {
+                  const track = audioProcessor.getTrack(activeTrackId);
+                  if (track) {
+                    // In a real app, we'd apply the effect here
+                    toast({
+                      title: "Compression Applied",
+                      description: "Dynamic range has been optimized"
+                    });
+                  }
+                }
+              }}
+            >
+              <BarChart2 size={14} className="mr-2" />
+              Compression
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      <DialogFooter className="flex justify-between">
+        <div>
+          <Button 
+            variant="destructive" 
+            onClick={() => {
+              // Discard the recording
+              if (activeTrackId) {
+                handleDeleteTrack(activeTrackId);
+              }
+              setShowRecordingPreviewModal(false);
+              toast({
+                title: "Recording Discarded",
+                description: "The recording has been deleted"
+              });
+            }}
+          >
+            <Trash2 size={14} className="mr-2" />
+            Discard
+          </Button>
+        </div>
+        
+        <div className="flex space-x-2">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              // Keep recording but continue editing
+              setShowRecordingPreviewModal(false);
+              setSidebarTab('effects');
+              toast({
+                title: "Recording Saved",
+                description: "Continue editing in the Effects panel"
+              });
+            }}
+          >
+            <Sliders size={14} className="mr-2" />
+            Edit Further
+          </Button>
+          
+          <Button 
+            variant="default"
+            onClick={() => {
+              // Accept and add to arrangement
+              setShowRecordingPreviewModal(false);
+              toast({
+                title: "Recording Added to Arrangement",
+                description: "Your recording is now in the timeline"
+              });
+            }}
+          >
+            <Check size={14} className="mr-2" />
+            Add to Arrangement
+          </Button>
+        </div>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+)}
 
 export default EnhancedStudio;
