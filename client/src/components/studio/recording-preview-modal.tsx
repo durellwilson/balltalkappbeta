@@ -12,7 +12,9 @@ import { useToast } from '@/hooks/use-toast';
 interface RecordingPreviewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  audioBuffer: AudioBuffer | undefined | null;
+  audioBuffer?: AudioBuffer | null;
+  audioBlob?: Blob | null;
+  audioUrl?: string;
   waveform?: number[];
   duration: number;
   onDiscard: () => void;
@@ -23,6 +25,8 @@ export function RecordingPreviewModal({
   open,
   onOpenChange,
   audioBuffer,
+  audioBlob,
+  audioUrl,
   waveform,
   duration,
   onDiscard,
@@ -38,6 +42,10 @@ export function RecordingPreviewModal({
 
   // Generate waveform data if not provided
   const [processedWaveform, setProcessedWaveform] = useState<number[] | undefined>(waveform);
+  
+  // Create a reference for audio element playback
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | undefined>(audioUrl);
   
   // Reset state when modal opens
   useEffect(() => {
@@ -55,8 +63,35 @@ export function RecordingPreviewModal({
       } else {
         setProcessedWaveform(waveform);
       }
+      
+      // Create blob URL if an actual blob is available but no URL yet
+      if (audioBlob && !audioUrl && !blobUrl) {
+        const url = URL.createObjectURL(audioBlob);
+        setBlobUrl(url);
+        
+        // Create an audio element for playback
+        if (!audioElementRef.current) {
+          const audioEl = new Audio(url);
+          audioElementRef.current = audioEl;
+        }
+      } else if (audioUrl && !blobUrl) {
+        setBlobUrl(audioUrl);
+        
+        // Create an audio element for playback
+        if (!audioElementRef.current) {
+          const audioEl = new Audio(audioUrl);
+          audioElementRef.current = audioEl;
+        }
+      }
     }
-  }, [open, audioBuffer, waveform]);
+    
+    // Cleanup function to revoke any object URLs
+    return () => {
+      if (blobUrl && !audioUrl) {
+        URL.revokeObjectURL(blobUrl);
+      }
+    };
+  }, [open, audioBuffer, audioBlob, audioUrl, waveform, blobUrl]);
 
   // Clean up when modal closes
   useEffect(() => {
@@ -101,7 +136,58 @@ export function RecordingPreviewModal({
 
   // Start playback with effects
   const startPlayback = () => {
-    if (!audioBuffer) return;
+    // If we have an HTML audio element (created from blob), use that
+    if (audioElementRef.current && blobUrl) {
+      try {
+        const audioEl = audioElementRef.current;
+        
+        // Set up event listeners for the audio element
+        audioEl.onended = () => {
+          setPlaybackPosition(0);
+          setIsPlaying(false);
+        };
+        
+        // Play the audio
+        audioEl.currentTime = playbackPosition;
+        audioEl.play()
+          .then(() => {
+            console.log('Audio playback started successfully');
+            // Apply FX
+            // Note: In a real implementation, we would connect this audio element
+            // to a Web Audio API context and apply effects, but for now we'll just play it
+          })
+          .catch(err => {
+            console.error('Error playing audio:', err);
+            toast({
+              title: "Playback Error",
+              description: "There was a problem playing the recording",
+              variant: "destructive"
+            });
+          });
+        
+        setIsPlaying(true);
+        
+        // Update playback position
+        playbackRef.current = window.setInterval(() => {
+          if (audioEl.paused) return;
+          setPlaybackPosition(audioEl.currentTime);
+        }, 30);
+        
+        return;
+      } catch (error) {
+        console.error('Error playing audio via HTML Audio element:', error);
+      }
+    }
+    
+    // Fallback to AudioBuffer playback if we don't have a blob URL
+    if (!audioBuffer) {
+      toast({
+        title: "Playback Error",
+        description: "No audio data available",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // Play the buffer with effects
     audioProcessor.playBuffer(audioBuffer);
@@ -129,6 +215,17 @@ export function RecordingPreviewModal({
       window.clearInterval(playbackRef.current);
       playbackRef.current = null;
     }
+    
+    // If we have an HTML audio element, pause it
+    if (audioElementRef.current) {
+      try {
+        audioElementRef.current.pause();
+      } catch (error) {
+        console.error('Error pausing audio element:', error);
+      }
+    }
+    
+    // Also stop any AudioBuffer playback
     audioProcessor.stopPlayback();
     setIsPlaying(false);
   };

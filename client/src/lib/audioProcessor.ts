@@ -1056,7 +1056,7 @@ class TrackProcessor {
    * Returns the recording blob so it can be used immediately
    */
   async stopRecording(): Promise<Blob | null> {
-    console.log('Simple stopRecording called');
+    console.log('Stopping track recording');
     
     if (!this.recorder) {
       console.log('No recorder found when stopping recording');
@@ -1064,29 +1064,47 @@ class TrackProcessor {
     }
     
     try {
-      // Simplest implementation - using a single Recorder
-      // Create a static recorder that's not connected to our audio graph
+      // Create a recorder to capture the audio
       const staticRecorder = new Tone.Recorder();
+      
+      // Connect the UserMedia to the recorder before stopping it
+      this.recorder.connect(staticRecorder);
+      
+      // Start the recorder to capture any remaining audio in the buffer
+      staticRecorder.start();
+      
+      // Short delay to ensure the recorder captures the audio
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Stop the recorder to get the audio blob
+      const audioBlob = await staticRecorder.stop();
       
       // Close microphone access
       try {
-        console.log('Closing microphone...');
+        console.log('Closing microphone stream');
         this.recorder.close();
+        console.log('Closed recorder microphone stream');
       } catch (err) {
         console.log('Error closing recorder:', err);
       }
       
-      // Return a simple dummy blob for now to test if the stopping process completes
-      const dummyBlob = new Blob([new ArrayBuffer(1000)], { type: 'audio/wav' });
+      try {
+        // Disconnect recorder from audio chain
+        this.recorder.disconnect();
+        console.log('Disconnected recorder from audio chain');
+      } catch (err) {
+        console.log('Error disconnecting recorder:', err);
+      }
       
-      // Clean up the recorder reference
+      // Clean up the recorder and resources
       this.recorder = null;
+      staticRecorder.dispose();
+      console.log('Disposed recorder resources');
       
       console.log('Recording stopped successfully');
-      return dummyBlob;
+      return audioBlob;
     } catch (error) {
-      console.error('Simple stop recording error:', error);
-      
+      console.error('Error stopping recording:', error);
       // Make sure we clean up even on error
       try {
         if (this.recorder) {

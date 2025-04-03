@@ -2466,10 +2466,15 @@ const EnhancedStudio: React.FC = () => {
         open={showRecordingPreviewModal}
         onOpenChange={setShowRecordingPreviewModal}
         audioBuffer={recordingPreviewData.buffer}
+        audioBlob={recordingPreviewData.audioBlob}
+        audioUrl={recordingPreviewData.audioUrl}
         waveform={recordingPreviewData.waveform}
         duration={recordingPreviewData.duration}
         onDiscard={() => {
           // Discard recording
+          if (recordingPreviewData.audioUrl) {
+            URL.revokeObjectURL(recordingPreviewData.audioUrl);
+          }
           setRecordingPreviewData({duration: 0, waveform: []});
           toast({
             title: "Recording Discarded",
@@ -2477,7 +2482,8 @@ const EnhancedStudio: React.FC = () => {
           });
         }}
         onSave={(name, effects) => {
-          if (!recordingPreviewData.buffer) {
+          // Check if we have either a blob or buffer to work with
+          if (!recordingPreviewData.buffer && !recordingPreviewData.audioBlob) {
             toast({
               title: "Recording Error",
               description: "No audio data available. Please try recording again.",
@@ -2563,6 +2569,50 @@ const EnhancedStudio: React.FC = () => {
           
           // Process with effects if needed
           try {
+            // Skip effects processing if we don't have an audio buffer
+            if (!recordingPreviewData.buffer) {
+              // If we have a blob but no buffer, use the blob directly
+              if (recordingPreviewData.audioBlob) {
+                const audioUrl = recordingPreviewData.audioUrl || URL.createObjectURL(recordingPreviewData.audioBlob);
+                console.log('No buffer available for effects processing, using raw blob URL:', audioUrl);
+                
+                track.loadAudio(audioUrl).then(() => {
+                  setTracks(prev => [...prev, newTrack]);
+                  
+                  const newRegion: AudioRegion = {
+                    id: `region-${Date.now()}`,
+                    trackId: newTrackId,
+                    start: overlapRecording ? projectTime - recordingPreviewData.duration : 0,
+                    end: overlapRecording ? projectTime : recordingPreviewData.duration,
+                    offset: 0,
+                    name: name,
+                    waveform: recordingPreviewData.waveform,
+                    file: audioUrl
+                  };
+                  
+                  setRegions(prev => [...prev, newRegion]);
+                  
+                  toast({
+                    title: 'Recording Saved',
+                    description: `Track "${name}" created with your recording`
+                  });
+                }).catch(err => {
+                  console.error('Failed to load audio from blob:', err);
+                  toast({
+                    title: "Recording Error", 
+                    description: "Could not load the recorded audio",
+                    variant: "destructive"
+                  });
+                  audioProcessor.removeTrack(newTrackId);
+                });
+                
+                // Skip the rest of the effects processing
+                return;
+              } else {
+                throw new Error('No audio buffer or blob available for effects processing');
+              }
+            }
+            
             // Create offline context for effects processing
             const offlineContext = new OfflineAudioContext(
               recordingPreviewData.buffer.numberOfChannels,
@@ -2671,7 +2721,8 @@ const EnhancedStudio: React.FC = () => {
               });
               
               // Use original buffer without effects if available
-              if (recordingPreviewData.buffer) {
+              // Try using buffer if available
+            if (recordingPreviewData.buffer) {
                 const wavBlob = createWAVBlob(recordingPreviewData.buffer);
                 const audioUrl = URL.createObjectURL(wavBlob);
                 
@@ -2696,27 +2747,66 @@ const EnhancedStudio: React.FC = () => {
                     description: `Track "${name}" created with your recording`
                   });
                 }).catch(err => {
-                  console.error('Failed to load fallback audio:', err);
+                  console.error('Failed to load fallback audio from buffer:', err);
                   toast({
                     title: "Recording Error", 
-                    description: "Could not load the fallback audio",
+                    description: "Could not load the audio buffer",
                     variant: "destructive"
                   });
                   
                   // Clean up
                   audioProcessor.removeTrack(newTrackId);
                 });
-              } else {
-                // No audio buffer available
+            } 
+            // If no buffer but we have a blob, use that directly
+            else if (recordingPreviewData.audioBlob) {
+                // If we already have a URL, use it, otherwise create one
+                const audioUrl = recordingPreviewData.audioUrl || URL.createObjectURL(recordingPreviewData.audioBlob);
+                
+                console.log('Using direct audio blob URL for playback:', audioUrl);
+                
+                track.loadAudio(audioUrl).then(() => {
+                  setTracks(prev => [...prev, newTrack]);
+                  
+                  const newRegion: AudioRegion = {
+                    id: `region-${Date.now()}`,
+                    trackId: newTrackId,
+                    start: overlapRecording ? projectTime - recordingPreviewData.duration : 0,
+                    end: overlapRecording ? projectTime : recordingPreviewData.duration,
+                    offset: 0,
+                    name: name,
+                    waveform: recordingPreviewData.waveform,
+                    file: audioUrl
+                  };
+                  
+                  setRegions(prev => [...prev, newRegion]);
+                  
+                  toast({
+                    title: 'Recording Saved',
+                    description: `Track "${name}" created with your recording`
+                  });
+                }).catch(err => {
+                  console.error('Failed to load audio from blob:', err);
+                  toast({
+                    title: "Recording Error", 
+                    description: "Could not load the recorded audio",
+                    variant: "destructive"
+                  });
+                  
+                  // Clean up
+                  audioProcessor.removeTrack(newTrackId);
+                });
+            } else {
+                // No audio data available
                 toast({
                   title: "Recording Error",
-                  description: "No audio buffer available for playback",
+                  description: "No audio data available for playback",
                   variant: "destructive"
                 });
                 
                 // Clean up
                 audioProcessor.removeTrack(newTrackId);
-              }
+            }
             });
           } catch (err) {
             // Handle any unexpected errors during the effects setup
