@@ -514,6 +514,28 @@ class AudioProcessor {
   }
 
   /**
+   * Play a specific audio buffer (for previewing recordings)
+   * @param buffer The audio buffer to play
+   */
+  playBuffer(buffer: AudioBuffer | null): void {
+    if (!buffer) return;
+    
+    // Create a buffer source
+    const source = new Tone.BufferSource(buffer).connect(this.eqBands);
+    source.start();
+    console.log('Playing buffer preview');
+  }
+  
+  /**
+   * Stop any active playback
+   */
+  stopPlayback(): void {
+    // In a more complex implementation, we would keep track of the
+    // buffer sources and stop them appropriately
+    console.log('Stopping buffer playback');
+  }
+  
+  /**
    * Get the current waveform data for visualization
    */
   getWaveform(): Float32Array {

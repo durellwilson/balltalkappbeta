@@ -23,6 +23,8 @@ import {
   Mic,
   Music,
   Disc,
+  Trash,
+  StopCircle,
   HelpCircle,
   Wand2,
   Sliders,
@@ -179,6 +181,8 @@ const EnhancedStudio: React.FC = () => {
   const [zoomLevel, setZoomLevel] = useState<number>(0.5); // Start with a more zoomed-out view
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [showRecordingPreviewModal, setShowRecordingPreviewModal] = useState<boolean>(false);
+  const [recordingBuffer, setRecordingBuffer] = useState<AudioBuffer | null>(null);
+  const [newRecordingName, setNewRecordingName] = useState<string>("New Recording");
   const [recordingPreviewData, setRecordingPreviewData] = useState<{buffer?: AudioBuffer, duration: number, waveform: number[]}>({duration: 0, waveform: []});
   const [duration, setDuration] = useState<number>(120); // Total timeline duration in seconds
   
@@ -2508,182 +2512,134 @@ const EnhancedStudio: React.FC = () => {
         existingTracks={tracks}
         currentPlayheadPosition={projectTime}
       />
-    </div>
-  );
-};
+    
+      {/* Recording Preview Modal */}
+      {showRecordingPreviewModal && (
+        <Dialog open={showRecordingPreviewModal} onOpenChange={setShowRecordingPreviewModal}>
+          <DialogContent className="bg-gray-900 text-white border-gray-800 max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Recording Preview</DialogTitle>
+              <DialogDescription className="text-gray-400">
+                Listen to your recording and add effects before adding it to your project
+              </DialogDescription>
+            </DialogHeader>
 
-{/* Recording Preview Modal */}
-{showRecordingPreviewModal && (
-  <Dialog open={showRecordingPreviewModal} onOpenChange={setShowRecordingPreviewModal}>
-    <DialogContent className="bg-gray-900 text-white border-gray-800 max-w-3xl">
-      <DialogHeader>
-        <DialogTitle>Recording Preview</DialogTitle>
-        <DialogDescription className="text-gray-400">
-          Listen to your recording and choose what to do with it
-        </DialogDescription>
-      </DialogHeader>
-      
-      <div className="py-4 space-y-4">
-        {/* Waveform preview */}
-        <Card className="bg-gray-800 border-gray-700 p-0 overflow-hidden">
-          <div className="h-40 relative">
-            <WaveformVisualizer
-              trackId={activeTrackId || 0}
-              isActive={true}
-              animated={true}
-              showPlayhead={true}
-              className="w-full h-full"
-              gradientColors={['#ef4444', '#f43f5e', '#fb7185']} // Red theme for recordings
-            />
-            
-            {/* Playback controls overlay */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="flex space-x-4">
+            <div className="my-4">
+              {recordingBuffer && (
+                <WaveformVisualizer
+                  audioBuffer={recordingBuffer}
+                  height={120}
+                  color="#4f46e5"
+                  className="w-full"
+                />
+              )}
+              <div className="flex justify-center mt-2">
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-12 w-12 bg-white/10 hover:bg-white/20 rounded-full"
+                  size="sm"
                   onClick={() => {
-                    // Preview playback
-                    const track = audioProcessor.getTrack(activeTrackId || 0);
-                    if (track) {
-                      track.togglePlayback();
+                    // Logic to play the recorded audio for preview
+                    if (recordingBuffer) {
+                      audioProcessor.playBuffer(recordingBuffer);
                     }
                   }}
                 >
-                  <PlayCircle size={24} />
+                  <Play size={14} className="mr-2" />
+                  Play
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    // Logic to stop playback
+                    audioProcessor.stopPlayback();
+                  }}
+                  className="ml-2"
+                >
+                  <Square size={14} className="mr-2" />
+                  Stop
                 </Button>
               </div>
             </div>
-          </div>
-        </Card>
-        
-        {/* Quick effects */}
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium">Quick Enhancements</h3>
-          <div className="grid grid-cols-3 gap-2">
-            <Button 
-              variant="outline" 
-              className="bg-gray-800 border-gray-700 justify-start"
-              onClick={() => {
-                // Apply noise reduction
-                if (activeTrackId) {
-                  const track = audioProcessor.getTrack(activeTrackId);
-                  if (track) {
-                    // In a real app, we'd apply the effect here
+
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="recording-name">Recording Name</Label>
+                <Input
+                  id="recording-name"
+                  placeholder="New Recording"
+                  className="bg-gray-800 border-gray-700"
+                  value={newRecordingName}
+                  onChange={(e) => setNewRecordingName(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label>Effects</Label>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="reverb">Reverb</Label>
+                    <Slider
+                      id="reverb"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      defaultValue={[0.3]}
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="delay">Delay</Label>
+                    <Slider
+                      id="delay"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      defaultValue={[0.2]}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="mt-4">
+              <div className="flex justify-between w-full">
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setShowRecordingPreviewModal(false);
+                    // Discard recording
+                    setRecordingBuffer(null);
                     toast({
-                      title: "Noise Reduction Applied",
-                      description: "Background noise has been reduced"
+                      title: "Recording Discarded",
+                      description: "Your recording has been deleted"
                     });
-                  }
-                }
-              }}
-            >
-              <Filter size={14} className="mr-2" />
-              Noise Reduction
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              className="bg-gray-800 border-gray-700 justify-start"
-              onClick={() => {
-                // Apply auto-tune
-                if (activeTrackId) {
-                  const track = audioProcessor.getTrack(activeTrackId);
-                  if (track) {
-                    // In a real app, we'd apply the effect here
+                  }}
+                >
+                  <Trash2 size={14} className="mr-2" />
+                  Discard
+                </Button>
+                <Button
+                  variant="default"
+                  onClick={() => {
+                    // Accept and add to arrangement
+                    setShowRecordingPreviewModal(false);
                     toast({
-                      title: "Auto-Tune Applied",
-                      description: "Vocals have been tuned to the project key"
+                      title: "Recording Added to Arrangement",
+                      description: "Your recording is now in the timeline"
                     });
-                  }
-                }
-              }}
-            >
-              <Music size={14} className="mr-2" />
-              Auto-Tune
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              className="bg-gray-800 border-gray-700 justify-start"
-              onClick={() => {
-                // Apply compression
-                if (activeTrackId) {
-                  const track = audioProcessor.getTrack(activeTrackId);
-                  if (track) {
-                    // In a real app, we'd apply the effect here
-                    toast({
-                      title: "Compression Applied",
-                      description: "Dynamic range has been optimized"
-                    });
-                  }
-                }
-              }}
-            >
-              <BarChart2 size={14} className="mr-2" />
-              Compression
-            </Button>
-          </div>
-        </div>
-      </div>
-      
-      <DialogFooter className="flex justify-between">
-        <div>
-          <Button 
-            variant="destructive" 
-            onClick={() => {
-              // Discard the recording
-              if (activeTrackId) {
-                handleDeleteTrack(activeTrackId);
-              }
-              setShowRecordingPreviewModal(false);
-              toast({
-                title: "Recording Discarded",
-                description: "The recording has been deleted"
-              });
-            }}
-          >
-            <Trash2 size={14} className="mr-2" />
-            Discard
-          </Button>
-        </div>
-        
-        <div className="flex space-x-2">
-          <Button 
-            variant="outline" 
-            onClick={() => {
-              // Keep recording but continue editing
-              setShowRecordingPreviewModal(false);
-              setSidebarTab('effects');
-              toast({
-                title: "Recording Saved",
-                description: "Continue editing in the Effects panel"
-              });
-            }}
-          >
-            <Sliders size={14} className="mr-2" />
-            Edit Further
-          </Button>
-          
-          <Button 
-            variant="default"
-            onClick={() => {
-              // Accept and add to arrangement
-              setShowRecordingPreviewModal(false);
-              toast({
-                title: "Recording Added to Arrangement",
-                description: "Your recording is now in the timeline"
-              });
-            }}
-          >
-            <Check size={14} className="mr-2" />
-            Add to Arrangement
-          </Button>
-        </div>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
-)}
+                  }}
+                >
+                  <Check size={14} className="mr-2" />
+                  Add to Arrangement
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </div>
+  );
+}
 
 export default EnhancedStudio;

@@ -2,8 +2,17 @@ import React, { useRef, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import audioProcessor from '@/lib/audioProcessor';
 
+// Helper function to format time in MM:SS format
+const formatTime = (timeInSeconds: number): string => {
+  const minutes = Math.floor(timeInSeconds / 60);
+  const seconds = Math.floor(timeInSeconds % 60);
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+};
+
 interface WaveformVisualizerProps extends React.HTMLAttributes<HTMLDivElement> {
   trackId?: number;
+  buffer?: AudioBuffer;  // For backward compatibility
+  audioBuffer?: AudioBuffer; // Preferred naming
   color?: string;
   gradientColors?: string[];
   height?: number;
@@ -27,6 +36,8 @@ interface WaveformVisualizerProps extends React.HTMLAttributes<HTMLDivElement> {
  */
 const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
   trackId,
+  buffer,
+  audioBuffer,
   color = 'rgba(59, 130, 246, 0.8)',
   gradientColors,
   height = 80,
@@ -65,7 +76,28 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
     // Get waveform data from AudioProcessor - use either track-specific or master
     let waveformData: number[] = [];
     
-    if (isMaster) {
+    // Check if we have an audio buffer provided directly
+    const bufferToUse = audioBuffer || buffer;
+    
+    if (bufferToUse) {
+      // Extract waveform data from the provided AudioBuffer
+      const channelData = bufferToUse.getChannelData(0); // Use first channel
+      
+      // Downsample the data if it's too large
+      const maxPoints = Math.min(canvas.width * 2, channelData.length);
+      const samplingRate = Math.floor(channelData.length / maxPoints);
+      
+      waveformData = [];
+      for (let i = 0; i < channelData.length; i += samplingRate) {
+        // Get peak value in each segment 
+        let maxVal = 0;
+        const end = Math.min(i + samplingRate, channelData.length);
+        for (let j = i; j < end; j++) {
+          maxVal = Math.max(maxVal, Math.abs(channelData[j]));
+        }
+        waveformData.push(maxVal);
+      }
+    } else if (isMaster) {
       // Full master waveform is a Float32Array, convert to numbers
       const masterData = audioProcessor.getWaveform();
       waveformData = Array.from(masterData).map(v => Math.abs(v));
@@ -90,7 +122,7 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       drawTimeMarkers(ctx, canvas.width, canvas.height, duration);
     }
 
-  }, [trackId, color, gradientColors, height, width, gain, showTimeMarkers, duration, isMaster]);
+  }, [trackId, color, gradientColors, height, width, gain, showTimeMarkers, duration, isMaster, buffer, audioBuffer]);
 
   // Render playhead position
   useEffect(() => {
@@ -392,6 +424,35 @@ const drawStaticWaveform = (
   }
 };
 
+// Helper function to draw time markers
+const drawTimeMarkers = (
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  duration: number
+) => {
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'center';
+  
+  // Draw markers every 15 seconds, or more frequent for short clips
+  const interval = duration > 120 ? 30 : (duration > 60 ? 15 : 5);
+  const markers = Math.floor(duration / interval);
+  
+  for (let i = 0; i <= markers; i++) {
+    const time = i * interval;
+    const x = (time / duration) * width;
+    
+    // Draw vertical line
+    ctx.fillRect(x, height - 12, 1, 8);
+    
+    // Draw time text below
+    if (i % 2 === 0 || duration < 30) { // Skip some labels on longer tracks
+      ctx.fillText(formatTime(time), x, height - 2);
+    }
+  }
+};
+
 // Helper function to draw an animated waveform
 const drawAnimatedWaveform = (
   ctx: CanvasRenderingContext2D, 
@@ -560,41 +621,7 @@ const drawAnimatedWaveform = (
   }
 };
 
-// Helper function to draw time markers
-const drawTimeMarkers = (
-  ctx: CanvasRenderingContext2D, 
-  width: number, 
-  height: number,
-  duration: number
-) => {
-  const numMarkers = Math.min(10, Math.floor(duration));
-  
-  ctx.strokeStyle = 'rgba(150, 150, 150, 0.3)';
-  ctx.fillStyle = 'rgba(150, 150, 150, 0.5)';
-  ctx.font = '9px sans-serif';
-  ctx.textAlign = 'center';
-  
-  for (let i = 1; i < numMarkers; i++) {
-    const x = (i / numMarkers) * width;
-    
-    // Draw marker line
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, height);
-    ctx.stroke();
-    
-    // Draw time label
-    const time = (i / numMarkers) * duration;
-    ctx.fillText(formatTime(time), x, 10);
-  }
-};
 
-// Helper to format time in MM:SS format
-const formatTime = (seconds: number): string => {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
 
 export { WaveformVisualizer };
 export type { WaveformVisualizerProps };
