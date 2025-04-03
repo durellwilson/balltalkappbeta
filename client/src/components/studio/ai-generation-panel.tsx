@@ -25,148 +25,658 @@ async function generateSyntheticAudio(
   duration: number,
   parameters: any
 ): Promise<AudioBuffer> {
-  // Create audio context
-  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  console.log(`Generating ${type} with duration ${duration}s and parameters:`, parameters);
   
-  // Create an empty audio buffer with the specified duration
+  // Create audio context and offline context for rendering
+  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
   const sampleRate = 44100;
   const numberOfChannels = 2;
-  const frameCount = duration * sampleRate;
-  const audioBuffer = audioContext.createBuffer(numberOfChannels, frameCount, sampleRate);
+  const frameCount = Math.ceil(duration * sampleRate);
   
-  // Fill the buffer with synthetic audio based on the type
-  for (let channel = 0; channel < numberOfChannels; channel++) {
-    const channelData = audioBuffer.getChannelData(channel);
+  // Create offline context for better audio generation with effects
+  const offlineContext = new OfflineAudioContext(
+    numberOfChannels, 
+    frameCount, 
+    sampleRate
+  );
+  
+  // Create master gain node for final output control
+  const masterGain = offlineContext.createGain();
+  masterGain.gain.value = 0.8; // Master volume control
+  masterGain.connect(offlineContext.destination);
+  
+  // Create different types of audio based on the selected type
+  if (type === 'music') {
+    // Generate music with harmonic structure and rhythmic elements
+    const baseFreq = ['electronic', 'pop'].includes(parameters.genre) ? 110 : 
+                     ['rock', 'hiphop'].includes(parameters.genre) ? 82.41 : 220;
+    const bpm = parameters.tempo;
+    const beatsPerSecond = bpm / 60;
+    const beatDuration = 60 / bpm;
     
-    // Different audio generation algorithms for each type
-    if (type === 'music') {
-      // Generate music-like waveforms with harmonics
-      const baseFreq = ['electronic', 'pop'].includes(parameters.genre) ? 110 : 
-                       ['rock', 'hiphop'].includes(parameters.genre) ? 82.41 : 220;
-      const bpm = parameters.tempo;
-      const beatsPerSecond = bpm / 60;
+    // Create a compressor for better dynamics
+    const compressor = offlineContext.createDynamicsCompressor();
+    compressor.threshold.value = -24;
+    compressor.ratio.value = 4;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+    compressor.connect(masterGain);
+    
+    // Create a low-pass filter to shape the sound
+    const lowpass = offlineContext.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = 5000;
+    lowpass.Q.value = 1;
+    lowpass.connect(compressor);
+    
+    // Generate drum patterns
+    const totalBeats = Math.ceil(duration * beatsPerSecond);
+    
+    // Create kick drum pattern
+    for (let beat = 0; beat < totalBeats; beat++) {
+      if (beat % 4 === 0 || (parameters.genre === 'hiphop' && beat % 4 === 2)) {
+        // Kick on beats 1 and 3 for most genres, more for hip-hop
+        const time = beat * beatDuration;
+        const kick = createKickDrum(offlineContext, time);
+        kick.connect(compressor);
+      }
       
-      // Create a more complex musical pattern
-      for (let i = 0; i < frameCount; i++) {
-        const t = i / sampleRate;
-        const beat = t * beatsPerSecond;
-        const bar = Math.floor(beat / 4);
+      if ((beat % 4 === 2 && parameters.genre !== 'ambient') || 
+          (parameters.genre === 'rock' && beat % 2 === 1)) {
+        // Snare on beats 3 for most genres, more for rock
+        const time = beat * beatDuration;
+        const snare = createSnare(offlineContext, time);
+        snare.connect(lowpass);
+      }
+      
+      if (beat % 2 === 1 || parameters.genre === 'electronic') {
+        // Hi-hats on off-beats, more for electronic
+        const time = beat * beatDuration;
+        const hihat = createHiHat(offlineContext, time, 0.3);
+        hihat.connect(lowpass);
+      }
+    }
+    
+    // Create bass line
+    const bassOscillator = offlineContext.createOscillator();
+    const bassGain = offlineContext.createGain();
+    
+    bassOscillator.type = 'triangle';
+    bassOscillator.frequency.value = baseFreq / 2;
+    
+    bassOscillator.connect(bassGain);
+    bassGain.connect(lowpass);
+    
+    // Create bass pattern
+    const bassPattern = [0, 0, 3, 0, 0, 0, 5, 7];
+    const patternLength = 8;
+    
+    for (let beat = 0; beat < totalBeats; beat++) {
+      const time = beat * beatDuration;
+      const patternIndex = beat % patternLength;
+      const note = bassPattern[patternIndex];
+      
+      // Calculate frequency from base note and pattern
+      const freq = (baseFreq / 2) * Math.pow(2, note / 12);
+      
+      // Schedule the frequency change
+      bassOscillator.frequency.setValueAtTime(freq, time);
+      
+      // Create volume envelope for each note
+      bassGain.gain.setValueAtTime(0, time);
+      bassGain.gain.linearRampToValueAtTime(0.7, time + 0.02);
+      bassGain.gain.linearRampToValueAtTime(0.5, time + beatDuration * 0.5);
+      bassGain.gain.linearRampToValueAtTime(0, time + beatDuration * 0.9);
+    }
+    
+    // Start and stop the bass oscillator
+    bassOscillator.start(0);
+    bassOscillator.stop(duration);
+    
+    // Create lead melody with proper harmonic overtones
+    const leadOscillator = offlineContext.createOscillator();
+    const leadGain = offlineContext.createGain();
+    
+    // Set the oscillator type based on genre
+    if (parameters.genre === 'electronic' || parameters.genre === 'pop') {
+      leadOscillator.type = 'sawtooth';
+    } else if (parameters.genre === 'rock') {
+      leadOscillator.type = 'square';
+    } else {
+      leadOscillator.type = 'sine';
+    }
+    
+    leadOscillator.frequency.value = baseFreq;
+    
+    // Connect lead through gain to master
+    leadOscillator.connect(leadGain);
+    leadGain.connect(lowpass);
+    
+    // Create lead melody pattern
+    const leadPattern = [0, 4, 7, 4, 5, 9, 7, 11];
+    
+    for (let beat = 0; beat < totalBeats; beat++) {
+      if (beat % 2 === 0) {  // Play notes on every other beat
+        const time = beat * beatDuration;
+        const patternIndex = (beat / 2) % leadPattern.length;
+        const note = leadPattern[patternIndex];
         
-        // Create a sequence of notes that changes every bar
-        const notePattern = [0, 4, 7, 12, 7, 4, 0, 5];
-        const noteIndex = Math.floor(beat % 8);
-        const note = notePattern[noteIndex];
+        // Calculate frequency from base note and pattern
         const freq = baseFreq * Math.pow(2, note / 12);
         
-        // Create drum-like accent on beats
-        const drumAccent = (beat % 1) < 0.1 ? 0.3 : 0;
-        const kickDrum = (beat % 2) < 0.1 ? 0.6 : 0;
+        // Schedule the frequency change
+        leadOscillator.frequency.setValueAtTime(freq, time);
         
-        // Main melody
-        let value = 0.15 * Math.sin(2 * Math.PI * freq * t);
-        
-        // Add harmonics
-        value += 0.05 * Math.sin(2 * Math.PI * freq * 2 * t);
-        value += 0.03 * Math.sin(2 * Math.PI * freq * 3 * t);
-        
-        // Add bass on every quarter note
-        value += 0.2 * Math.sin(2 * Math.PI * (baseFreq / 2) * t) * (beat % 1 < 0.5 ? 0.7 : 0.3);
-        
-        // Add percussion
-        value += kickDrum * Math.sin(2 * Math.PI * 60 * t) * Math.exp(-30 * (beat % 2));
-        value += drumAccent * Math.random() * 0.5;
-        
-        // Add some variation and dynamics
-        const dynamicsFactor = 0.7 + 0.3 * Math.sin(2 * Math.PI * 0.1 * t);
-        
-        // Apply the value
-        channelData[i] = Math.max(-0.8, Math.min(0.8, value * dynamicsFactor));
+        // Create volume envelope for each note
+        leadGain.gain.setValueAtTime(0, time);
+        leadGain.gain.linearRampToValueAtTime(0.5, time + 0.05);
+        leadGain.gain.linearRampToValueAtTime(0.3, time + beatDuration * 0.5);
+        leadGain.gain.linearRampToValueAtTime(0, time + beatDuration * 0.9);
       }
-    } 
-    else if (type === 'vocal' || type === 'speech') {
-      // Generate synthetic vocal-like signals
-      const baseFreq = type === 'vocal' ? 
-                       (parameters.gender === 'male' ? 120 : 220) : // Vocal
-                       180; // Speech
-      const modulationRate = type === 'vocal' ? 5 : 8; // Faster for speech
+    }
+    
+    // Start and stop the lead oscillator
+    leadOscillator.start(0);
+    leadOscillator.stop(duration);
+    
+    // Add pad chords for thickness (if not ambient or electronic)
+    if (!['ambient', 'electronic'].includes(parameters.genre)) {
+      const padOscillators = [];
+      const padGains = [];
       
-      // Speech formants (peaks in the frequency spectrum)
-      const formants = [500, 1500, 2500];
+      // Create chord notes
+      const chordNotes = [0, 4, 7]; // Major triad
       
-      for (let i = 0; i < frameCount; i++) {
-        const t = i / sampleRate;
+      for (let i = 0; i < chordNotes.length; i++) {
+        const osc = offlineContext.createOscillator();
+        const gain = offlineContext.createGain();
         
-        // Create a carrier wave with vibrato for vocals
-        const vibrato = type === 'vocal' ? 15 * Math.sin(2 * Math.PI * 5 * t) : 0;
-        const freq = baseFreq + vibrato;
+        // Set oscillator type and frequency
+        osc.type = 'sine';
+        osc.frequency.value = baseFreq * Math.pow(2, chordNotes[i] / 12);
         
-        // Create a modulator wave for the formants
-        let value = 0;
+        // Connect oscillator through gain
+        osc.connect(gain);
+        gain.connect(lowpass);
         
-        // Vowel-like formants
-        for (let j = 0; j < formants.length; j++) {
-          const formantFreq = formants[j] + 200 * Math.sin(2 * Math.PI * 0.2 * t);
-          value += (0.2 / (j + 1)) * Math.sin(2 * Math.PI * formantFreq * t);
+        // Set gain level - make it subtle
+        gain.gain.value = 0.15;
+        
+        // Save references
+        padOscillators.push(osc);
+        padGains.push(gain);
+        
+        // Start oscillator
+        osc.start(0);
+        osc.stop(duration);
+      }
+      
+      // Create chord changes
+      const chordChanges = [0, 5, 7, 0]; // I - IV - V - I progression
+      const chordDuration = beatDuration * 4; // One chord per bar
+      
+      for (let chord = 0; chord < Math.ceil(duration / chordDuration); chord++) {
+        const time = chord * chordDuration;
+        const chordIndex = chord % chordChanges.length;
+        const transposeAmount = chordChanges[chordIndex];
+        
+        // Transpose each oscillator in the chord
+        for (let i = 0; i < chordNotes.length; i++) {
+          const transposedNote = chordNotes[i] + transposeAmount;
+          const freq = baseFreq * Math.pow(2, transposedNote / 12);
+          
+          // Schedule frequency change
+          padOscillators[i].frequency.setValueAtTime(freq, time);
+          
+          // Create volume envelope for each chord
+          padGains[i].gain.setValueAtTime(0.05, time);
+          padGains[i].gain.linearRampToValueAtTime(0.15, time + 1);
+          padGains[i].gain.linearRampToValueAtTime(0.05, time + chordDuration * 0.9);
+        }
+      }
+    }
+    
+    console.log(`Generated music with BPM=${bpm}, genre=${parameters.genre}, duration=${duration}s`);
+  }
+  else if (type === 'vocal' || type === 'speech') {
+    // Generate vocal or speech simulation
+    const isVocal = type === 'vocal';
+    const baseFreq = isVocal ? 
+                     (parameters.gender === 'male' ? 120 : 220) : // Vocal
+                     180; // Speech
+    
+    // Create formant filters for vocal characteristics
+    const formants = [];
+    const formantGains = [];
+    const formantFrequencies = isVocal ? 
+                               [500, 1200, 2500, 3500] : // Singing formants
+                               [730, 1090, 2440]; // Speech formants
+    
+    // Create source oscillator
+    const source = offlineContext.createOscillator();
+    source.type = 'sawtooth'; // Rich harmonic content for voice
+    source.frequency.value = baseFreq;
+    
+    // Create source gain
+    const sourceGain = offlineContext.createGain();
+    sourceGain.gain.value = 0.6;
+    
+    // Connect source to gain
+    source.connect(sourceGain);
+    
+    // Create formant filters
+    for (let i = 0; i < formantFrequencies.length; i++) {
+      const formant = offlineContext.createBiquadFilter();
+      const formantGain = offlineContext.createGain();
+      
+      formant.type = 'bandpass';
+      formant.frequency.value = formantFrequencies[i];
+      formant.Q.value = 10;
+      
+      // Set gain based on formant importance
+      formantGain.gain.value = 1.0 / (i + 1);
+      
+      // Connect source gain to formant filter to formant gain to master
+      sourceGain.connect(formant);
+      formant.connect(formantGain);
+      formantGain.connect(masterGain);
+      
+      formants.push(formant);
+      formantGains.push(formantGain);
+    }
+    
+    // Create vibrato for vocals
+    if (isVocal) {
+      const vibratoAmount = 5; // Hz variation
+      const vibratoRate = 5; // 5Hz vibrato
+      
+      // Add vibrato throughout the duration
+      for (let t = 0; t < duration; t += 0.05) {
+        source.frequency.setValueAtTime(
+          baseFreq + Math.sin(t * vibratoRate * 2 * Math.PI) * vibratoAmount,
+          t
+        );
+      }
+    }
+    
+    // Create syllable patterns for realistic speech/singing
+    const syllableDuration = isVocal ? 0.25 : 0.15; // seconds per syllable
+    const syllables = Math.ceil(duration / syllableDuration);
+    
+    // Function to switch between different vowel sounds by changing formants
+    const vowels = ['a', 'e', 'i', 'o', 'u'];
+    
+    for (let i = 0; i < syllables; i++) {
+      const time = i * syllableDuration;
+      const vowelIndex = i % vowels.length;
+      
+      // Change formant frequencies for different vowels
+      switch (vowels[vowelIndex]) {
+        case 'a': // "ah" sound
+          if (formants.length > 0) formants[0].frequency.setValueAtTime(730, time);
+          if (formants.length > 1) formants[1].frequency.setValueAtTime(1090, time);
+          if (formants.length > 2) formants[2].frequency.setValueAtTime(2440, time);
+          break;
+          
+        case 'e': // "eh" sound
+          if (formants.length > 0) formants[0].frequency.setValueAtTime(530, time);
+          if (formants.length > 1) formants[1].frequency.setValueAtTime(1840, time);
+          if (formants.length > 2) formants[2].frequency.setValueAtTime(2480, time);
+          break;
+          
+        case 'i': // "ee" sound
+          if (formants.length > 0) formants[0].frequency.setValueAtTime(270, time);
+          if (formants.length > 1) formants[1].frequency.setValueAtTime(2290, time);
+          if (formants.length > 2) formants[2].frequency.setValueAtTime(3010, time);
+          break;
+          
+        case 'o': // "oh" sound
+          if (formants.length > 0) formants[0].frequency.setValueAtTime(570, time);
+          if (formants.length > 1) formants[1].frequency.setValueAtTime(840, time);
+          if (formants.length > 2) formants[2].frequency.setValueAtTime(2410, time);
+          break;
+          
+        case 'u': // "oo" sound
+          if (formants.length > 0) formants[0].frequency.setValueAtTime(370, time);
+          if (formants.length > 1) formants[1].frequency.setValueAtTime(950, time);
+          if (formants.length > 2) formants[2].frequency.setValueAtTime(2650, time);
+          break;
+      }
+      
+      // Create amplitude envelope for each syllable
+      sourceGain.gain.setValueAtTime(0.1, time);
+      sourceGain.gain.linearRampToValueAtTime(0.6, time + 0.02);
+      sourceGain.gain.linearRampToValueAtTime(0.3, time + syllableDuration * 0.7);
+      sourceGain.gain.linearRampToValueAtTime(0.1, time + syllableDuration * 0.9);
+    }
+    
+    // Add pitch contour (rising/falling) for more natural speech/singing
+    for (let t = 0; t < duration; t += 1) {
+      const pitchVariation = Math.sin(t * 0.5 * Math.PI) * 20; // +/- 20 Hz variation
+      
+      source.frequency.setValueAtTime(
+        baseFreq + pitchVariation,
+        t
+      );
+    }
+    
+    // Start and stop the oscillator
+    source.start(0);
+    source.stop(duration);
+    
+    console.log(`Generated ${type} with baseFreq=${baseFreq}, duration=${duration}s`);
+  }
+  else if (type === 'sfx') {
+    // Generate sound effect based on category
+    const sfxCategory = parameters.genre || 'ambient';
+    
+    switch (sfxCategory) {
+      case 'ambient': {
+        // Create ambient atmosphere with filtered noise and drones
+        const noiseBufferSize = offlineContext.sampleRate * 2; // 2 seconds of noise
+        const noiseBuffer = offlineContext.createBuffer(1, noiseBufferSize, offlineContext.sampleRate);
+        const noiseData = noiseBuffer.getChannelData(0);
+        
+        // Fill the buffer with noise
+        for (let i = 0; i < noiseBufferSize; i++) {
+          noiseData[i] = Math.random() * 2 - 1;
         }
         
-        // Add carrier
-        value += 0.3 * Math.sin(2 * Math.PI * freq * t);
+        // Create noise source
+        const noiseSource = offlineContext.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
+        noiseSource.loop = true;
         
-        // Modulate amplitude to create syllable-like pattern
-        const syllableEnvelope = 0.5 + 0.5 * Math.sin(2 * Math.PI * modulationRate * t / 5);
+        // Create filters
+        const lowpassFilter = offlineContext.createBiquadFilter();
+        lowpassFilter.type = 'lowpass';
+        lowpassFilter.frequency.value = 400;
+        lowpassFilter.Q.value = 0.7;
         
-        // Apply some variation so it sounds less robotic
-        const randomVariation = 0.05 * (Math.random() * 2 - 1);
+        const highpassFilter = offlineContext.createBiquadFilter();
+        highpassFilter.type = 'highpass';
+        highpassFilter.frequency.value = 100;
+        highpassFilter.Q.value = 0.7;
         
-        // Apply the value with modulation
-        channelData[i] = (value * syllableEnvelope + randomVariation) * 0.7;
+        // Create gain node for noise
+        const noiseGain = offlineContext.createGain();
+        noiseGain.gain.value = 0.15;
+        
+        // Create slow LFO for filter modulation
+        const lfoRate = 0.1; // Hz
+        
+        // Modulate filter frequency over time
+        for (let t = 0; t < duration; t += 0.1) {
+          const modulation = 200 + 100 * Math.sin(t * lfoRate * 2 * Math.PI);
+          lowpassFilter.frequency.setValueAtTime(400 + modulation, t);
+        }
+        
+        // Connect noise path
+        noiseSource.connect(highpassFilter);
+        highpassFilter.connect(lowpassFilter);
+        lowpassFilter.connect(noiseGain);
+        noiseGain.connect(masterGain);
+        
+        // Create drone tones for atmosphere
+        const droneTones = [100, 150, 200, 300];
+        
+        for (let i = 0; i < droneTones.length; i++) {
+          const droneOsc = offlineContext.createOscillator();
+          const droneGain = offlineContext.createGain();
+          
+          droneOsc.type = 'sine';
+          droneOsc.frequency.value = droneTones[i];
+          
+          droneGain.gain.value = 0.1 / (i + 1);
+          
+          // Add subtle pitch variations
+          for (let t = 0; t < duration; t += 0.5) {
+            const pitchVariation = droneTones[i] * 0.01 * Math.sin(t * 0.2 * 2 * Math.PI);
+            droneOsc.frequency.setValueAtTime(droneTones[i] + pitchVariation, t);
+          }
+          
+          // Connect drone
+          droneOsc.connect(droneGain);
+          droneGain.connect(masterGain);
+          
+          // Start oscillator
+          droneOsc.start(0);
+          droneOsc.stop(duration);
+        }
+        
+        // Start noise
+        noiseSource.start(0);
+        noiseSource.stop(duration);
+        
+        console.log(`Generated ambient SFX with duration=${duration}s`);
+        break;
       }
-    } 
-    else if (type === 'sfx') {
-      // Generate sound effects based on category
-      switch (parameters.genre) {
-        case 'ambient':
-          // Ambient sound - wind, background noise
-          for (let i = 0; i < frameCount; i++) {
-            const t = i / sampleRate;
-            let noise = 0.2 * (Math.random() * 2 - 1);
-            
-            // Filtered noise
-            let filteredNoise = 0;
-            for (let j = 0; j < 10; j++) {
-              filteredNoise += noise * Math.sin(2 * Math.PI * (50 + j * 50) * t);
-            }
-            filteredNoise /= 10;
-            
-            channelData[i] = filteredNoise * 0.5;
-          }
-          break;
+      
+      case 'impact': {
+        // Create impact/hit sound with sharp attack and quick decay
+        
+        // Noise component for the attack
+        const noiseBufferSize = offlineContext.sampleRate;
+        const noiseBuffer = offlineContext.createBuffer(1, noiseBufferSize, offlineContext.sampleRate);
+        const noiseData = noiseBuffer.getChannelData(0);
+        
+        // Fill with noise
+        for (let i = 0; i < noiseBufferSize; i++) {
+          noiseData[i] = Math.random() * 2 - 1;
+        }
+        
+        // Create noise source
+        const noiseSource = offlineContext.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
+        
+        // Create bandpass filter
+        const bandpass = offlineContext.createBiquadFilter();
+        bandpass.type = 'bandpass';
+        bandpass.frequency.value = 1000;
+        bandpass.Q.value = 0.7;
+        
+        // Create noise gain with sharp envelope
+        const noiseGain = offlineContext.createGain();
+        noiseGain.gain.setValueAtTime(0, 0);
+        noiseGain.gain.linearRampToValueAtTime(0.7, 0.001);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, 0.3);
+        
+        // Connect noise path
+        noiseSource.connect(bandpass);
+        bandpass.connect(noiseGain);
+        noiseGain.connect(masterGain);
+        
+        // Create tone component for the body
+        const tone = offlineContext.createOscillator();
+        const toneGain = offlineContext.createGain();
+        
+        tone.type = 'triangle';
+        tone.frequency.setValueAtTime(200, 0);
+        tone.frequency.exponentialRampToValueAtTime(50, 0.5);
+        
+        toneGain.gain.setValueAtTime(0, 0);
+        toneGain.gain.linearRampToValueAtTime(0.8, 0.005);
+        toneGain.gain.exponentialRampToValueAtTime(0.001, 1.0);
+        
+        // Connect tone path
+        tone.connect(toneGain);
+        toneGain.connect(masterGain);
+        
+        // Start sources
+        noiseSource.start(0);
+        tone.start(0);
+        tone.stop(duration);
+        
+        console.log(`Generated impact SFX with duration=${duration}s`);
+        break;
+      }
+      
+      default: {
+        // Create a synthetic SFX (electronic beep sequence)
+        
+        // Create oscillator
+        const osc = offlineContext.createOscillator();
+        const gain = offlineContext.createGain();
+        
+        osc.type = 'square';
+        osc.frequency.value = 440;
+        
+        // Connect oscillator
+        osc.connect(gain);
+        gain.connect(masterGain);
+        
+        // Create sequence of beeps
+        const beepDuration = 0.2;
+        const numBeeps = Math.floor(duration / beepDuration);
+        
+        for (let i = 0; i < numBeeps; i++) {
+          const time = i * beepDuration;
           
-        case 'impact':
-          // Impact sound - hit, explosion
-          for (let i = 0; i < frameCount; i++) {
-            const t = i / sampleRate;
-            const envelope = Math.exp(-10 * t);
-            const noise = Math.random() * 2 - 1;
-            
-            channelData[i] = noise * envelope * 0.8;
-          }
-          break;
+          // Vary frequency for each beep
+          const freq = 440 + (i * 110);
+          osc.frequency.setValueAtTime(freq, time);
           
-        default:
-          // Default SFX - computer beeps
-          for (let i = 0; i < frameCount; i++) {
-            const t = i / sampleRate;
-            const freq = 440 + 880 * Math.floor(t * 2 % 4) / 4;
-            const envelope = Math.max(0, 1 - 10 * (t % 0.5));
-            
-            channelData[i] = 0.5 * Math.sin(2 * Math.PI * freq * t) * envelope;
-          }
+          // Create envelope for each beep
+          gain.gain.setValueAtTime(0, time);
+          gain.gain.linearRampToValueAtTime(0.6, time + 0.01);
+          gain.gain.linearRampToValueAtTime(0.4, time + beepDuration * 0.5);
+          gain.gain.linearRampToValueAtTime(0, time + beepDuration * 0.9);
+        }
+        
+        // Start oscillator
+        osc.start(0);
+        osc.stop(duration);
+        
+        console.log(`Generated default SFX with duration=${duration}s`);
       }
     }
   }
   
-  return audioBuffer;
+  // Render the audio to a buffer
+  console.log(`Rendering ${duration.toFixed(1)}s of audio...`);
+  try {
+    const renderedBuffer = await offlineContext.startRendering();
+    console.log(`Successfully rendered audio (${renderedBuffer.duration.toFixed(2)}s, ${renderedBuffer.numberOfChannels} channels)`);
+    return renderedBuffer;
+  } catch (error) {
+    console.error("Error rendering audio:", error);
+    
+    // Fallback to simple audio generation if offline rendering fails
+    const fallbackBuffer = audioContext.createBuffer(
+      numberOfChannels, 
+      frameCount, 
+      sampleRate
+    );
+    
+    // Fill with a simple sine wave in case of error
+    for (let channel = 0; channel < numberOfChannels; channel++) {
+      const channelData = fallbackBuffer.getChannelData(channel);
+      for (let i = 0; i < frameCount; i++) {
+        const t = i / sampleRate;
+        channelData[i] = Math.sin(2 * Math.PI * 440 * t) * 0.5;
+      }
+    }
+    
+    return fallbackBuffer;
+  }
+}
+
+// Create a kick drum sound
+function createKickDrum(context: AudioContext | OfflineAudioContext, time: number): AudioNode {
+  const oscillator = context.createOscillator();
+  const gainNode = context.createGain();
+  
+  oscillator.connect(gainNode);
+  
+  oscillator.type = 'sine';
+  oscillator.frequency.setValueAtTime(150, time);
+  oscillator.frequency.exponentialRampToValueAtTime(40, time + 0.2);
+  
+  gainNode.gain.setValueAtTime(0, time);
+  gainNode.gain.linearRampToValueAtTime(0.8, time + 0.01);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+  
+  oscillator.start(time);
+  oscillator.stop(time + 0.3);
+  
+  return gainNode;
+}
+
+// Create a snare drum sound
+function createSnare(context: AudioContext | OfflineAudioContext, time: number): AudioNode {
+  const noiseBuffer = context.createBuffer(1, context.sampleRate * 0.2, context.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    data[i] = Math.random() * 2 - 1;
+  }
+  
+  const noise = context.createBufferSource();
+  noise.buffer = noiseBuffer;
+  
+  const noiseFilter = context.createBiquadFilter();
+  noiseFilter.type = 'highpass';
+  noiseFilter.frequency.value = 1000;
+  
+  const noiseGain = context.createGain();
+  noiseGain.gain.setValueAtTime(0, time);
+  noiseGain.gain.linearRampToValueAtTime(0.8, time + 0.01);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+  
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  
+  noise.start(time);
+  
+  // Add body/tone
+  const oscillator = context.createOscillator();
+  const oscGain = context.createGain();
+  
+  oscillator.type = 'triangle';
+  oscillator.frequency.value = 200;
+  
+  oscGain.gain.setValueAtTime(0, time);
+  oscGain.gain.linearRampToValueAtTime(0.5, time + 0.01);
+  oscGain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+  
+  oscillator.connect(oscGain);
+  
+  oscillator.start(time);
+  oscillator.stop(time + 0.1);
+  
+  // Combine both components through a gain node
+  const combinedGain = context.createGain();
+  oscGain.connect(combinedGain);
+  noiseGain.connect(combinedGain);
+  
+  return combinedGain;
+}
+
+// Create a hi-hat sound
+function createHiHat(context: AudioContext | OfflineAudioContext, time: number, gain: number): AudioNode {
+  const noiseBuffer = context.createBuffer(1, context.sampleRate * 0.1, context.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    data[i] = Math.random() * 2 - 1;
+  }
+  
+  const noise = context.createBufferSource();
+  noise.buffer = noiseBuffer;
+  
+  const noiseFilter = context.createBiquadFilter();
+  noiseFilter.type = 'highpass';
+  noiseFilter.frequency.value = 7000;
+  
+  const noiseGain = context.createGain();
+  noiseGain.gain.setValueAtTime(0, time);
+  noiseGain.gain.linearRampToValueAtTime(gain, time + 0.005);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+  
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  
+  noise.start(time);
+  
+  return noiseGain;
 }
 
 // Helper function to convert AudioBuffer to WAV format for playback
@@ -220,21 +730,43 @@ function writeString(dataView: DataView, offset: number, str: string): void {
 // Extract waveform data from AudioBuffer for visualization
 function extractWaveformData(audioBuffer: AudioBuffer): number[] {
   const channelData = audioBuffer.getChannelData(0); // Use the first channel
-  const points = 100; // Number of points for the visualization
+  
+  // Calculate number of points based on duration to ensure high resolution
+  // More points for longer audio (1 point per 10ms minimum)
+  const duration = audioBuffer.duration;
+  const points = Math.max(500, Math.floor(duration * 100)); 
+  
   const blockSize = Math.floor(channelData.length / points);
   const waveform = [];
   
+  // Calculate the maximum value for normalization
+  let maxValue = 0.001; // Small non-zero default to avoid division by zero
+  for (let i = 0; i < channelData.length; i++) {
+    maxValue = Math.max(maxValue, Math.abs(channelData[i]));
+  }
+  
+  // Fill the waveform data with normalized values
   for (let i = 0; i < points; i++) {
     const start = blockSize * i;
     let sum = 0;
     
+    // Compute RMS (root mean square) for better amplitude representation
     for (let j = 0; j < blockSize; j++) {
-      sum += Math.abs(channelData[start + j] || 0);
+      if (start + j < channelData.length) {
+        const sample = channelData[start + j];
+        sum += sample * sample; // Square for RMS calculation
+      }
     }
     
-    waveform.push(sum / blockSize);
+    // Calculate RMS and normalize relative to maximum value
+    const rms = Math.sqrt(sum / blockSize);
+    const normalizedValue = rms / maxValue;
+    
+    // Scale to a reasonable amplitude range (0.05-0.95) to ensure visibility
+    waveform.push(0.05 + normalizedValue * 0.9);
   }
   
+  console.log(`Created high-resolution waveform with ${points} points for ${duration.toFixed(2)}s audio`);
   return waveform;
 }
 import { Input } from "@/components/ui/input";
@@ -601,8 +1133,17 @@ export function AIGenerationPanel({
     // Convert Blob to ArrayBuffer and call onGenerateTrack
     const reader = new FileReader();
     reader.readAsArrayBuffer(generatedAudio);
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       if (reader.result) {
+        // Convert ArrayBuffer to AudioBuffer for extracting waveform
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const audioBuffer = await audioContext.decodeAudioData(reader.result as ArrayBuffer);
+        
+        // Extract the waveform data
+        const waveformData = extractWaveformData(audioBuffer);
+        
+        console.log(`Adding track to project: ${activeTab}, duration=${duration}s, waveform points=${waveformData.length}`);
+        
         onGenerateTrack({
           buffer: reader.result as ArrayBuffer,
           name: `Generated ${activeTab} - ${new Date().toLocaleTimeString()}`,
@@ -610,7 +1151,7 @@ export function AIGenerationPanel({
                activeTab === 'vocal' ? 'vocal' : 
                activeTab === 'speech' ? 'vocal' : 'audio',
           duration: duration,
-          waveform: Array.from({ length: 100 }, () => Math.random() * 0.7 + 0.15),
+          waveform: waveformData,
           creationMethod: 'ai-generated'
         });
       }
