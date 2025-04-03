@@ -1443,6 +1443,28 @@ const EnhancedStudio: React.FC = () => {
             >
               {isPlaying ? <Pause size={14} /> : <Play size={14} />}
             </Button>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-gray-800 border-gray-700"
+                    onClick={() => {
+                      setShowSidebar(true);
+                      setSidebarTab('ai');
+                    }}
+                  >
+                    <Sparkles size={16} className="mr-1 text-purple-400" />
+                    AI
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Open AI Generator
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           
           <div className="flex items-center space-x-2">
