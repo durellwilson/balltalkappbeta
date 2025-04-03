@@ -2164,50 +2164,53 @@ const EnhancedStudio: React.FC = () => {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="cloud" className="m-0">
-                  <div className="p-3">
+                <TabsContent value="cloud" className="m-0 h-[calc(100vh-130px)] flex flex-col">
+                  <div className="p-3 border-b border-gray-800">
                     <h3 className="text-sm font-medium mb-3">Cloud Storage</h3>
-                    <div className="space-y-4">
-                      <ProjectSync projectId={parseInt(project.id)} />
-                      
-                      <Card className="bg-gray-800 border-gray-700">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm flex items-center gap-2">
-                            <Folder className="h-4 w-4" />
-                            Project Details
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-sm space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">Project Name:</span>
-                            <span className="font-medium">{project.name}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">Created:</span>
-                            <span className="font-medium">{new Date(project.createdAt).toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">Last Modified:</span>
-                            <span className="font-medium">{new Date(project.updatedAt).toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">Tracks:</span>
-                            <span className="font-medium">{tracks.length}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-gray-500">BPM:</span>
-                            <span className="font-medium">{project.bpm}</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
+                    <ProjectSync projectId={parseInt(project.id)} />
+                  </div>
+                  
+                  <div className="flex-1 overflow-hidden flex flex-col p-3">
+                    <h3 className="text-sm font-medium mb-3">Project Details</h3>
+                    <Card className="bg-gray-800 border-gray-700 flex-1">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Folder className="h-4 w-4" />
+                          Project Information
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="text-sm space-y-2">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Project Name:</span>
+                          <span className="font-medium">{project.name}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Created:</span>
+                          <span className="font-medium">{new Date(project.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Last Modified:</span>
+                          <span className="font-medium">{new Date(project.updatedAt).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Tracks:</span>
+                          <span className="font-medium">{tracks.length}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">BPM:</span>
+                          <span className="font-medium">{project.bpm}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="ai" className="m-0">
-                  <div className="p-3">
+                <TabsContent value="ai" className="m-0 h-[calc(100vh-130px)] flex flex-col">
+                  <div className="p-3 border-b border-gray-800">
                     <h3 className="text-sm font-medium mb-3">AI Tools</h3>
-                    
+                  </div>
+                  
+                  <div className="flex-1 overflow-hidden flex flex-col p-3">
                     <AIGenerationPanel 
                       onGenerateTrack={(track) => {
                         if (track && track.buffer) {
