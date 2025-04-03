@@ -484,6 +484,9 @@ const EnhancedStudio: React.FC = () => {
     }
   };
   
+  // State to hold real-time waveform data during recording
+  const [recordingWaveform, setRecordingWaveform] = useState<Float32Array | null>(null);
+  
   const handleRecordStart = async () => {
     try {
       // Check if audio processor is ready - if not, we show the overlay prompt now
@@ -504,15 +507,24 @@ const EnhancedStudio: React.FC = () => {
         // If we get here, we have permissions - immediately stop the stream
         stream.getTracks().forEach(track => track.stop());
         
-        // Now start recording with the audio processor
-        await audioProcessor.startRecording();
+        // Reset recording waveform
+        setRecordingWaveform(null);
+        
+        // Start recording with real-time waveform visualization
+        audioProcessor.startRecording((waveformData) => {
+          // This callback will be called about 20 times per second with new waveform data
+          setRecordingWaveform(waveformData);
+        });
+        
         setIsRecording(true);
         
-        // If not playing, start playback too
+        // If not playing, start playback too for layered recording
         if (!isPlaying) {
           audioProcessor.play();
           setIsPlaying(true);
         }
+        
+        console.log('Started recording with real-time visualization');
       } catch (micError) {
         console.error("Microphone access error:", micError);
         toast({
@@ -1573,6 +1585,59 @@ const EnhancedStudio: React.FC = () => {
               selectedTrackId={activeTrackId}
               onTrackSelect={setActiveTrackId}
             />
+            
+            {/* Real-time recording visualization overlay */}
+            {isRecording && recordingWaveform && (
+              <div className="mt-2 mb-4 relative bg-black/30 rounded-lg border border-red-500/30 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse mr-2"></div>
+                    <h3 className="text-red-500 font-medium">Recording in progress</h3>
+                  </div>
+                  <div className="text-white font-mono bg-red-950/50 px-2 rounded">
+                    {formatTime(recordingTime)}
+                  </div>
+                </div>
+                
+                <div className="h-32 bg-black/50 rounded-lg overflow-hidden flex items-center">
+                  <svg width="100%" height="100%" viewBox="0 0 512 100" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="recordingWaveGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor="rgba(255, 70, 70, 0.8)" />
+                        <stop offset="50%" stopColor="rgba(255, 70, 70, 0.3)" />
+                        <stop offset="100%" stopColor="rgba(255, 70, 70, 0.1)" />
+                      </linearGradient>
+                    </defs>
+                    <rect x="0" y="0" width="100%" height="100%" fill="rgba(0,0,0,0.2)" />
+                    
+                    {/* Main waveform */}
+                    <path
+                      d={`M 0,50 ${Array.from(recordingWaveform).map((v, i) => 
+                        `L ${i}, ${50 - v * 45}`).join(' ')} V 100 H 0 Z`}
+                      fill="url(#recordingWaveGradient)"
+                      stroke="rgba(255, 80, 80, 0.6)"
+                      strokeWidth="1"
+                    />
+                    
+                    {/* Center line */}
+                    <line x1="0" y1="50" x2="512" y2="50" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                    
+                    {/* Reflection effect */}
+                    <path
+                      d={`M 0,50 ${Array.from(recordingWaveform).map((v, i) => 
+                        `L ${i}, ${50 + v * 25}`).join(' ')} V 100 H 0 Z`}
+                      fill="rgba(255, 70, 70, 0.1)"
+                      stroke="none"
+                    />
+                  </svg>
+                </div>
+                
+                <div className="mt-2 text-gray-400 text-sm">
+                  Recording will be added as a new track when you click the Stop button
+                </div>
+              </div>
+            )}
+            
             <div className="mb-4">
               <h2 className="text-xl font-semibold mb-2">Arrangement</h2>
               

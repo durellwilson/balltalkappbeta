@@ -279,23 +279,79 @@ class AudioProcessor {
 
   /**
    * Start transport/playback
+   * This will play all tracks at the current transport position
    */
   play(): void {
+    // Ensure we're initialized
+    if (!this.isInitialized) {
+      console.warn('Audio processor not initialized, attempting to initialize now');
+      this.initialize().catch(err => {
+        console.error('Failed to initialize audio processor:', err);
+      });
+      return;
+    }
+    
+    // Start the transport
     Tone.Transport.start();
+    
+    // Get the current playback position
+    const currentTime = Tone.Transport.seconds;
+    console.log(`Starting playback at position ${currentTime}s`);
+    
+    // Play all tracks synchronized at the current transport position
+    this.tracks.forEach((track, trackId) => {
+      // Only play tracks that aren't muted
+      if (!track.isMuted()) {
+        try {
+          console.log(`Playing track ${trackId} from position ${currentTime}s`);
+          track.play(currentTime);
+        } catch (error) {
+          console.error(`Failed to play track ${trackId}:`, error);
+        }
+      } else {
+        console.log(`Track ${trackId} is muted, skipping playback`);
+      }
+    });
   }
 
   /**
    * Stop transport/playback
+   * This will stop all tracks and reset the playback position
    */
   stop(): void {
+    // Stop the transport
     Tone.Transport.stop();
+    
+    // Stop all tracks
+    this.tracks.forEach((track, trackId) => {
+      try {
+        track.stop();
+      } catch (error) {
+        console.error(`Failed to stop track ${trackId}:`, error);
+      }
+    });
+    
+    console.log('All playback stopped');
   }
 
   /**
    * Pause transport/playback
+   * This will pause all tracks at their current position
    */
   pause(): void {
+    // Pause the transport
     Tone.Transport.pause();
+    
+    // Pause all tracks
+    this.tracks.forEach((track, trackId) => {
+      try {
+        track.stop();
+      } catch (error) {
+        console.error(`Failed to pause track ${trackId}:`, error);
+      }
+    });
+    
+    console.log('Playback paused');
   }
 
   /**
@@ -372,24 +428,81 @@ class AudioProcessor {
   }
 
   /**
-   * Start recording the master output
+   * Start recording the master output with real-time waveform visualization
+   * 
+   * @param onWaveformUpdate Optional callback to receive real-time waveform data for visualization
    */
-  startRecording(): void {
+  startRecording(onWaveformUpdate?: (waveform: Float32Array) => void): void {
+    // Create a new track for recording
+    const recordingTrackId = Date.now();
+    const recordingTrack = this.createTrack(recordingTrackId);
+    
+    // Start recording on this track with real-time visualization callback
+    recordingTrack.startRecording(onWaveformUpdate).catch(error => {
+      console.error('Failed to start track recording:', error);
+    });
+    
+    // Also start master recording for backup
     this.recorder = new Tone.Recorder();
     this.masterGain.connect(this.recorder);
     this.recorder.start();
+    
+    // Set flag to indicate we're recording
+    this.processingActive = true;
+    console.log('Started recording with real-time visualization');
   }
 
   /**
    * Stop recording and return the audio blob
+   * @returns Promise that resolves to a Blob containing the recorded audio
    */
   async stopRecording(): Promise<Blob | null> {
-    if (!this.recorder) return null;
-    
-    const recording = await this.recorder.stop();
-    this.masterGain.disconnect(this.recorder);
-    this.recorder = null;
-    return recording;
+    try {
+      // Find the recording track (should be the last one created)
+      const trackIds = this.getTrackIds();
+      const recordingTrackId = Math.max(...trackIds);
+      const recordingTrack = this.getTrack(recordingTrackId);
+      
+      // Stop recording and get the audio data
+      let recordingBlob: Blob | null = null;
+      
+      if (recordingTrack) {
+        // Try to get recording from the track first
+        try {
+          recordingBlob = await recordingTrack.stopRecording();
+          console.log('Successfully captured recording from track');
+          
+          // Clean up the temporary recording track since we'll create a new playback track
+          this.removeTrack(recordingTrackId);
+        } catch (trackError) {
+          console.error('Failed to get recording from track:', trackError);
+        }
+      }
+      
+      // Fallback to master recording if track recording failed
+      if (!recordingBlob && this.recorder) {
+        try {
+          recordingBlob = await this.recorder.stop();
+          console.log('Falling back to master recording');
+        } catch (masterError) {
+          console.error('Failed to get master recording:', masterError);
+        }
+        
+        this.masterGain.disconnect(this.recorder);
+        this.recorder = null;
+      }
+      
+      this.processingActive = false;
+      return recordingBlob;
+    } catch (error) {
+      console.error('Error stopping recording:', error);
+      if (this.recorder) {
+        this.masterGain.disconnect(this.recorder);
+        this.recorder = null;
+      }
+      this.processingActive = false;
+      return null;
+    }
   }
 
   /**
@@ -643,14 +756,43 @@ class TrackProcessor {
 
   /**
    * Play the track
+   * @param startTime Optional time within the audio file to start playback from (in seconds)
+   * @param offset Optional offset to add to the current transport time (for regions)
+   * @param duration Optional duration to play (for clips/regions)
    */
-  play(startTime?: number): void {
-    if (!this.player) return;
+  play(startTime?: number, offset?: number, duration?: number): void {
+    if (!this.player) {
+      console.warn('Cannot play track: no player available');
+      return;
+    }
     
-    if (startTime !== undefined) {
-      this.player.start(Tone.now(), startTime);
-    } else {
-      this.player.start();
+    try {
+      // If the player is already playing, stop it first
+      if (this.player.state === 'started') {
+        this.player.stop();
+      }
+      
+      // Configure playback options
+      const now = Tone.now();
+      
+      if (startTime !== undefined) {
+        // If we have a specific start time in the audio file
+        if (duration) {
+          // Play a specific section (for regions/clips)
+          console.log(`Playing track from ${startTime}s for ${duration}s duration with offset ${offset || 0}s`);
+          this.player.start(now, startTime, duration);
+        } else {
+          // Play from a specific point to the end
+          console.log(`Playing track from ${startTime}s to end`);
+          this.player.start(now, startTime);
+        }
+      } else {
+        // Play from the beginning
+        console.log('Playing track from beginning');
+        this.player.start();
+      }
+    } catch (error) {
+      console.error('Error playing track:', error);
     }
   }
 
