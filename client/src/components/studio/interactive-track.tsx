@@ -33,7 +33,8 @@ import {
   LayoutGrid,
   Scissors,
   Hammer,
-  Sparkles
+  Sparkles,
+  Palette
 } from 'lucide-react';
 
 interface InteractiveTrackProps {
@@ -55,6 +56,7 @@ interface InteractiveTrackProps {
   onPlay?: (id: number) => void;
   onStop?: (id: number) => void;
   onAiEnhance?: (id: number) => void;
+  onColorChange?: (id: number, color: string) => void;
   volume?: number;
   pan?: number;
   color?: string;
@@ -86,6 +88,7 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
   onPlay,
   onStop,
   onAiEnhance,
+  onColorChange,
   volume = 0.8,
   pan = 0,
   color = '#3b82f6',
@@ -182,26 +185,26 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
     if (creationMethod) {
       switch (creationMethod) {
         case 'recorded':
-          return 'from-red-500 to-rose-500'; // Red/Rose for recorded tracks
+          return '#ef4444, #f43f5e'; // Red/Rose for recorded tracks
         case 'uploaded':
-          return 'from-blue-500 to-sky-500'; // Blue/Sky for uploaded tracks
+          return '#0ea5e9, #3b82f6'; // Blue/Sky for uploaded tracks
         case 'ai-generated':
-          return 'from-purple-500 to-fuchsia-500'; // Purple/Fuchsia for AI-generated tracks
+          return '#8b5cf6, #d946ef'; // Purple/Fuchsia for AI-generated tracks
       }
     }
     
     // Fall back to type-based coloring if no creation method specified
     switch (type) {
       case 'vocal':
-        return 'from-rose-500 to-pink-500';
+        return '#f43f5e, #ec4899'; // Rose/Pink
       case 'instrument':
-        return 'from-amber-500 to-orange-500';
+        return '#f59e0b, #f97316'; // Amber/Orange
       case 'drum':
-        return 'from-indigo-500 to-blue-500';
+        return '#6366f1, #3b82f6'; // Indigo/Blue
       case 'mix':
-        return 'from-emerald-500 to-green-500';
+        return '#10b981, #84cc16'; // Emerald/Lime
       default:
-        return 'from-sky-500 to-blue-500';
+        return '#0ea5e9, #3b82f6'; // Sky/Blue
     }
   };
 
@@ -279,7 +282,10 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center space-x-2">
               <div 
-                className={`w-3 h-full min-h-[2rem] rounded-sm bg-gradient-to-b ${getTrackTypeColor()}`}
+                className="w-3 h-full min-h-[2rem] rounded-sm"
+                style={color ? 
+                  { background: color } : 
+                  { background: `linear-gradient(to bottom, ${getTrackTypeColor()})` }}
               ></div>
               <div className="flex flex-col">
                 <h3 className="text-sm font-medium truncate">{name}</h3>
@@ -410,6 +416,53 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
                       <span>AI Enhance</span>
                     </Button>
                     
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="justify-start h-8"
+                        >
+                          <Palette size={14} className="mr-2" />
+                          <span>Change Color</span>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-56 p-3 bg-gray-800 border-gray-700">
+                        <h4 className="text-sm font-medium mb-2 text-white">Track Color</h4>
+                        <div className="grid grid-cols-5 gap-2">
+                          {[
+                            '#ef4444', // red
+                            '#f97316', // orange
+                            '#f59e0b', // amber
+                            '#84cc16', // lime
+                            '#10b981', // emerald
+                            '#14b8a6', // teal
+                            '#06b6d4', // cyan
+                            '#0ea5e9', // sky
+                            '#3b82f6', // blue
+                            '#6366f1', // indigo
+                            '#8b5cf6', // violet
+                            '#a855f7', // purple
+                            '#d946ef', // fuchsia
+                            '#ec4899', // pink
+                            '#f43f5e', // rose
+                          ].map((colorValue) => (
+                            <Button
+                              key={colorValue}
+                              className="w-6 h-6 p-0 rounded-md"
+                              style={{ backgroundColor: colorValue }}
+                              variant="ghost"
+                              onClick={() => {
+                                if (onColorChange) {
+                                  onColorChange(id, colorValue);
+                                }
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    
                     <hr className="border-gray-700 my-1" />
                     
                     <Button
@@ -494,7 +547,9 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
                 isActive={isActive}
                 animated={true}
                 showPlayhead={true}
-                gradientColors={['#2563eb', '#3b82f6', '#60a5fa']}
+                gradientColors={color ? 
+                  [color, color, color] : 
+                  ['#2563eb', '#3b82f6', '#60a5fa']}
                 className="w-full h-full"
               />
             ) : (
@@ -503,7 +558,9 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
                 height={96}
                 barCount={32}
                 style="bars"
-                gradientColors={['#3b82f6', '#8b5cf6', '#d946ef']}
+                gradientColors={color ? 
+                  [color, color, color] : 
+                  ['#3b82f6', '#8b5cf6', '#d946ef']}
                 className="w-full h-full"
               />
             )}

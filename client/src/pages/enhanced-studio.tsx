@@ -42,7 +42,8 @@ import {
   MousePointer,
   Scissors,
   Maximize,
-  Minimize
+  Minimize,
+  Circle
 } from 'lucide-react';
 
 // UI Components
@@ -106,6 +107,8 @@ interface Track {
   pan: number;
   isMuted: boolean;
   isSoloed: boolean;
+  isArmed?: boolean;
+  color?: string;
   createdBy?: string;
   collaborator?: {
     id: string;
@@ -1023,6 +1026,22 @@ const EnhancedStudio: React.FC = () => {
     });
   };
   
+  // Handle track color change
+  const handleTrackColorChange = (trackId: number, color: string) => {
+    setTracks(prevTracks => 
+      prevTracks.map(track => 
+        track.id === trackId 
+          ? { ...track, color } 
+          : track
+      )
+    );
+    
+    toast({
+      title: "Track Color Changed",
+      description: "Track color has been updated.",
+    });
+  };
+  
   const handleMasterVolumeChange = (volume: number) => {
     setMasterVolume(volume);
     audioProcessor.setMasterVolume(volume);
@@ -1759,32 +1778,32 @@ const EnhancedStudio: React.FC = () => {
             >
               <Tabs value={sidebarTab} onValueChange={(value) => setSidebarTab(value as any)}>
                 <div className="p-3 border-b border-gray-800">
-                  <TabsList className="w-full bg-gray-800 flex flex-wrap gap-1">
-                    <TabsTrigger value="tracks" className="flex-auto">
+                  <TabsList className="w-full bg-gray-800 flex overflow-x-auto no-scrollbar">
+                    <TabsTrigger value="tracks" className="whitespace-nowrap min-w-fit py-1 px-3">
                       <LayoutPanelLeft size={14} className="mr-1" />
                       Tracks
                     </TabsTrigger>
-                    <TabsTrigger value="effects" className="flex-auto">
+                    <TabsTrigger value="effects" className="whitespace-nowrap min-w-fit py-1 px-3">
                       <Sliders size={14} className="mr-1" />
                       Effects
                     </TabsTrigger>
-                    <TabsTrigger value="master" className="flex-auto">
+                    <TabsTrigger value="master" className="whitespace-nowrap min-w-fit py-1 px-3">
                       <Wand2 size={14} className="mr-1" />
                       Master
                     </TabsTrigger>
-                    <TabsTrigger value="mixer" className="flex-auto">
+                    <TabsTrigger value="mixer" className="whitespace-nowrap min-w-fit py-1 px-3">
                       <Settings size={14} className="mr-1" />
                       Mix
                     </TabsTrigger>
-                    <TabsTrigger value="collab" className="flex-auto">
+                    <TabsTrigger value="collab" className="whitespace-nowrap min-w-fit py-1 px-3">
                       <Users size={14} className="mr-1" />
                       Collab
                     </TabsTrigger>
-                    <TabsTrigger value="cloud" className="flex-auto">
+                    <TabsTrigger value="cloud" className="whitespace-nowrap min-w-fit py-1 px-3">
                       <Cloud size={14} className="mr-1" />
                       Cloud
                     </TabsTrigger>
-                    <TabsTrigger value="ai" className="flex-auto">
+                    <TabsTrigger value="ai" className="whitespace-nowrap min-w-fit py-1 px-3">
                       <Sparkles size={14} className="mr-1" />
                       AI
                     </TabsTrigger>
@@ -1795,13 +1814,47 @@ const EnhancedStudio: React.FC = () => {
                   <div className="p-3">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-sm font-medium">Tracks</h3>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <PlusCircle size={14} className="mr-1" />
-                            Add Track
-                          </Button>
-                        </DropdownMenuTrigger>
+                      <div className="flex items-center space-x-2">
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          className={`${isRecording ? 'animate-pulse' : ''}`}
+                          onClick={() => {
+                            if (isRecording) {
+                              setIsRecording(false);
+                              toast({ 
+                                title: 'Recording Stopped',
+                                description: 'Your recording has been saved to the selected track.'
+                              });
+                            } else {
+                              // Check if we have a track ready for recording
+                              if (!tracks.some(t => t.isArmed)) {
+                                toast({
+                                  title: 'No Track Armed',
+                                  description: 'Please arm a track for recording first.',
+                                  variant: 'destructive'
+                                });
+                                return;
+                              }
+                              
+                              setIsRecording(true);
+                              toast({ 
+                                title: 'Recording Started',
+                                description: 'Recording to the armed track...'
+                              });
+                            }
+                          }}
+                        >
+                          <Circle size={12} className="mr-1 fill-current" />
+                          {isRecording ? 'Stop Recording' : 'Record'}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <PlusCircle size={14} className="mr-1" />
+                              Add Track
+                            </Button>
+                          </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-gray-800 border-gray-700">
                           <DropdownMenuItem onClick={() => handleAddTrack('audio')}>
                             <Music size={14} className="mr-2" />
@@ -1835,6 +1888,7 @@ const EnhancedStudio: React.FC = () => {
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
+                      </div>
                     </div>
                     
                     <ScrollArea className="h-[calc(100vh-200px)]">
@@ -1935,6 +1989,7 @@ const EnhancedStudio: React.FC = () => {
                                 isSoloed={track.isSoloed}
                                 volume={track.volume}
                                 pan={track.pan}
+                                color={track.color}
                                 collaborator={track.collaborator}
                                 onSelect={() => setActiveTrackId(track.id)}
                                 onMuteToggle={handleTrackMuteToggle}
@@ -1943,6 +1998,7 @@ const EnhancedStudio: React.FC = () => {
                                 onPanChange={handleTrackPanChange}
                                 onDelete={handleDeleteTrack}
                                 onAiEnhance={handleAiEnhance}
+                                onColorChange={handleTrackColorChange}
                               />
                             </div>
                           ))
