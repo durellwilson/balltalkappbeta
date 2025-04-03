@@ -527,6 +527,12 @@ const EnhancedStudio: React.FC = () => {
         // Reset recording waveform
         setRecordingWaveform(null);
         
+        // Stop any playback to prevent feedback loops and echoes
+        if (isPlaying) {
+          audioProcessor.stop();
+          setIsPlaying(false);
+        }
+        
         // Start recording with real-time waveform visualization
         audioProcessor.startRecording((waveformData) => {
           // This callback will be called about 20 times per second with new waveform data
@@ -534,12 +540,7 @@ const EnhancedStudio: React.FC = () => {
         });
         
         setIsRecording(true);
-        
-        // If not playing, start playback too for layered recording
-        if (!isPlaying) {
-          audioProcessor.play();
-          setIsPlaying(true);
-        }
+        setOverlapRecording(false); // Disable overlap recording to ensure clean recording
         
         console.log('Started recording with real-time visualization');
       } catch (micError) {
@@ -2631,47 +2632,8 @@ const EnhancedStudio: React.FC = () => {
               }
             }
             
-            // EQ
-            if (effects.eq) {
-              try {
-                // Simple 3-band EQ
-                if (effects.eq.low !== 0) {
-                  const lowEQ = offlineContext.createBiquadFilter();
-                  lowEQ.type = 'lowshelf';
-                  lowEQ.frequency.value = 320;
-                  lowEQ.gain.value = effects.eq.low * 12; // -12 to +12 dB
-                  
-                  lastNode.connect(lowEQ);
-                  lastNode = lowEQ;
-                  console.log('Added low EQ:', effects.eq.low);
-                }
-                
-                if (effects.eq.mid !== 0) {
-                  const midEQ = offlineContext.createBiquadFilter();
-                  midEQ.type = 'peaking';
-                  midEQ.frequency.value = 1000;
-                  midEQ.Q.value = 1;
-                  midEQ.gain.value = effects.eq.mid * 12; // -12 to +12 dB
-                  
-                  lastNode.connect(midEQ);
-                  lastNode = midEQ;
-                  console.log('Added mid EQ:', effects.eq.mid);
-                }
-                
-                if (effects.eq.high !== 0) {
-                  const highEQ = offlineContext.createBiquadFilter();
-                  highEQ.type = 'highshelf';
-                  highEQ.frequency.value = 3200;
-                  highEQ.gain.value = effects.eq.high * 12; // -12 to +12 dB
-                  
-                  lastNode.connect(highEQ);
-                  lastNode = highEQ;
-                  console.log('Added high EQ:', effects.eq.high);
-                }
-              } catch (err) {
-                console.error('Failed to add EQ effects:', err);
-              }
-            }
+            // We'll skip EQ for now since it's not in the effects interface
+            // In future, we can add EQ here if needed
             
             // Final output
             lastNode.connect(offlineContext.destination);
@@ -2712,7 +2674,7 @@ const EnhancedStudio: React.FC = () => {
                 // Success notification
                 toast({
                   title: 'Recording Saved',
-                  description: `Track "${name}" created with your recording`,
+                  description: `Track "${name}" created with your recording`
                 });
               }).catch(err => {
                 console.error('Failed to load processed audio:', err);
@@ -2732,31 +2694,53 @@ const EnhancedStudio: React.FC = () => {
                 description: 'Could not process effects. Using original recording.'
               });
               
-              // Use original buffer without effects
-              const wavBlob = createWAVBlob(recordingPreviewData.buffer);
-              const audioUrl = URL.createObjectURL(wavBlob);
-              
-              track.loadAudio(audioUrl).then(() => {
-                setTracks(prev => [...prev, newTrack]);
+              // Use original buffer without effects if available
+              if (recordingPreviewData.buffer) {
+                const wavBlob = createWAVBlob(recordingPreviewData.buffer);
+                const audioUrl = URL.createObjectURL(wavBlob);
                 
-                const newRegion: AudioRegion = {
-                  id: `region-${Date.now()}`,
-                  trackId: newTrackId,
-                  start: overlapRecording ? projectTime - recordingPreviewData.duration : 0,
-                  end: overlapRecording ? projectTime : recordingPreviewData.duration,
-                  offset: 0,
-                  name: name,
-                  waveform: recordingPreviewData.waveform,
-                  file: audioUrl
-                };
-                
-                setRegions(prev => [...prev, newRegion]);
-                
-                toast({
-                  title: 'Recording Saved',
-                  description: `Track "${name}" created with your recording`
+                track.loadAudio(audioUrl).then(() => {
+                  setTracks(prev => [...prev, newTrack]);
+                  
+                  const newRegion: AudioRegion = {
+                    id: `region-${Date.now()}`,
+                    trackId: newTrackId,
+                    start: overlapRecording ? projectTime - recordingPreviewData.duration : 0,
+                    end: overlapRecording ? projectTime : recordingPreviewData.duration,
+                    offset: 0,
+                    name: name,
+                    waveform: recordingPreviewData.waveform,
+                    file: audioUrl
+                  };
+                  
+                  setRegions(prev => [...prev, newRegion]);
+                  
+                  toast({
+                    title: 'Recording Saved',
+                    description: `Track "${name}" created with your recording`
+                  });
+                }).catch(err => {
+                  console.error('Failed to load fallback audio:', err);
+                  toast({
+                    title: "Recording Error", 
+                    description: "Could not load the fallback audio",
+                    variant: "destructive"
+                  });
+                  
+                  // Clean up
+                  audioProcessor.removeTrack(newTrackId);
                 });
-              });
+              } else {
+                // No audio buffer available
+                toast({
+                  title: "Recording Error",
+                  description: "No audio buffer available for playback",
+                  variant: "destructive"
+                });
+                
+                // Clean up
+                audioProcessor.removeTrack(newTrackId);
+              }
             });
           } catch (err) {
             // Handle any unexpected errors during the effects setup
