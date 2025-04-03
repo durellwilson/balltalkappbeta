@@ -581,10 +581,43 @@ const EnhancedStudio: React.FC = () => {
             const buffer = await audioContext.decodeAudioData(arrayBuffer);
             
             // Store the recording preview data
+            // Generate a waveform from the buffer if recording waveform is not available
+            let waveformData: number[] = [];
+            
+            // Convert the Float32Array to a regular array, or generate one from the buffer
+            if (recordingWaveform && recordingWaveform.length > 0) {
+              // Convert Float32Array to regular array and normalize values
+              waveformData = Array.from(recordingWaveform).map(v => Math.abs(v));
+            } else {
+              // Generate waveform data from the audio buffer for visualization
+              const channelData = buffer.getChannelData(0);
+              const waveformPoints = 200; // Reasonable number of points
+              const samplesPerPoint = Math.floor(channelData.length / waveformPoints);
+              
+              for (let i = 0; i < waveformPoints; i++) {
+                const startSample = i * samplesPerPoint;
+                let peakInSegment = 0;
+                
+                // Find peak in this segment
+                for (let j = 0; j < samplesPerPoint && (startSample + j) < channelData.length; j++) {
+                  peakInSegment = Math.max(peakInSegment, Math.abs(channelData[startSample + j]));
+                }
+                
+                waveformData.push(peakInSegment);
+              }
+            }
+            
+            // Store with the generated waveform
             setRecordingPreviewData({
               buffer: buffer,
-              duration: recordingTime,
-              waveform: Array.from(recordingWaveform || [])
+              duration: buffer.duration || recordingTime, // Use actual buffer duration if available
+              waveform: waveformData
+            });
+            
+            console.log("Recording preview prepared successfully", { 
+              durationInBuffer: buffer.duration,
+              durationMeasured: recordingTime,
+              waveformPoints: waveformData.length 
             });
             
             // Show the preview modal
@@ -2467,6 +2500,15 @@ const EnhancedStudio: React.FC = () => {
           });
         }}
         onSave={(name, effects) => {
+          if (!recordingPreviewData.buffer) {
+            toast({
+              title: "Recording Error",
+              description: "No audio data available. Please try recording again.",
+              variant: "destructive"
+            });
+            return;
+          }
+          
           // Create a new track with the recording
           const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
           const newTrack: Track = {
@@ -2486,78 +2528,173 @@ const EnhancedStudio: React.FC = () => {
             pan: newTrack.pan
           });
           
-          if (recordingPreviewData.buffer && track) {
-            // Create a blob from the buffer to get a URL
-            const audioContext = audioProcessor.getAudioContext();
-            const channels = recordingPreviewData.buffer.numberOfChannels;
-            const frameCount = recordingPreviewData.buffer.length;
+          if (!track) {
+            toast({
+              title: "Track Creation Error",
+              description: "Could not create a new track. Please try again.",
+              variant: "destructive"
+            });
+            return;
+          }
+          
+          // Function to convert AudioBuffer to WAV
+          const createWAVBlob = (audioBuffer: AudioBuffer): Blob => {
+            const numOfChan = audioBuffer.numberOfChannels;
+            const length = audioBuffer.length * numOfChan * 2; // 16-bit = 2 bytes per sample
+            const buffer = new ArrayBuffer(44 + length);
+            const view = new DataView(buffer);
+            const sampleRate = audioBuffer.sampleRate;
             
-            // Create offline context to apply effects
+            // Write WAV header
+            // "RIFF" chunk descriptor
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + length, true);
+            writeString(view, 8, 'WAVE');
+            // "fmt" sub-chunk
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); // fmt chunk size
+            view.setUint16(20, 1, true); // audio format (PCM)
+            view.setUint16(22, numOfChan, true); // channels
+            view.setUint32(24, sampleRate, true); // sample rate
+            view.setUint32(28, sampleRate * numOfChan * 2, true); // byte rate
+            view.setUint16(32, numOfChan * 2, true); // block align
+            view.setUint16(34, 16, true); // bits per sample
+            // "data" sub-chunk
+            writeString(view, 36, 'data');
+            view.setUint32(40, length, true);
+            
+            // Write audio data
+            let offset = 44;
+            for (let i = 0; i < audioBuffer.length; i++) {
+              for (let channel = 0; channel < numOfChan; channel++) {
+                const sample = Math.max(-1, Math.min(1, audioBuffer.getChannelData(channel)[i]));
+                const int16 = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                view.setInt16(offset, int16, true);
+                offset += 2;
+              }
+            }
+            
+            return new Blob([buffer], { type: 'audio/wav' });
+          };
+          
+          // Helper function to write strings to DataView
+          const writeString = (view: DataView, offset: number, string: string): void => {
+            for (let i = 0; i < string.length; i++) {
+              view.setUint8(offset + i, string.charCodeAt(i));
+            }
+          };
+          
+          // Process with effects if needed
+          try {
+            // Create offline context for effects processing
             const offlineContext = new OfflineAudioContext(
-              channels,
-              frameCount,
+              recordingPreviewData.buffer.numberOfChannels,
+              recordingPreviewData.buffer.length,
               recordingPreviewData.buffer.sampleRate
             );
             
-            // Create source from buffer
+            // Create source node
             const source = offlineContext.createBufferSource();
             source.buffer = recordingPreviewData.buffer;
             
-            // Apply effects if needed
-            let currentNode = source;
+            // Connect effects chain
+            let lastNode: AudioNode = source;
             
-            // Apply reverb effect
+            // Reverb
             if (effects.reverb > 0) {
-              const reverb = offlineContext.createConvolver();
-              // In a real app, load an impulse response
-              // For now, we'll skip this but in reality, we would connect it
-              
-              // Connect through the effect chain
-              currentNode.connect(reverb);
-              currentNode = reverb;
-            }
-            
-            // Apply delay effect
-            if (effects.delay > 0) {
-              const delay = offlineContext.createDelay();
-              delay.delayTime.value = effects.delay * 0.5; // Max 500ms delay
-              
-              const feedback = offlineContext.createGain();
-              feedback.gain.value = 0.4;
-              
-              // Connect through the effect chain
-              currentNode.connect(delay);
-              delay.connect(feedback);
-              feedback.connect(delay);
-              currentNode = delay;
-            }
-            
-            // Connect to destination
-            currentNode.connect(offlineContext.destination);
-            
-            // Start source and render
-            source.start(0);
-            
-            offlineContext.startRendering().then(renderedBuffer => {
-              // Create a blob from the processed buffer
-              const audioData = new Float32Array(renderedBuffer.length * renderedBuffer.numberOfChannels);
-              let offset = 0;
-              
-              for (let channel = 0; channel < renderedBuffer.numberOfChannels; channel++) {
-                const channelData = renderedBuffer.getChannelData(channel);
-                audioData.set(channelData, offset);
-                offset += channelData.length;
+              try {
+                const reverb = offlineContext.createConvolver();
+                lastNode.connect(reverb);
+                lastNode = reverb;
+                console.log('Added reverb effect:', effects.reverb);
+              } catch (err) {
+                console.error('Failed to add reverb effect:', err);
               }
+            }
+            
+            // Delay
+            if (effects.delay > 0) {
+              try {
+                const delay = offlineContext.createDelay(2.0);
+                delay.delayTime.value = effects.delay * 0.5;
+                
+                const feedback = offlineContext.createGain();
+                feedback.gain.value = 0.3;
+                
+                lastNode.connect(delay);
+                delay.connect(feedback);
+                feedback.connect(delay);
+                lastNode = delay;
+                console.log('Added delay effect:', effects.delay);
+              } catch (err) {
+                console.error('Failed to add delay effect:', err);
+              }
+            }
+            
+            // EQ
+            if (effects.eq) {
+              try {
+                // Simple 3-band EQ
+                if (effects.eq.low !== 0) {
+                  const lowEQ = offlineContext.createBiquadFilter();
+                  lowEQ.type = 'lowshelf';
+                  lowEQ.frequency.value = 320;
+                  lowEQ.gain.value = effects.eq.low * 12; // -12 to +12 dB
+                  
+                  lastNode.connect(lowEQ);
+                  lastNode = lowEQ;
+                  console.log('Added low EQ:', effects.eq.low);
+                }
+                
+                if (effects.eq.mid !== 0) {
+                  const midEQ = offlineContext.createBiquadFilter();
+                  midEQ.type = 'peaking';
+                  midEQ.frequency.value = 1000;
+                  midEQ.Q.value = 1;
+                  midEQ.gain.value = effects.eq.mid * 12; // -12 to +12 dB
+                  
+                  lastNode.connect(midEQ);
+                  lastNode = midEQ;
+                  console.log('Added mid EQ:', effects.eq.mid);
+                }
+                
+                if (effects.eq.high !== 0) {
+                  const highEQ = offlineContext.createBiquadFilter();
+                  highEQ.type = 'highshelf';
+                  highEQ.frequency.value = 3200;
+                  highEQ.gain.value = effects.eq.high * 12; // -12 to +12 dB
+                  
+                  lastNode.connect(highEQ);
+                  lastNode = highEQ;
+                  console.log('Added high EQ:', effects.eq.high);
+                }
+              } catch (err) {
+                console.error('Failed to add EQ effects:', err);
+              }
+            }
+            
+            // Final output
+            lastNode.connect(offlineContext.destination);
+            
+            // Render audio
+            source.start(0);
+            offlineContext.startRendering().then(renderedBuffer => {
+              // Convert to WAV and create URL
+              const wavBlob = createWAVBlob(renderedBuffer);
+              const audioUrl = URL.createObjectURL(wavBlob);
               
-              const audioBlob = new Blob([audioData], { type: 'audio/wav' });
-              const audioUrl = URL.createObjectURL(audioBlob);
+              console.log('Successfully processed audio with effects', {
+                channels: renderedBuffer.numberOfChannels,
+                sampleRate: renderedBuffer.sampleRate,
+                duration: renderedBuffer.duration
+              });
               
-              // Load the processed audio
+              // Create track with the processed audio
               track.loadAudio(audioUrl).then(() => {
                 // Add to tracks list
                 setTracks(prev => [...prev, newTrack]);
                 
-                // Create a region for this recording
+                // Create region for this recording
                 const newRegion: AudioRegion = {
                   id: `region-${Date.now()}`,
                   trackId: newTrackId,
@@ -2569,39 +2706,37 @@ const EnhancedStudio: React.FC = () => {
                   file: audioUrl
                 };
                 
-                // Add to regions
+                // Add region
                 setRegions(prev => [...prev, newRegion]);
                 
+                // Success notification
                 toast({
                   title: 'Recording Saved',
-                  description: `New track "${name}" created with your recording.`
+                  description: `Track "${name}" created with your recording`,
                 });
               }).catch(err => {
-                console.error("Failed to load recorded audio:", err);
+                console.error('Failed to load processed audio:', err);
                 toast({
-                  title: "Recording Error",
-                  description: "Recorded audio could not be loaded. Please try again.",
-                  variant: "destructive"
+                  title: 'Loading Error',
+                  description: 'Failed to load the processed audio',
+                  variant: 'destructive'
                 });
                 
-                // Clean up the created track
+                // Clean up
                 audioProcessor.removeTrack(newTrackId);
               });
             }).catch(err => {
-              console.error("Failed to process effects:", err);
+              // Handle rendering error - fall back to original buffer
+              console.error('Failed to render effects:', err);
               toast({
-                title: "Effects Processing Error",
-                description: "Could not apply effects to the recording. Adding without effects.",
-                variant: "warning"
+                description: 'Could not process effects. Using original recording.'
               });
               
-              // Fallback to original buffer without effects
-              const audioBlob = new Blob([recordingPreviewData.buffer.getChannelData(0)], { type: 'audio/wav' });
-              const audioUrl = URL.createObjectURL(audioBlob);
+              // Use original buffer without effects
+              const wavBlob = createWAVBlob(recordingPreviewData.buffer);
+              const audioUrl = URL.createObjectURL(wavBlob);
               
-              // Load the unprocessed audio as fallback
               track.loadAudio(audioUrl).then(() => {
-                // Rest of the implementation same as above...
                 setTracks(prev => [...prev, newTrack]);
                 
                 const newRegion: AudioRegion = {
@@ -2619,10 +2754,21 @@ const EnhancedStudio: React.FC = () => {
                 
                 toast({
                   title: 'Recording Saved',
-                  description: `New track "${name}" created with your recording.`
+                  description: `Track "${name}" created with your recording`
                 });
               });
             });
+          } catch (err) {
+            // Handle any unexpected errors during the effects setup
+            console.error('Unexpected error during audio processing:', err);
+            toast({
+              title: 'Processing Error',
+              description: 'An error occurred while processing the audio',
+              variant: 'destructive'
+            });
+            
+            // Clean up
+            audioProcessor.removeTrack(newTrackId);
           }
         }}
       />
