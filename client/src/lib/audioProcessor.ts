@@ -6,7 +6,7 @@ import * as Tone from 'tone';
  * with support for real-time effects, recording, and high-resolution waveform generation
  */
 class AudioProcessor {
-  private context: AudioContext;
+  private context: Tone.Context['rawContext'];
   private masterCompressor: Tone.Compressor;
   private masterLimiter: Tone.Limiter;
   private masterGain: Tone.Gain;
@@ -616,9 +616,9 @@ class TrackProcessor {
   private muted: boolean = false;
   private soloed: boolean = false;
   private audioBuffer: AudioBuffer | null = null;
-  private context: AudioContext;
+  private context: Tone.Context['rawContext'];
 
-  constructor(context: AudioContext, options: TrackProcessorOptions = {}) {
+  constructor(context: Tone.Context['rawContext'], options: TrackProcessorOptions = {}) {
     this.context = context;
     this.output = options.output || Tone.getDestination();
     
@@ -644,18 +644,36 @@ class TrackProcessor {
   async loadAudio(url: string): Promise<void> {
     try {
       this.disposePlayer();
-      this.player = new Tone.Player({
-        url,
-        onload: () => {
-          if (this.player) {
-            const buffer = this.player.buffer.get();
-            this.audioBuffer = buffer ? buffer : null;
-            this.player.connect(this.compressor);
-            console.log(`Loaded audio: ${url}`);
-          }
+      
+      // Create a new player with proper connection to the signal chain
+      this.player = new Tone.Player().connect(this.compressor);
+      this.player.load(url).then(() => {
+        if (this.player) {
+          const buffer = this.player.buffer.get();
+          this.audioBuffer = buffer ? buffer : null;
+          console.log(`Loaded audio: ${url}`);
         }
-      }).connect(this.compressor);
-      await this.player.load(url);
+      });
+      
+      // Wait for the audio to be fully loaded before returning
+      return new Promise((resolve, reject) => {
+        try {
+          // Set up proper onload callback that resolves the promise
+          this.player!.buffer.onload = () => {
+            console.log(`Audio successfully loaded: ${url}`);
+            resolve();
+          };
+          
+          // Start the loading process
+          this.player!.load(url).catch(error => {
+            console.error('Error in player.load():', error);
+            reject(error);
+          });
+        } catch (error) {
+          console.error('Error setting up audio load:', error);
+          reject(error);
+        }
+      });
     } catch (error) {
       console.error('Failed to load audio:', error);
       throw error;
@@ -672,8 +690,27 @@ class TrackProcessor {
       
       this.disposePlayer();
       this.audioBuffer = audioBuffer;
-      this.player = new Tone.Player(audioBuffer).connect(this.compressor);
-      console.log(`Loaded audio file: ${file.name}`);
+      
+      // Create a properly connected player that's ready to use
+      // Create a player and set the buffer directly
+      this.player = new Tone.Player().connect(this.compressor);
+      this.player.buffer.set(audioBuffer);
+      console.log(`Player loaded successfully with buffer from file: ${file.name}`);
+      
+      // Make sure player is properly initialized before continuing
+      return new Promise((resolve) => {
+        // Use the existing buffer and check that it's valid
+        if (this.player && this.player.buffer.loaded) {
+          console.log(`Audio buffer loaded successfully: ${file.name}`);
+          resolve();
+        } else {
+          // Set up a callback in case it's not loaded yet
+          this.player!.buffer.onload = () => {
+            console.log(`Audio buffer loaded asynchronously: ${file.name}`);
+            resolve();
+          };
+        }
+      });
     } catch (error) {
       console.error('Failed to load audio file:', error);
       throw error;
@@ -743,7 +780,8 @@ class TrackProcessor {
       recorder.dispose();
       
       this.audioBuffer = audioBuffer;
-      this.player = new Tone.Player(audioBuffer).connect(this.compressor);
+      this.player = new Tone.Player().connect(this.compressor);
+      this.player.buffer.set(audioBuffer);
       
       // Return the blob so it can be used immediately
       return blob;
