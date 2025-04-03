@@ -11,8 +11,8 @@ const formatTime = (timeInSeconds: number): string => {
 
 interface WaveformVisualizerProps extends React.HTMLAttributes<HTMLDivElement> {
   trackId?: number;
-  buffer?: AudioBuffer;  // For backward compatibility
-  audioBuffer?: AudioBuffer; // Preferred naming
+  buffer?: AudioBuffer | null;  // For backward compatibility
+  audioBuffer?: AudioBuffer | null | undefined; // Preferred naming
   waveform?: number[];  // Raw waveform data
   color?: string;
   gradientColors?: string[];

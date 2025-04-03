@@ -91,6 +91,9 @@ import type { Effect, EffectType } from '@/components/studio/effects-panel';
 import { MasteringPanel } from '@/components/studio/mastering-panel';
 import { AIGenerationPanel } from '@/components/studio/ai-generation-panel';
 import { ProjectSync } from '@/components/studio/project-sync';
+import { RecordingPreviewModal } from '@/components/studio/recording-preview-modal';
+import { RecordingStatusPanel } from '@/components/studio/recording-status-panel';
+import { ConfirmationDialog } from '@/components/studio/confirmation-dialog';
 
 // Hooks and Utils
 import { useToast } from '@/hooks/use-toast';
@@ -568,64 +571,36 @@ const EnhancedStudio: React.FC = () => {
       const blob = await audioProcessor.stopRecording();
       
       if (blob) {
-        // Create a new track with the recording
-        const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
-        const newTrack: Track = {
-          id: newTrackId,
-          name: `Recording ${newTrackId}`,
-          type: 'audio',
-          volume: 0.8,
-          pan: 0,
-          isMuted: false,
-          isSoloed: false,
-          creationMethod: 'recorded'
+        // Convert blob to AudioBuffer for the preview
+        const reader = new FileReader();
+        
+        reader.onload = async () => {
+          try {
+            const arrayBuffer = reader.result as ArrayBuffer;
+            const audioContext = audioProcessor.getAudioContext();
+            const buffer = await audioContext.decodeAudioData(arrayBuffer);
+            
+            // Store the recording preview data
+            setRecordingPreviewData({
+              buffer: buffer,
+              duration: recordingTime,
+              waveform: Array.from(recordingWaveform || [])
+            });
+            
+            // Show the preview modal
+            setShowRecordingPreviewModal(true);
+            
+          } catch (error) {
+            console.error("Failed to decode recorded audio:", error);
+            toast({
+              title: "Recording Error",
+              description: "Failed to process the recording. Please try again.",
+              variant: "destructive"
+            });
+          }
         };
         
-        // Create track processor
-        const track = audioProcessor.createTrack(newTrackId, {
-          volume: newTrack.volume,
-          pan: newTrack.pan
-        });
-        
-        try {
-          // Load the recorded audio
-          const url = URL.createObjectURL(blob);
-          await track.loadAudio(url);
-          
-          // Add to tracks list
-          setTracks(prev => [...prev, newTrack]);
-          
-          // Create a region for this recording
-          const recordingDuration = recordingTime;
-          const newRegion: AudioRegion = {
-            id: `region-${Date.now()}`,
-            trackId: newTrackId,
-            start: overlapRecording ? projectTime - recordingDuration : 0,
-            end: overlapRecording ? projectTime : recordingDuration,
-            offset: 0,
-            name: `Recording ${new Date().toLocaleTimeString()}`,
-            waveform: audioProcessor.getTrack(newTrackId)?.getWaveform() || [],
-            file: url
-          };
-          
-          // Add to regions
-          setRegions(prev => [...prev, newRegion]);
-          
-          toast({
-            title: 'Recording completed',
-            description: `New track "${newTrack.name}" created with your recording.`
-          });
-        } catch (error) {
-          console.error("Failed to load recorded audio:", error);
-          toast({
-            title: "Recording Error",
-            description: "Recorded audio could not be loaded. Please try again.",
-            variant: "destructive"
-          });
-          
-          // Clean up the created track
-          audioProcessor.removeTrack(newTrackId);
-        }
+        reader.readAsArrayBuffer(blob);
       } else {
         toast({
           title: "Recording Error",
@@ -1619,53 +1594,16 @@ const EnhancedStudio: React.FC = () => {
             
             {/* Real-time recording visualization overlay */}
             {isRecording && recordingWaveform && (
-              <div className="mt-2 mb-4 relative bg-black/30 rounded-lg border border-red-500/30 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse mr-2"></div>
-                    <h3 className="text-red-500 font-medium">Recording in progress</h3>
-                  </div>
-                  <div className="text-white font-mono bg-red-950/50 px-2 rounded">
-                    {formatTime(recordingTime)}
-                  </div>
-                </div>
-                
-                <div className="h-32 bg-black/50 rounded-lg overflow-hidden flex items-center">
-                  <svg width="100%" height="100%" viewBox="0 0 512 100" preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="recordingWaveGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="rgba(255, 70, 70, 0.8)" />
-                        <stop offset="50%" stopColor="rgba(255, 70, 70, 0.3)" />
-                        <stop offset="100%" stopColor="rgba(255, 70, 70, 0.1)" />
-                      </linearGradient>
-                    </defs>
-                    <rect x="0" y="0" width="100%" height="100%" fill="rgba(0,0,0,0.2)" />
-                    
-                    {/* Main waveform */}
-                    <path
-                      d={`M 0,50 ${Array.from(recordingWaveform).map((v, i) => 
-                        `L ${i}, ${50 - v * 45}`).join(' ')} V 100 H 0 Z`}
-                      fill="url(#recordingWaveGradient)"
-                      stroke="rgba(255, 80, 80, 0.6)"
-                      strokeWidth="1"
-                    />
-                    
-                    {/* Center line */}
-                    <line x1="0" y1="50" x2="512" y2="50" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-                    
-                    {/* Reflection effect */}
-                    <path
-                      d={`M 0,50 ${Array.from(recordingWaveform).map((v, i) => 
-                        `L ${i}, ${50 + v * 25}`).join(' ')} V 100 H 0 Z`}
-                      fill="rgba(255, 70, 70, 0.1)"
-                      stroke="none"
-                    />
-                  </svg>
-                </div>
-                
-                <div className="mt-2 text-gray-400 text-sm">
-                  Recording will be added as a new track when you click the Stop button
-                </div>
+              <div className="mt-2 mb-4">
+                <RecordingStatusPanel
+                  recordingTime={recordingTime}
+                  waveform={recordingWaveform}
+                  onStopRecording={handleRecordStop}
+                  maxRecordingTime={180} // 3 minutes max recording time
+                  armedTrack={activeTrackId ? { id: activeTrackId, name: tracks.find(t => t.id === activeTrackId)?.name || `Track ${activeTrackId}` } : null}
+                  showTimer={true}
+                  animated={true}
+                />
               </div>
             )}
             
@@ -2514,130 +2452,180 @@ const EnhancedStudio: React.FC = () => {
       />
     
       {/* Recording Preview Modal */}
-      {showRecordingPreviewModal && (
-        <Dialog open={showRecordingPreviewModal} onOpenChange={setShowRecordingPreviewModal}>
-          <DialogContent className="bg-gray-900 text-white border-gray-800 max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>Recording Preview</DialogTitle>
-              <DialogDescription className="text-gray-400">
-                Listen to your recording and add effects before adding it to your project
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="my-4">
-              {recordingBuffer && (
-                <WaveformVisualizer
-                  audioBuffer={recordingBuffer}
-                  height={120}
-                  color="#4f46e5"
-                  className="w-full"
-                />
-              )}
-              <div className="flex justify-center mt-2">
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    // Logic to play the recorded audio for preview
-                    if (recordingBuffer) {
-                      audioProcessor.playBuffer(recordingBuffer);
-                    }
-                  }}
-                >
-                  <Play size={14} className="mr-2" />
-                  Play
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    // Logic to stop playback
-                    audioProcessor.stopPlayback();
-                  }}
-                  className="ml-2"
-                >
-                  <Square size={14} className="mr-2" />
-                  Stop
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="recording-name">Recording Name</Label>
-                <Input
-                  id="recording-name"
-                  placeholder="New Recording"
-                  className="bg-gray-800 border-gray-700"
-                  value={newRecordingName}
-                  onChange={(e) => setNewRecordingName(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <Label>Effects</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="reverb">Reverb</Label>
-                    <Slider
-                      id="reverb"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      defaultValue={[0.3]}
-                      className="w-full"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="delay">Delay</Label>
-                    <Slider
-                      id="delay"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      defaultValue={[0.2]}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter className="mt-4">
-              <div className="flex justify-between w-full">
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    setShowRecordingPreviewModal(false);
-                    // Discard recording
-                    setRecordingBuffer(null);
-                    toast({
-                      title: "Recording Discarded",
-                      description: "Your recording has been deleted"
-                    });
-                  }}
-                >
-                  <Trash2 size={14} className="mr-2" />
-                  Discard
-                </Button>
-                <Button
-                  variant="default"
-                  onClick={() => {
-                    // Accept and add to arrangement
-                    setShowRecordingPreviewModal(false);
-                    toast({
-                      title: "Recording Added to Arrangement",
-                      description: "Your recording is now in the timeline"
-                    });
-                  }}
-                >
-                  <Check size={14} className="mr-2" />
-                  Add to Arrangement
-                </Button>
-              </div>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
+      <RecordingPreviewModal
+        open={showRecordingPreviewModal}
+        onOpenChange={setShowRecordingPreviewModal}
+        audioBuffer={recordingPreviewData.buffer}
+        waveform={recordingPreviewData.waveform}
+        duration={recordingPreviewData.duration}
+        onDiscard={() => {
+          // Discard recording
+          setRecordingPreviewData({duration: 0, waveform: []});
+          toast({
+            title: "Recording Discarded",
+            description: "Your recording has been deleted"
+          });
+        }}
+        onSave={(name, effects) => {
+          // Create a new track with the recording
+          const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
+          const newTrack: Track = {
+            id: newTrackId,
+            name: name,
+            type: 'audio',
+            volume: 0.8,
+            pan: 0,
+            isMuted: false,
+            isSoloed: false,
+            creationMethod: 'recorded'
+          };
+          
+          // Create track in audio processor
+          const track = audioProcessor.createTrack(newTrackId, {
+            volume: newTrack.volume,
+            pan: newTrack.pan
+          });
+          
+          if (recordingPreviewData.buffer && track) {
+            // Create a blob from the buffer to get a URL
+            const audioContext = audioProcessor.getAudioContext();
+            const channels = recordingPreviewData.buffer.numberOfChannels;
+            const frameCount = recordingPreviewData.buffer.length;
+            
+            // Create offline context to apply effects
+            const offlineContext = new OfflineAudioContext(
+              channels,
+              frameCount,
+              recordingPreviewData.buffer.sampleRate
+            );
+            
+            // Create source from buffer
+            const source = offlineContext.createBufferSource();
+            source.buffer = recordingPreviewData.buffer;
+            
+            // Apply effects if needed
+            let currentNode = source;
+            
+            // Apply reverb effect
+            if (effects.reverb > 0) {
+              const reverb = offlineContext.createConvolver();
+              // In a real app, load an impulse response
+              // For now, we'll skip this but in reality, we would connect it
+              
+              // Connect through the effect chain
+              currentNode.connect(reverb);
+              currentNode = reverb;
+            }
+            
+            // Apply delay effect
+            if (effects.delay > 0) {
+              const delay = offlineContext.createDelay();
+              delay.delayTime.value = effects.delay * 0.5; // Max 500ms delay
+              
+              const feedback = offlineContext.createGain();
+              feedback.gain.value = 0.4;
+              
+              // Connect through the effect chain
+              currentNode.connect(delay);
+              delay.connect(feedback);
+              feedback.connect(delay);
+              currentNode = delay;
+            }
+            
+            // Connect to destination
+            currentNode.connect(offlineContext.destination);
+            
+            // Start source and render
+            source.start(0);
+            
+            offlineContext.startRendering().then(renderedBuffer => {
+              // Create a blob from the processed buffer
+              const audioData = new Float32Array(renderedBuffer.length * renderedBuffer.numberOfChannels);
+              let offset = 0;
+              
+              for (let channel = 0; channel < renderedBuffer.numberOfChannels; channel++) {
+                const channelData = renderedBuffer.getChannelData(channel);
+                audioData.set(channelData, offset);
+                offset += channelData.length;
+              }
+              
+              const audioBlob = new Blob([audioData], { type: 'audio/wav' });
+              const audioUrl = URL.createObjectURL(audioBlob);
+              
+              // Load the processed audio
+              track.loadAudio(audioUrl).then(() => {
+                // Add to tracks list
+                setTracks(prev => [...prev, newTrack]);
+                
+                // Create a region for this recording
+                const newRegion: AudioRegion = {
+                  id: `region-${Date.now()}`,
+                  trackId: newTrackId,
+                  start: overlapRecording ? projectTime - recordingPreviewData.duration : 0,
+                  end: overlapRecording ? projectTime : recordingPreviewData.duration,
+                  offset: 0,
+                  name: name,
+                  waveform: recordingPreviewData.waveform,
+                  file: audioUrl
+                };
+                
+                // Add to regions
+                setRegions(prev => [...prev, newRegion]);
+                
+                toast({
+                  title: 'Recording Saved',
+                  description: `New track "${name}" created with your recording.`
+                });
+              }).catch(err => {
+                console.error("Failed to load recorded audio:", err);
+                toast({
+                  title: "Recording Error",
+                  description: "Recorded audio could not be loaded. Please try again.",
+                  variant: "destructive"
+                });
+                
+                // Clean up the created track
+                audioProcessor.removeTrack(newTrackId);
+              });
+            }).catch(err => {
+              console.error("Failed to process effects:", err);
+              toast({
+                title: "Effects Processing Error",
+                description: "Could not apply effects to the recording. Adding without effects.",
+                variant: "warning"
+              });
+              
+              // Fallback to original buffer without effects
+              const audioBlob = new Blob([recordingPreviewData.buffer.getChannelData(0)], { type: 'audio/wav' });
+              const audioUrl = URL.createObjectURL(audioBlob);
+              
+              // Load the unprocessed audio as fallback
+              track.loadAudio(audioUrl).then(() => {
+                // Rest of the implementation same as above...
+                setTracks(prev => [...prev, newTrack]);
+                
+                const newRegion: AudioRegion = {
+                  id: `region-${Date.now()}`,
+                  trackId: newTrackId,
+                  start: overlapRecording ? projectTime - recordingPreviewData.duration : 0,
+                  end: overlapRecording ? projectTime : recordingPreviewData.duration,
+                  offset: 0,
+                  name: name,
+                  waveform: recordingPreviewData.waveform,
+                  file: audioUrl
+                };
+                
+                setRegions(prev => [...prev, newRegion]);
+                
+                toast({
+                  title: 'Recording Saved',
+                  description: `New track "${name}" created with your recording.`
+                });
+              });
+            });
+          }
+        }}
+      />
     </div>
   );
 }

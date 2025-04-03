@@ -389,6 +389,13 @@ class AudioProcessor {
   getPlaybackPosition(): number {
     return Tone.Transport.seconds;
   }
+  
+  /**
+   * Get the raw audio context for advanced operations
+   */
+  getAudioContext(): BaseAudioContext {
+    return this.context;
+  }
 
   /**
    * Set the master volume (0-1)
