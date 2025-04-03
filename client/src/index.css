@@ -22,4 +22,28 @@
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
   }
+
+  /* Custom scrollable tabs */
+  .tabs-scrollable {
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .tabs-scrollable::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabs-scrollable-list {
+    display: inline-flex;
+    min-width: max-content;
+  }
+
+  .tabs-trigger {
+    padding: 0.5rem 0.75rem;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+  }
 }

@@ -43,7 +43,12 @@ import {
   Scissors,
   Maximize,
   Minimize,
-  Circle
+  Circle,
+  Plus,
+  Minus,
+  Filter,
+  BarChart2,
+  Check
 } from 'lucide-react';
 
 // UI Components
@@ -55,7 +60,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -1360,7 +1365,8 @@ const EnhancedStudio: React.FC = () => {
     const ms = Math.floor((seconds % 1) * 100);
     return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
   };
-  const generateWaveform = (buffer: AudioBuffer, samples: number = 200): number[] => {
+  const generateWaveform = (buffer: AudioBuffer | null, samples: number = 200): number[] => {
+    if (!buffer) return new Array(samples).fill(0);
     const channelData = buffer.getChannelData(0); // Get only the first channel
     const blockSize = Math.floor(channelData.length / samples);
     const waveform = [];
@@ -1811,36 +1817,38 @@ const EnhancedStudio: React.FC = () => {
             >
               <Tabs value={sidebarTab} onValueChange={(value) => setSidebarTab(value as any)}>
                 <div className="p-3 border-b border-gray-800">
-                  <TabsList className="w-full bg-gray-800 flex overflow-x-auto no-scrollbar">
-                    <TabsTrigger value="tracks" className="whitespace-nowrap min-w-fit py-1 px-3">
-                      <LayoutPanelLeft size={14} className="mr-1" />
-                      Tracks
-                    </TabsTrigger>
-                    <TabsTrigger value="effects" className="whitespace-nowrap min-w-fit py-1 px-3">
-                      <Sliders size={14} className="mr-1" />
-                      Effects
-                    </TabsTrigger>
-                    <TabsTrigger value="master" className="whitespace-nowrap min-w-fit py-1 px-3">
-                      <Wand2 size={14} className="mr-1" />
-                      Master
-                    </TabsTrigger>
-                    <TabsTrigger value="mixer" className="whitespace-nowrap min-w-fit py-1 px-3">
-                      <Settings size={14} className="mr-1" />
-                      Mix
-                    </TabsTrigger>
-                    <TabsTrigger value="collab" className="whitespace-nowrap min-w-fit py-1 px-3">
-                      <Users size={14} className="mr-1" />
-                      Collab
-                    </TabsTrigger>
-                    <TabsTrigger value="cloud" className="whitespace-nowrap min-w-fit py-1 px-3">
-                      <Cloud size={14} className="mr-1" />
-                      Cloud
-                    </TabsTrigger>
-                    <TabsTrigger value="ai" className="whitespace-nowrap min-w-fit py-1 px-3">
-                      <Sparkles size={14} className="mr-1" />
-                      AI
-                    </TabsTrigger>
-                  </TabsList>
+                  <div className="tabs-scrollable">
+                    <TabsList className="tabs-scrollable-list bg-gray-800">
+                      <TabsTrigger value="tracks" className="tabs-trigger min-w-[80px] flex-shrink-0">
+                        <LayoutPanelLeft size={14} className="mr-1" />
+                        Tracks
+                      </TabsTrigger>
+                      <TabsTrigger value="effects" className="tabs-trigger min-w-[80px] flex-shrink-0">
+                        <Sliders size={14} className="mr-1" />
+                        Effects
+                      </TabsTrigger>
+                      <TabsTrigger value="master" className="tabs-trigger min-w-[80px] flex-shrink-0">
+                        <Wand2 size={14} className="mr-1" />
+                        Master
+                      </TabsTrigger>
+                      <TabsTrigger value="mixer" className="tabs-trigger min-w-[80px] flex-shrink-0">
+                        <Settings size={14} className="mr-1" />
+                        Mix
+                      </TabsTrigger>
+                      <TabsTrigger value="collab" className="tabs-trigger min-w-[80px] flex-shrink-0">
+                        <Users size={14} className="mr-1" />
+                        Collab
+                      </TabsTrigger>
+                      <TabsTrigger value="cloud" className="tabs-trigger min-w-[80px] flex-shrink-0">
+                        <Cloud size={14} className="mr-1" />
+                        Cloud
+                      </TabsTrigger>
+                      <TabsTrigger value="ai" className="tabs-trigger min-w-[80px] flex-shrink-0">
+                        <Sparkles size={14} className="mr-1" />
+                        AI
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
                 </div>
                 
                 <TabsContent value="tracks" className="m-0">
@@ -1853,80 +1861,112 @@ const EnhancedStudio: React.FC = () => {
                           size="sm"
                           className={`${isRecording ? 'animate-pulse' : ''}`}
                           onClick={() => {
-                            if (isRecording) {
-                              // Stop recording
-                              setIsRecording(false);
-                              
-                              // Create a preview dialog to review the recording
-                              setShowRecordingPreviewModal(true);
-                              
-                              // Set the active track to the one we just recorded to
-                              const armedTrack = tracks.find(t => t.isArmed);
-                              if (armedTrack) {
-                                setActiveTrackId(armedTrack.id);
-                              }
-                              
-                              toast({ 
-                                title: 'Recording Stopped',
-                                description: 'Your recording is ready for preview.'
-                              });
-                            } else {
-                              // Create a temporary track if no track exists or none are armed
-                              if (tracks.length === 0 || !tracks.some(t => t.isArmed)) {
-                                // Create a new track for instant recording
-                                const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
-                                const newTrack: Track = {
-                                  id: newTrackId,
-                                  name: `Recording ${newTrackId}`,
-                                  type: 'vocal',
-                                  volume: 0.8,
-                                  pan: 0,
-                                  isMuted: false,
-                                  isSoloed: false,
-                                  isArmed: true,
-                                  creationMethod: 'recorded',
-                                  color: '#ef4444' // Red color for recording
-                                };
+                            try {
+                              if (isRecording) {
+                                // Stop recording
+                                setIsRecording(false);
                                 
-                                // Create track processor
-                                audioProcessor.createTrack(newTrackId, {
-                                  volume: newTrack.volume,
-                                  pan: newTrack.pan
-                                });
-                                
-                                // Add to tracks list
-                                setTracks(prev => [...prev, newTrack]);
-                                setActiveTrackId(newTrackId);
-                                
-                                // Start recording immediately
-                                setTimeout(() => {
-                                  // Short timeout to ensure the track is created first
-                                  const track = audioProcessor.getTrack(newTrackId);
-                                  if (track) {
-                                    track.startRecording();
-                                  }
-                                }, 100);
-                              } else {
-                                // Use the existing armed track
+                                // Get the recorded audio data
                                 const armedTrack = tracks.find(t => t.isArmed);
                                 if (armedTrack) {
                                   const track = audioProcessor.getTrack(armedTrack.id);
                                   if (track) {
-                                    track.startRecording();
+                                    // Get recording data and create waveform
+                                    const buffer = track.getRecordingBuffer();
+                                    const duration = buffer ? buffer.duration : 0;
+                                    const waveform = generateWaveform(buffer || null, 100);
+                                    
+                                    // Set recording preview data
+                                    setRecordingPreviewData({
+                                      buffer,
+                                      duration,
+                                      waveform: waveform || []
+                                    });
+                                    
+                                    // Show the preview modal
+                                    setShowRecordingPreviewModal(true);
+                                    
+                                    // Set the active track to the one we just recorded to
+                                    setActiveTrackId(armedTrack.id);
                                   }
-                                  setActiveTrackId(armedTrack.id);
                                 }
+                                
+                                toast({ 
+                                  title: 'Recording Stopped',
+                                  description: 'Your recording is ready for preview'
+                                });
+                              } else {
+                                // Initialize audio context if needed
+                                if (!audioProcessor.isReady()) {
+                                  audioProcessor.init();
+                                }
+                                
+                                // Create a temporary track if no track exists or none are armed
+                                if (tracks.length === 0 || !tracks.some(t => t.isArmed)) {
+                                  // Create a new track for instant recording
+                                  const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
+                                  const newTrack: Track = {
+                                    id: newTrackId,
+                                    name: `Recording ${newTrackId}`,
+                                    type: 'vocal',
+                                    volume: 0.8,
+                                    pan: 0,
+                                    isMuted: false,
+                                    isSoloed: false,
+                                    isArmed: true,
+                                    creationMethod: 'recorded',
+                                    color: '#ef4444' // Red color for recording
+                                  };
+                                  
+                                  // Create track processor
+                                  audioProcessor.createTrack(newTrackId, {
+                                    volume: newTrack.volume,
+                                    pan: newTrack.pan
+                                  });
+                                  
+                                  // Add to tracks list
+                                  setTracks(prev => [...prev, newTrack]);
+                                  setActiveTrackId(newTrackId);
+                                  
+                                  // Start recording immediately
+                                  setTimeout(() => {
+                                    // Short timeout to ensure the track is created first
+                                    const track = audioProcessor.getTrack(newTrackId);
+                                    if (track) {
+                                      track.startRecording();
+                                      console.log('Started recording on new track:', newTrackId);
+                                    }
+                                  }, 100);
+                                } else {
+                                  // Use the existing armed track
+                                  const armedTrack = tracks.find(t => t.isArmed);
+                                  if (armedTrack) {
+                                    const track = audioProcessor.getTrack(armedTrack.id);
+                                    if (track) {
+                                      track.startRecording();
+                                      console.log('Started recording on existing track:', armedTrack.id);
+                                    }
+                                    setActiveTrackId(armedTrack.id);
+                                  }
+                                }
+                                
+                                // Start recording state
+                                setIsRecording(true);
+                                
+                                // Update zoom level for better visibility
+                                setZoomLevel(Math.min(zoomLevel * 1.5, 2));
+                                
+                                toast({ 
+                                  title: 'Recording Started',
+                                  description: 'Speak or play now - recording in progress...'
+                                });
                               }
-                              
-                              // Start recording
-                              setIsRecording(true);
-                              
-                              // Update zoom level for better visibility
-                              setZoomLevel(Math.min(zoomLevel * 1.5, 200));
-                              
-                              toast({ 
-                                title: 'Recording Started',
-                                description: 'Speak or play now - recording in progress...'
+                            } catch (error) {
+                              console.error('Recording error:', error);
+                              toast({
+                                title: 'Recording Error',
+                                description: 'There was an error with the recording process. Please try again.',
+                                variant: 'destructive'
                               });
                             }
                           }}
