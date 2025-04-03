@@ -765,8 +765,27 @@ class TrackProcessor {
       // Dispose of any existing player
       this.disposePlayer();
       
+      // Request microphone permission explicitly - needed for mobile
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log('Microphone access granted');
+        
+        // Clean up the stream when we're done with it
+        stream.getTracks().forEach(track => {
+          track.addEventListener('ended', () => {
+            console.log('Audio track ended');
+          });
+        });
+      } catch (permissionError) {
+        console.error('Microphone permission denied:', permissionError);
+        throw new Error('Microphone access is required for recording. Please allow microphone access and try again.');
+      }
+      
       // Create recorder from microphone
-      this.recorder = new Tone.UserMedia().connect(this.compressor);
+      this.recorder = new Tone.UserMedia({
+        mute: false, // Make sure audio is not muted
+        volume: 1.0  // Full volume
+      }).connect(this.compressor);
       
       // Connect to a meter for real-time analysis if we have a callback
       if (onWaveformUpdate) {
@@ -787,8 +806,9 @@ class TrackProcessor {
         }, 50); // Update every 50ms for smooth visualization
       }
       
-      // Open the microphone
+      // Open the microphone (Tone.js UserMedia doesn't support detailed constraints)
       await this.recorder.open();
+      
       console.log('Started recording with real-time visualization');
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -801,33 +821,77 @@ class TrackProcessor {
    * Returns the recording blob so it can be used immediately
    */
   async stopRecording(): Promise<Blob | null> {
-    if (!this.recorder) return null;
+    if (!this.recorder) {
+      console.error('No recorder found when stopping recording');
+      return null;
+    }
     
     try {
+      console.log('Stopping recording and processing audio...');
+      
+      // Create a recorder connected to our UserMedia source
       const recorder = new Tone.Recorder();
+      
+      // Connect our recorder to the audio source
       this.recorder.connect(recorder);
+      
+      // Start the recorder to capture any ongoing audio
       recorder.start();
       
-      // Record for at least 500ms to capture some audio
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Allow a moment to capture audio (important for mobile)
+      await new Promise(resolve => setTimeout(resolve, 800));
       
-      const blob = await recorder.stop();
-      const arrayBuffer = await blob.arrayBuffer();
-      const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
-      
-      this.disposeRecorder();
-      recorder.dispose();
-      
-      this.audioBuffer = audioBuffer;
-      this.player = new Tone.Player().connect(this.compressor);
-      this.player.buffer.set(audioBuffer);
-      
-      // Return the blob so it can be used immediately
-      return blob;
+      try {
+        // Stop recording and get blob
+        const blob = await recorder.stop();
+        console.log('Recording captured successfully, converting to audio buffer...');
+        
+        if (!blob || blob.size === 0) {
+          console.error('Recording resulted in empty audio data');
+          throw new Error('No audio was recorded');
+        }
+        
+        // Convert blob to AudioBuffer
+        const arrayBuffer = await blob.arrayBuffer();
+        
+        // Use a try-catch specifically for decoding, as this can fail on some mobile devices
+        try {
+          const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+          
+          // Save the buffer and create a player
+          this.audioBuffer = audioBuffer;
+          this.player = new Tone.Player().connect(this.compressor);
+          this.player.buffer.set(audioBuffer);
+          
+          console.log('Recording processed successfully:', {
+            duration: audioBuffer.duration,
+            sampleRate: audioBuffer.sampleRate,
+            numberOfChannels: audioBuffer.numberOfChannels
+          });
+          
+          // Clean up
+          this.disposeRecorder();
+          recorder.dispose();
+          
+          // Return the blob for immediate use
+          return blob;
+        } catch (decodeError) {
+          console.error('Failed to decode audio data:', decodeError);
+          throw new Error('Failed to process recording. The audio format may not be supported on this device.');
+        }
+      } catch (recorderError) {
+        console.error('Recorder failed to stop:', recorderError);
+        throw new Error('Failed to finish recording. Please try again.');
+      }
     } catch (error) {
       console.error('Failed to stop recording:', error);
+      // Always clean up
       this.disposeRecorder();
-      throw error;
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('An unknown error occurred while processing the recording');
+      }
     }
   }
 

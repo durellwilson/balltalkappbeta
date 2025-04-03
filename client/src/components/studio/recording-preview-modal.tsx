@@ -162,25 +162,25 @@ export function RecordingPreviewModal({
       }
       onOpenChange(newOpen);
     }}>
-      <DialogContent className="bg-gray-900 text-white border-gray-800 max-w-3xl">
+      <DialogContent className="bg-gray-900 text-white border-gray-800 max-w-[95vw] sm:max-w-3xl w-full p-4 sm:p-6">
         <DialogHeader>
-          <DialogTitle>Recording Preview</DialogTitle>
-          <DialogDescription className="text-gray-400">
-            Listen to your recording and add effects before adding it to your project
+          <DialogTitle className="text-center">Recording Preview</DialogTitle>
+          <DialogDescription className="text-gray-400 text-center px-2">
+            Listen to your recording and add effects before adding
           </DialogDescription>
         </DialogHeader>
 
         {/* Waveform display */}
-        <div className="mt-4 rounded-md overflow-hidden bg-gray-800 border border-gray-700">
+        <div className="mt-2 rounded-md overflow-hidden bg-gray-800 border border-gray-700">
           <WaveformVisualizer
-            height={120}
+            height={100}
             width="100%"
             waveform={processedWaveform}
             audioBuffer={audioBuffer}
             color="#3b82f6"
             gradientColors={["#3b82f6", "#1e40af"]}
-            showTimeMarkers
-            showScale
+            showTimeMarkers={false} // Simplified for all screen sizes
+            showScale={false} // Simplified for all screen sizes
             duration={duration}
             playbackPosition={playbackPosition}
             responsive
@@ -197,7 +197,7 @@ export function RecordingPreviewModal({
         </div>
 
         {/* Playback controls */}
-        <div className="flex justify-center mt-2 mb-4">
+        <div className="flex justify-center mt-2 mb-2">
           <Button
             variant="secondary"
             size="icon"
@@ -212,7 +212,7 @@ export function RecordingPreviewModal({
           </Button>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           <div>
             <Label htmlFor="recording-name">Recording Name</Label>
             <Input
@@ -225,10 +225,11 @@ export function RecordingPreviewModal({
           </div>
 
           <div>
-            <Label>Effects</Label>
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <div className="space-y-2">
-                <Label htmlFor="reverb" className="flex justify-between">
+            <Label className="block mb-1">Effects</Label>
+            {/* Make layout responsive */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+              <div className="space-y-1">
+                <Label htmlFor="reverb" className="flex justify-between text-sm">
                   <span>Reverb</span>
                   <span className="text-gray-400">{Math.round(reverb * 100)}%</span>
                 </Label>
@@ -242,8 +243,8 @@ export function RecordingPreviewModal({
                   className="w-full"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="delay" className="flex justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="delay" className="flex justify-between text-sm">
                   <span>Delay</span>
                   <span className="text-gray-400">{Math.round(delay * 100)}%</span>
                 </Label>
@@ -261,35 +262,38 @@ export function RecordingPreviewModal({
           </div>
         </div>
 
-        <DialogFooter className="mt-4">
-          <div className="flex justify-between w-full">
+        {/* Make buttons stack on mobile */}
+        <DialogFooter className="mt-3 flex-col sm:flex-row gap-2">
+          <Button
+            variant="destructive"
+            onClick={handleDiscard}
+            className="w-full sm:w-auto order-1 sm:order-none"
+          >
+            <Trash2 size={14} className="mr-2" />
+            Discard
+          </Button>
+          
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <Button
-              variant="destructive"
-              onClick={handleDiscard}
+              variant="outline"
+              onClick={() => {
+                // Reset effects
+                setReverb(0.3);
+                setDelay(0.2);
+              }}
+              className="w-full sm:w-auto"
             >
-              <Trash2 size={14} className="mr-2" />
-              Discard
+              <Undo size={14} className="mr-2" />
+              Reset Effects
             </Button>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  // Reset effects
-                  setReverb(0.3);
-                  setDelay(0.2);
-                }}
-              >
-                <Undo size={14} className="mr-2" />
-                Reset Effects
-              </Button>
-              <Button
-                variant="default"
-                onClick={handleSave}
-              >
-                <Save size={14} className="mr-2" />
-                Add to Arrangement
-              </Button>
-            </div>
+            <Button
+              variant="default"
+              onClick={handleSave}
+              className="w-full sm:w-auto"
+            >
+              <Save size={14} className="mr-2" />
+              Add to Track
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>
