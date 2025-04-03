@@ -21,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Helper function to generate synthetic audio for demos
 async function generateSyntheticAudio(
-  type: 'music' | 'vocal' | 'speech' | 'sfx',
+  type: 'music' | 'vocal' | 'speech' | 'sfx' | 'drums' | 'melody',
   duration: number,
   parameters: any
 ): Promise<AudioBuffer> {
@@ -365,6 +365,241 @@ async function generateSyntheticAudio(
     source.stop(duration);
     
     console.log(`Generated ${type} with baseFreq=${baseFreq}, duration=${duration}s`);
+  }
+  else if (type === 'drums') {
+    // Generate drum patterns with specified style and tempo
+    const style = parameters.genre || 'trap';
+    const bpm = parameters.tempo;
+    const beatsPerSecond = bpm / 60;
+    const beatDuration = 60 / bpm;
+    
+    // Create a compressor for better drum dynamics
+    const compressor = offlineContext.createDynamicsCompressor();
+    compressor.threshold.value = -20;
+    compressor.ratio.value = 5;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+    compressor.connect(masterGain);
+
+    // Total number of beats in the duration
+    const totalBeats = Math.ceil(duration * beatsPerSecond);
+    
+    // Pattern definitions for different styles
+    let kickPattern: number[] = [];
+    let snarePattern: number[] = [];
+    let hihatPattern: number[] = [];
+
+    switch (style) {
+      case 'trap':
+        // Trap style (heavy kicks, fast hi-hats, occasional snare)
+        kickPattern = [0, 0, 7, 8, 12, 14];  // 16th notes where kicks occur
+        snarePattern = [4, 12];              // Snares on beats 2 and 4
+        hihatPattern = [0, 2, 4, 6, 8, 10, 12, 14]; // 8th notes hi-hats
+        break;
+      
+      case 'hiphop':
+        // Hip hop style (boom bap)
+        kickPattern = [0, 2, 8, 10];
+        snarePattern = [4, 12];
+        hihatPattern = [0, 2, 4, 6, 8, 10, 12, 14];
+        break;
+        
+      case 'rock':
+        // Rock style (steady backbeat)
+        kickPattern = [0, 6, 8, 14];
+        snarePattern = [4, 12];
+        hihatPattern = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]; // 16th notes
+        break;
+        
+      case 'electronic':
+        // Electronic style (four-on-the-floor)
+        kickPattern = [0, 4, 8, 12];
+        snarePattern = [4, 12];
+        hihatPattern = [1, 3, 5, 7, 9, 11, 13, 15]; // Off-beat hi-hats
+        break;
+        
+      case 'jazz':
+        // Jazz style (ride-based pattern)
+        kickPattern = [0, 8];
+        snarePattern = [4, 12];
+        hihatPattern = [0, 2, 4, 6, 8, 9, 10, 12, 14]; // Ride pattern
+        break;
+    }
+    
+    // Create drums for each beat
+    for (let i = 0; i < totalBeats; i++) {
+      const sixteenthInBeat = i % 16;
+      const time = (i / 16) * 4 * beatDuration + (sixteenthInBeat * beatDuration / 4);
+      
+      // Add kick drum
+      if (kickPattern.includes(sixteenthInBeat)) {
+        const kick = createKickDrum(offlineContext, time);
+        kick.connect(compressor);
+      }
+      
+      // Add snare drum
+      if (snarePattern.includes(sixteenthInBeat)) {
+        const snare = createSnare(offlineContext, time);
+        snare.connect(compressor);
+      }
+      
+      // Add hi-hat
+      if (hihatPattern.includes(sixteenthInBeat)) {
+        // Vary the hi-hat volume to create rhythm
+        const hihatGain = sixteenthInBeat % 4 === 0 ? 0.4 : 0.25;
+        const hihat = createHiHat(offlineContext, time, hihatGain);
+        hihat.connect(compressor);
+      }
+    }
+    
+    console.log(`Generated drums with style=${style}, tempo=${bpm}, duration=${duration}s`);
+  }
+  else if (type === 'melody') {
+    // Generate melodic patterns with specified key, tempo and scale
+    const combinedKeyScale = parameters.genre || 'Cmajor';
+    const key = combinedKeyScale.charAt(0);
+    const scale = combinedKeyScale.substring(1);
+    const bpm = parameters.tempo;
+    const beatsPerSecond = bpm / 60;
+    const beatDuration = 60 / bpm;
+    
+    // Set up base frequency based on key
+    let baseFreq: number;
+    switch (key) {
+      case 'C': baseFreq = 261.63; break; // C4
+      case 'D': baseFreq = 293.66; break; // D4
+      case 'E': baseFreq = 329.63; break; // E4
+      case 'F': baseFreq = 349.23; break; // F4
+      case 'G': baseFreq = 392.00; break; // G4
+      case 'A': baseFreq = 440.00; break; // A4
+      case 'B': baseFreq = 493.88; break; // B4
+      default: baseFreq = 261.63; // Default to C4
+    }
+    
+    // Define scale patterns
+    let scaleIntervals: number[];
+    switch (scale) {
+      case 'major':
+        scaleIntervals = [0, 2, 4, 5, 7, 9, 11]; // Whole, Whole, Half, Whole, Whole, Whole, Half
+        break;
+        
+      case 'minor':
+        scaleIntervals = [0, 2, 3, 5, 7, 8, 10]; // Whole, Half, Whole, Whole, Half, Whole, Whole
+        break;
+        
+      case 'pentatonic':
+        scaleIntervals = [0, 2, 4, 7, 9]; // Major pentatonic
+        break;
+        
+      case 'blues':
+        scaleIntervals = [0, 3, 5, 6, 7, 10]; // Blues scale
+        break;
+        
+      default:
+        scaleIntervals = [0, 2, 4, 5, 7, 9, 11]; // Default to major
+    }
+    
+    // Create compressor and reverb for melody
+    const compressor = offlineContext.createDynamicsCompressor();
+    compressor.threshold.value = -18;
+    compressor.ratio.value = 3;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+    compressor.connect(masterGain);
+    
+    // Create a convolver for reverb
+    const convolver = offlineContext.createConvolver();
+    
+    // Create a simple impulse response for reverb
+    const impulseLength = 0.5 * offlineContext.sampleRate;
+    const impulse = offlineContext.createBuffer(2, impulseLength, offlineContext.sampleRate);
+    const leftChannel = impulse.getChannelData(0);
+    const rightChannel = impulse.getChannelData(1);
+    
+    // Fill the impulse with decreasing random values
+    for (let i = 0; i < impulseLength; i++) {
+      const decay = Math.exp(-i / (impulseLength * 0.5));
+      leftChannel[i] = (Math.random() * 2 - 1) * decay;
+      rightChannel[i] = (Math.random() * 2 - 1) * decay;
+    }
+    
+    convolver.buffer = impulse;
+    
+    // Create a gain node for the wet (reverb) signal
+    const reverbGain = offlineContext.createGain();
+    reverbGain.gain.value = 0.2; // Subtler reverb
+    
+    // Connect the reverb chain
+    convolver.connect(reverbGain);
+    reverbGain.connect(masterGain);
+    
+    // Create melody pattern
+    const noteLength = beatDuration * 0.9; // Leave a small gap between notes
+    const notesPerBar = 8; // 8th notes
+    const totalNotes = Math.ceil(duration / (beatDuration / 2)); // 8th notes in the duration
+    
+    // Create a melody pattern based on scale
+    // Simple pattern using scale tones
+    let melodyPattern: number[] = [];
+    
+    for (let i = 0; i < totalNotes; i++) {
+      // Use a combination of step-wise and interval motion
+      if (i % 4 === 0) {
+        // Start phrases on root or fifth
+        melodyPattern.push(i % 8 === 0 ? 0 : 4);
+      } else if (i % 4 === 1) {
+        // Second note often steps up or down
+        melodyPattern.push(i % 8 === 1 ? 1 : 2);
+      } else if (i % 4 === 2) {
+        // Third note often a larger jump
+        melodyPattern.push(i % 8 === 2 ? 4 : 3);
+      } else {
+        // Fourth note returns to a stable tone
+        melodyPattern.push(i % 8 === 3 ? 0 : 2);
+      }
+    }
+    
+    // Create oscillator for melody
+    const melodyOsc = offlineContext.createOscillator();
+    melodyOsc.type = 'sine';
+    
+    // Create gain node for shaping the notes
+    const melodyGain = offlineContext.createGain();
+    melodyGain.gain.value = 0;
+    
+    // Connect oscillator to gain to compressor and reverb
+    melodyOsc.connect(melodyGain);
+    melodyGain.connect(compressor);
+    melodyGain.connect(convolver); // Send to reverb as well for depth
+    
+    // Schedule all the melody notes
+    for (let i = 0; i < totalNotes; i++) {
+      const time = i * (beatDuration / 2); // 8th notes
+      
+      // Get scale degree from pattern and map to actual interval
+      const scaleDegree = melodyPattern[i % melodyPattern.length];
+      const octave = Math.floor(scaleDegree / scaleIntervals.length);
+      const scaleIndex = scaleDegree % scaleIntervals.length;
+      const interval = scaleIntervals[scaleIndex] + (12 * octave);
+      
+      // Calculate frequency
+      const freq = baseFreq * Math.pow(2, interval / 12);
+      
+      // Schedule frequency change
+      melodyOsc.frequency.setValueAtTime(freq, time);
+      
+      // Create volume envelope for the note
+      melodyGain.gain.setValueAtTime(0, time);
+      melodyGain.gain.linearRampToValueAtTime(0.5, time + 0.02);
+      melodyGain.gain.linearRampToValueAtTime(0.3, time + noteLength * 0.7);
+      melodyGain.gain.linearRampToValueAtTime(0, time + noteLength);
+    }
+    
+    // Start and stop the oscillator
+    melodyOsc.start(0);
+    melodyOsc.stop(duration);
+    
+    console.log(`Generated melody in key=${key} scale=${scale}, tempo=${bpm}, duration=${duration}s`);
   }
   else if (type === 'sfx') {
     // Generate sound effect based on category
@@ -835,7 +1070,7 @@ interface GenParameters {
 }
 
 interface GenerationSettings {
-  type: 'music' | 'vocal' | 'speech' | 'sfx';
+  type: 'music' | 'vocal' | 'speech' | 'sfx' | 'drums' | 'melody';
   prompt: string;
   parameters: GenParameters;
 }
@@ -843,7 +1078,7 @@ interface GenerationSettings {
 interface HistoryItem {
   id: string;
   timestamp: Date;
-  type: 'music' | 'vocal' | 'speech' | 'sfx' | 'enhance';
+  type: 'music' | 'vocal' | 'speech' | 'sfx' | 'drums' | 'melody' | 'enhance';
   prompt: string;
   parameters: GenParameters;
   duration: number;
@@ -888,7 +1123,7 @@ export function AIGenerationPanel({
   const { toast } = useToast();
   
   // State
-  const [activeTab, setActiveTab] = useState<'music' | 'vocal' | 'speech' | 'sfx' | 'enhance'>('music');
+  const [activeTab, setActiveTab] = useState<'music' | 'drums' | 'melody' | 'vocal' | 'speech' | 'sfx' | 'enhance'>('music');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedAudio, setGeneratedAudio] = useState<Blob | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -922,6 +1157,21 @@ export function AIGenerationPanel({
   const [speechText, setSpeechText] = useState('');
   const [speechVoice, setSpeechVoice] = useState('default');
   const [speechSpeed, setSpeechSpeed] = useState(1);
+  
+  // Drums/beat generation state
+  const [drumsPrompt, setDrumsPrompt] = useState('');
+  const [drumsStyle, setDrumsStyle] = useState('trap');
+  const [drumsTempo, setDrumsTempo] = useState(120);
+  const [drumsDuration, setDrumsDuration] = useState(8);
+  const [drumsComplexity, setDrumsComplexity] = useState(70);
+  
+  // Melody generation state
+  const [melodyPrompt, setMelodyPrompt] = useState('');
+  const [melodyKey, setMelodyKey] = useState('C');
+  const [melodyScale, setMelodyScale] = useState('major');
+  const [melodyTempo, setMelodyTempo] = useState(120);
+  const [melodyDuration, setMelodyDuration] = useState(8);
+  const [melodyOctave, setMelodyOctave] = useState(4);
   
   // SFX generation state
   const [sfxPrompt, setSfxPrompt] = useState('');
@@ -957,7 +1207,9 @@ export function AIGenerationPanel({
     if ((activeTab === 'music' && !musicPrompt) || 
         (activeTab === 'vocal' && !vocalPrompt) || 
         (activeTab === 'speech' && !speechText) || 
-        (activeTab === 'sfx' && !sfxPrompt)) {
+        (activeTab === 'sfx' && !sfxPrompt) ||
+        (activeTab === 'drums' && !drumsPrompt) ||
+        (activeTab === 'melody' && !melodyPrompt)) {
       toast({
         description: 'Please enter a prompt or text for generation.',
         variant: 'destructive'
@@ -970,7 +1222,7 @@ export function AIGenerationPanel({
     try {
       // Build parameters based on active tab
       let generationSettings: GenerationSettings;
-      let generationType: 'music' | 'vocal' | 'speech' | 'sfx' = activeTab as 'music' | 'vocal' | 'speech' | 'sfx';
+      let generationType: 'music' | 'vocal' | 'speech' | 'sfx' | 'drums' | 'melody' = activeTab as any;
       let generationDuration = 0;
       
       switch (activeTab) {
@@ -987,6 +1239,36 @@ export function AIGenerationPanel({
             }
           };
           generationDuration = musicDuration;
+          break;
+          
+        case 'drums':
+          generationSettings = {
+            type: 'drums',
+            prompt: drumsPrompt,
+            parameters: {
+              model: 'standard',
+              genre: drumsStyle,
+              mood: 'default',
+              tempo: drumsTempo,
+              duration: drumsDuration
+            }
+          };
+          generationDuration = drumsDuration;
+          break;
+          
+        case 'melody':
+          generationSettings = {
+            type: 'melody',
+            prompt: melodyPrompt,
+            parameters: {
+              model: 'standard',
+              genre: melodyKey + melodyScale,
+              mood: 'default',
+              tempo: melodyTempo,
+              duration: melodyDuration
+            }
+          };
+          generationDuration = melodyDuration;
           break;
           
         case 'vocal':
@@ -1065,7 +1347,10 @@ export function AIGenerationPanel({
         type: activeTab,
         prompt: activeTab === 'speech' ? speechText : 
                activeTab === 'music' ? musicPrompt :
-               activeTab === 'vocal' ? vocalPrompt : sfxPrompt,
+               activeTab === 'vocal' ? vocalPrompt : 
+               activeTab === 'drums' ? drumsPrompt :
+               activeTab === 'melody' ? melodyPrompt :
+               sfxPrompt,
         parameters: generationSettings.parameters,
         duration: generationSettings.parameters.duration
       };
@@ -1085,7 +1370,9 @@ export function AIGenerationPanel({
             name: `Generated ${activeTab} - ${new Date().toLocaleTimeString()}`,
             type: activeTab === 'music' ? 'audio' : 
                  activeTab === 'vocal' ? 'vocal' : 
-                 activeTab === 'speech' ? 'vocal' : 'audio',
+                 activeTab === 'speech' ? 'vocal' : 
+                 activeTab === 'drums' ? 'drum' : 
+                 activeTab === 'melody' ? 'instrument' : 'audio',
             duration: generationSettings.parameters.duration,
             waveform: waveformData,
             creationMethod: 'ai-generated'
@@ -1141,6 +1428,36 @@ export function AIGenerationPanel({
           }
         };
         duration = musicDuration;
+        break;
+        
+      case 'drums':
+        settings = {
+          type: 'drums',
+          prompt: drumsPrompt,
+          parameters: {
+            model: 'standard',
+            genre: drumsStyle,
+            mood: 'default',
+            tempo: drumsTempo,
+            duration: drumsDuration
+          }
+        };
+        duration = drumsDuration;
+        break;
+        
+      case 'melody':
+        settings = {
+          type: 'melody',
+          prompt: melodyPrompt,
+          parameters: {
+            model: 'standard',
+            genre: melodyKey + melodyScale,
+            mood: 'default',
+            tempo: melodyTempo,
+            duration: melodyDuration
+          }
+        };
+        duration = melodyDuration;
         break;
         
       case 'vocal':
@@ -1216,7 +1533,9 @@ export function AIGenerationPanel({
           name: `Generated ${activeTab} - ${new Date().toLocaleTimeString()}`,
           type: activeTab === 'music' ? 'audio' : 
                activeTab === 'vocal' ? 'vocal' : 
-               activeTab === 'speech' ? 'vocal' : 'audio',
+               activeTab === 'speech' ? 'vocal' : 
+               activeTab === 'drums' ? 'drum' : 
+               activeTab === 'melody' ? 'instrument' : 'audio',
           duration: duration,
           waveform: waveformData,
           creationMethod: 'ai-generated'
@@ -1242,6 +1561,29 @@ export function AIGenerationPanel({
         setMusicTempo(item.parameters.tempo);
         setMusicDuration(item.parameters.duration);
         setMusicModel(item.parameters.model);
+        break;
+        
+      case 'drums':
+        setActiveTab('drums');
+        setDrumsPrompt(item.prompt);
+        setDrumsStyle(item.parameters.genre);
+        setDrumsTempo(item.parameters.tempo);
+        setDrumsDuration(item.parameters.duration);
+        break;
+        
+      case 'melody':
+        setActiveTab('melody');
+        setMelodyPrompt(item.prompt);
+        // Extract key and scale from genre which is stored as a combined value
+        const keyScale = item.parameters.genre || 'Cmajor';
+        if (keyScale.length > 1) {
+          const key = keyScale.charAt(0);
+          const scale = keyScale.substring(1);
+          setMelodyKey(key);
+          setMelodyScale(scale);
+        }
+        setMelodyTempo(item.parameters.tempo);
+        setMelodyDuration(item.parameters.duration);
         break;
         
       case 'vocal':
@@ -1319,6 +1661,14 @@ export function AIGenerationPanel({
               <TabsTrigger value="music" className="flex-1">
                 <Music size={14} className="mr-1" />
                 Music
+              </TabsTrigger>
+              <TabsTrigger value="drums" className="flex-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="8" x2="12" y2="4"/><line x1="16" y1="12" x2="20" y2="12"/><line x1="12" y1="16" x2="12" y2="20"/><line x1="8" y1="12" x2="4" y2="12"/></svg>
+                Drums
+              </TabsTrigger>
+              <TabsTrigger value="melody" className="flex-1">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                Melody
               </TabsTrigger>
               <TabsTrigger value="vocal" className="flex-1">
                 <Mic size={14} className="mr-1" />
