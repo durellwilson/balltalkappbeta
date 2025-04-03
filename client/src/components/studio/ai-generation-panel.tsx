@@ -1366,6 +1366,12 @@ export function AIGenerationPanel({
                   placeholder="An upbeat electronic track with deep bass, synth pads, and a driving beat..."
                   value={musicPrompt}
                   onChange={e => setMusicPrompt(e.target.value)}
+                  onKeyDown={e => {
+                    // Ensure spacebar events are processed
+                    if (e.key === ' ') {
+                      e.stopPropagation(); // Prevent default space behavior of scrolling
+                    }
+                  }}
                   className="bg-gray-800 border-gray-700 min-h-24"
                 />
               </div>
@@ -1459,6 +1465,11 @@ export function AIGenerationPanel({
                   placeholder="A soulful female vocal singing about love and loss..."
                   value={vocalPrompt}
                   onChange={e => setVocalPrompt(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === ' ') {
+                      e.stopPropagation();
+                    }
+                  }}
                   className="bg-gray-800 border-gray-700 min-h-24"
                 />
               </div>
@@ -1520,6 +1531,11 @@ export function AIGenerationPanel({
                   placeholder="Enter the text you want to convert to speech..."
                   value={speechText}
                   onChange={e => setSpeechText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === ' ') {
+                      e.stopPropagation();
+                    }
+                  }}
                   className="bg-gray-800 border-gray-700 min-h-24"
                 />
               </div>
@@ -1571,6 +1587,11 @@ export function AIGenerationPanel({
                   placeholder="A door creaking open with a slight echo..."
                   value={sfxPrompt}
                   onChange={e => setSfxPrompt(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === ' ') {
+                      e.stopPropagation();
+                    }
+                  }}
                   className="bg-gray-800 border-gray-700 min-h-24"
                 />
               </div>
