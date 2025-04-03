@@ -542,17 +542,11 @@ class AudioProcessor {
         if (this.recorder) {
           try {
             const recordingBlob = await this.recorder.stop();
-            console.log('Captured master recording');
-            this.masterGain.disconnect(this.recorder);
-            this.recorder = null;
-            this.processingActive = false;
+            console.log('Captured master recording, blob size:', recordingBlob?.size);
             return recordingBlob;
           } catch (masterError) {
             console.error('Failed to get master recording:', masterError);
-            if (this.recorder) {
-              this.masterGain.disconnect(this.recorder);
-              this.recorder = null;
-            }
+            throw masterError;
           }
         }
         return null;
@@ -565,15 +559,20 @@ class AudioProcessor {
       let recordingBlob: Blob | null = null;
       
       if (recordingTrack) {
-        // Try to get recording from the track first
         try {
+          // Get recording from the track
           console.log('Stopping recording on track:', recordingTrackId);
           recordingBlob = await recordingTrack.stopRecording();
-          console.log('Successfully captured recording from track');
+          console.log('Successfully captured recording from track, blob size:', recordingBlob?.size);
           
-          // Clean up the temporary recording track since we'll create a new playback track
-          const removed = this.removeTrack(recordingTrackId);
-          console.log('Removed recording track:', removed ? 'success' : 'failed');
+          // If we successfully got a recording from the track
+          if (recordingBlob && recordingBlob.size > 0) {
+            // Clean up the temporary recording track since we'll create a new playback track with the recording
+            const removed = this.removeTrack(recordingTrackId);
+            console.log('Removed recording track:', removed ? 'success' : 'failed');
+          } else {
+            console.warn('Got empty recording from track, keeping track for diagnostics');
+          }
         } catch (trackError) {
           console.error('Failed to get recording from track:', trackError);
         }
@@ -582,33 +581,36 @@ class AudioProcessor {
       }
       
       // Fallback to master recording if track recording failed
-      if (!recordingBlob && this.recorder) {
+      if ((!recordingBlob || recordingBlob.size === 0) && this.recorder) {
         try {
           console.log('Attempting to get recording from master recorder');
           recordingBlob = await this.recorder.stop();
           console.log('Falling back to master recording, blob size:', recordingBlob?.size);
         } catch (masterError) {
           console.error('Failed to get master recording:', masterError);
-        } finally {
-          // Always disconnect and clean up
-          if (this.recorder) {
-            this.masterGain.disconnect(this.recorder);
-            this.recorder = null;
-          }
         }
       }
       
-      this.processingActive = false;
       return recordingBlob;
     } catch (error) {
       console.error('Error stopping recording:', error);
-      // Always clean up
-      if (this.recorder) {
-        this.masterGain.disconnect(this.recorder);
-        this.recorder = null;
-      }
-      this.processingActive = false;
       return null;
+    } finally {
+      // Always run cleanup regardless of success or failure
+      this.processingActive = false;
+      
+      // Cleanup the recorder resources
+      if (this.recorder) {
+        try {
+          this.masterGain.disconnect(this.recorder);
+          this.recorder.dispose();
+          console.log('Disposed master recorder resources');
+        } catch (cleanupError) {
+          console.error('Error during recorder cleanup:', cleanupError);
+        } finally {
+          this.recorder = null;
+        }
+      }
     }
   }
 
@@ -970,11 +972,14 @@ class TrackProcessor {
       return null;
     }
     
+    // Create a recorder object for capturing audio
+    let recorder: Tone.Recorder | null = null;
+    
     try {
       console.log('Stopping recording and processing audio...');
       
       // Create a recorder connected to our UserMedia source
-      const recorder = new Tone.Recorder();
+      recorder = new Tone.Recorder();
       
       // Connect our recorder to the audio source
       this.recorder.connect(recorder);
@@ -985,56 +990,60 @@ class TrackProcessor {
       // Allow a moment to capture audio (important for mobile)
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      try {
-        // Stop recording and get blob
-        const blob = await recorder.stop();
-        console.log('Recording captured successfully, converting to audio buffer...');
-        
-        if (!blob || blob.size === 0) {
-          console.error('Recording resulted in empty audio data');
-          throw new Error('No audio was recorded');
-        }
-        
-        // Convert blob to AudioBuffer
-        const arrayBuffer = await blob.arrayBuffer();
-        
-        // Use a try-catch specifically for decoding, as this can fail on some mobile devices
-        try {
-          const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
-          
-          // Save the buffer and create a player
-          this.audioBuffer = audioBuffer;
-          this.player = new Tone.Player().connect(this.compressor);
-          this.player.buffer.set(audioBuffer);
-          
-          console.log('Recording processed successfully:', {
-            duration: audioBuffer.duration,
-            sampleRate: audioBuffer.sampleRate,
-            numberOfChannels: audioBuffer.numberOfChannels
-          });
-          
-          // Clean up
-          this.disposeRecorder();
-          recorder.dispose();
-          
-          // Return the blob for immediate use
-          return blob;
-        } catch (decodeError) {
-          console.error('Failed to decode audio data:', decodeError);
-          throw new Error('Failed to process recording. The audio format may not be supported on this device.');
-        }
-      } catch (recorderError) {
-        console.error('Recorder failed to stop:', recorderError);
-        throw new Error('Failed to finish recording. Please try again.');
+      // Stop recording and get blob
+      const blob = await recorder.stop();
+      console.log('Recording captured successfully, converting to audio buffer...');
+      
+      if (!blob || blob.size === 0) {
+        console.error('Recording resulted in empty audio data');
+        throw new Error('No audio was recorded');
       }
+      
+      // Convert blob to AudioBuffer
+      const arrayBuffer = await blob.arrayBuffer();
+      
+      // Decode the audio data
+      const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+      
+      // Save the buffer and create a player
+      this.audioBuffer = audioBuffer;
+      this.player = new Tone.Player().connect(this.compressor);
+      this.player.buffer.set(audioBuffer);
+      
+      console.log('Recording processed successfully:', {
+        duration: audioBuffer.duration,
+        sampleRate: audioBuffer.sampleRate,
+        numberOfChannels: audioBuffer.numberOfChannels
+      });
+      
+      // Return the blob for immediate use
+      return blob;
     } catch (error) {
       console.error('Failed to stop recording:', error);
-      // Always clean up
-      this.disposeRecorder();
+      
       if (error instanceof Error) {
         throw error;
       } else {
         throw new Error('An unknown error occurred while processing the recording');
+      }
+    } finally {
+      // Always clean up resources in finally block to ensure it happens
+      // regardless of success or failure
+      try {
+        // Clean up the temporary recorder
+        if (recorder) {
+          try {
+            recorder.dispose();
+            console.log('Temporary recorder disposed');
+          } catch (recorderError) {
+            console.error('Error disposing temporary recorder:', recorderError);
+          }
+        }
+        
+        // Clean up the main recorder
+        this.disposeRecorder();
+      } catch (cleanupError) {
+        console.error('Error during recorder cleanup:', cleanupError);
       }
     }
   }

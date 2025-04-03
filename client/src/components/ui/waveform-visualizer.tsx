@@ -482,6 +482,10 @@ const drawAnimatedWaveform = (
 ) => {
   const centerY = height / 2;
   
+  // Apply time-based animation effect
+  const now = Date.now() / 1000;
+  const animationFactor = Math.sin(now * 5) * 0.15 + 0.85; // Pulse between 0.7-1.0
+  
   // Create gradient if colors are provided
   let fillStyle: string | CanvasGradient = color;
   if (gradientColors && gradientColors.length >= 2) {
@@ -495,19 +499,41 @@ const drawAnimatedWaveform = (
     fillStyle = gradient;
   }
   
-  // Create a secondary gradient for peak highlights
+  // Create a secondary gradient for peak highlights - more vibrant for animation
   let highlightStyle: string | CanvasGradient = 'rgba(255, 255, 255, 0.5)';
   if (gradientColors && gradientColors.length >= 2) {
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
     gradient.addColorStop(0, 'rgba(255, 255, 255, 0.7)');
     gradient.addColorStop(1, 'rgba(200, 200, 255, 0.3)');
     highlightStyle = gradient;
+  } else {
+    // Create a more vibrant highlight if no gradient colors specified
+    const highlightGradient = ctx.createLinearGradient(0, 0, 0, height);
+    
+    // Extract base color components for highlight calculation
+    let r = 255, g = 255, b = 255;
+    if (color.startsWith('rgb')) {
+      const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      if (match) {
+        r = parseInt(match[1], 10);
+        g = parseInt(match[2], 10);
+        b = parseInt(match[3], 10);
+      }
+    }
+    
+    // Create shimmer effect highlights
+    highlightGradient.addColorStop(0, `rgba(${Math.min(255, r + 50)}, ${Math.min(255, g + 50)}, ${Math.min(255, b + 80)}, 0.7)`);
+    highlightGradient.addColorStop(1, `rgba(${Math.min(255, r + 30)}, ${Math.min(255, g + 30)}, ${Math.min(255, b + 50)}, 0.3)`);
+    highlightStyle = highlightGradient;
   }
   
   ctx.fillStyle = fillStyle;
   
   // Draw waveform with smoothing between points and mirrored about center
   const sliceWidth = width / data.length;
+  
+  // Apply slight vibration based on animation factor
+  const vibration = animationFactor * 0.5;
   
   // Draw path from center out with a smoother approach
   ctx.beginPath();
