@@ -1791,8 +1791,8 @@ const EnhancedStudio: React.FC = () => {
                   </TabsList>
                 </div>
                 
-                <TabsContent value="tracks" className="m-0 h-[calc(100vh-130px)] flex flex-col">
-                  <div className="p-3 border-b border-gray-800">
+                <TabsContent value="tracks" className="m-0">
+                  <div className="p-3">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-sm font-medium">Tracks</h3>
                       <DropdownMenu>
@@ -1952,8 +1952,8 @@ const EnhancedStudio: React.FC = () => {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="effects" className="m-0 h-[calc(100vh-130px)] flex flex-col">
-                  <div className="p-3 border-b border-gray-800">
+                <TabsContent value="effects" className="m-0">
+                  <div className="p-3">
                     <h3 className="text-sm font-medium mb-3">Track Effects</h3>
                     
                     {activeTrackId ? (
@@ -1980,8 +1980,8 @@ const EnhancedStudio: React.FC = () => {
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="master" className="m-0 h-[calc(100vh-130px)] flex flex-col">
-                  <div className="p-3 border-b border-gray-800">
+                <TabsContent value="master" className="m-0">
+                  <div className="p-3">
                     <h3 className="text-sm font-medium mb-3">Mastering</h3>
                     
                     <MasteringPanel
@@ -1996,8 +1996,8 @@ const EnhancedStudio: React.FC = () => {
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="mixer" className="m-0 h-[calc(100vh-130px)] flex flex-col">
-                  <div className="p-3 border-b border-gray-800">
+                <TabsContent value="mixer" className="m-0">
+                  <div className="p-3">
                     <h3 className="text-sm font-medium mb-3">Mixer</h3>
                     
                     <div className="space-y-4">
@@ -2077,8 +2077,8 @@ const EnhancedStudio: React.FC = () => {
                   </div>
                 </TabsContent>
                 
-                <TabsContent value="collab" className="m-0 h-[calc(100vh-130px)] flex flex-col">
-                  <div className="p-3 border-b border-gray-800">
+                <TabsContent value="collab" className="m-0">
+                  <div className="p-3">
                     <h3 className="text-sm font-medium mb-2">Collaborators</h3>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
@@ -2164,8 +2164,8 @@ const EnhancedStudio: React.FC = () => {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="cloud" className="m-0 h-[calc(100vh-130px)] flex flex-col">
-                  <div className="p-3 border-b border-gray-800">
+                <TabsContent value="cloud" className="m-0">
+                  <div className="p-3">
                     <h3 className="text-sm font-medium mb-3">Cloud Storage</h3>
                     <ProjectSync projectId={parseInt(project.id)} />
                   </div>
