@@ -72,34 +72,94 @@ class AudioProcessor {
   }
   
   /**
-   * Initialize premium audio effect processors
+   * Initialize premium audio effect processors including AI-enhanced voice effects
    */
   private async initializeAdvancedEffects(): Promise<void> {
     try {
-      // Studio-quality reverb with adjustable parameters
+      // AI Voice Enhancement: Using a combination of custom-tuned processors
+      // that simulate AI voice enhancement through advanced DSP techniques
+      
+      // Multiband compressor for voice clarity (simulating AI voice enhancement)
+      const aiVoiceEnhancer = new Tone.MultibandCompressor({
+        lowFrequency: 200,
+        highFrequency: 3500,
+        low: {
+          threshold: -35,
+          ratio: 3,
+          attack: 0.03,
+          release: 0.5
+        },
+        mid: {
+          threshold: -30,
+          ratio: 2,
+          attack: 0.02,
+          release: 0.3
+        },
+        high: {
+          threshold: -40,
+          ratio: 4,
+          attack: 0.01,
+          release: 0.2
+        }
+      });
+      
+      // Voice isolation effect using selective EQ and filtering
+      // Simulating AI voice isolation by emphasizing vocal frequencies
+      // and reducing background noise frequencies
+      const voiceIsolator = new Tone.Filter({
+        type: "bandpass",
+        frequency: 1000,
+        Q: 0.9
+      });
+      
+      const voiceEnhancerGain = new Tone.Gain(0).connect(this.eqBands);
+      voiceIsolator.connect(voiceEnhancerGain);
+      aiVoiceEnhancer.connect(voiceIsolator);
+      
+      // Keep reference to the reverb processor for compatibility
       this.reverbProcessor = new Tone.Reverb({
         decay: 2.5,
         preDelay: 0.01,
         wet: 0 // Initially disabled
       });
       
-      // Harmonic exciter for adding brilliance and clarity
-      this.exciter = new Tone.FrequencyShifter(0);
-      
-      // Spectral processor for harmonics enhancement
-      this.spectralProcessor = new Tone.Chebyshev(4);
-      
       // Pre-load impulse responses
       await this.reverbProcessor.generate();
       
-      // Insert in chain (bypassed initially)
+      // Clean spectral processor for voice presence (replacing standard exciter)
+      this.spectralProcessor = new Tone.Chebyshev(2);
       this.spectralProcessor.wet.value = 0;
+      
+      // Maintain frequency shifter as a tool for special effects
+      this.exciter = new Tone.FrequencyShifter(0);
       this.exciter.wet.value = 0;
+      
+      // Connect the chain
       this.reverbProcessor.connect(this.eqBands);
       this.spectralProcessor.connect(this.reverbProcessor);
-      this.exciter.connect(this.spectralProcessor);
+      aiVoiceEnhancer.connect(this.spectralProcessor);
+      this.exciter.connect(aiVoiceEnhancer);
+      
+      console.log('Initialized AI voice enhancement and isolation effects');
     } catch (error) {
       console.error('Failed to initialize advanced effects:', error);
+      
+      // Fallback to simpler effects if advanced initialization fails
+      try {
+        // Basic reverb
+        this.reverbProcessor = new Tone.Reverb({
+          decay: 2.5,
+          preDelay: 0.01,
+          wet: 0
+        });
+        
+        await this.reverbProcessor.generate();
+        this.reverbProcessor.connect(this.eqBands);
+        
+        console.log('Initialized fallback effects');
+      } catch (fallbackError) {
+        console.error('Failed to initialize fallback effects:', fallbackError);
+      }
     }
   }
 
@@ -475,6 +535,29 @@ class AudioProcessor {
     try {
       // Find the recording track (should be the last one created)
       const trackIds = this.getTrackIds();
+      
+      if (trackIds.length === 0) {
+        console.warn('No tracks found when stopping recording');
+        // Handle master recording if available
+        if (this.recorder) {
+          try {
+            const recordingBlob = await this.recorder.stop();
+            console.log('Captured master recording');
+            this.masterGain.disconnect(this.recorder);
+            this.recorder = null;
+            this.processingActive = false;
+            return recordingBlob;
+          } catch (masterError) {
+            console.error('Failed to get master recording:', masterError);
+            if (this.recorder) {
+              this.masterGain.disconnect(this.recorder);
+              this.recorder = null;
+            }
+          }
+        }
+        return null;
+      }
+      
       const recordingTrackId = Math.max(...trackIds);
       const recordingTrack = this.getTrack(recordingTrackId);
       
@@ -484,33 +567,42 @@ class AudioProcessor {
       if (recordingTrack) {
         // Try to get recording from the track first
         try {
+          console.log('Stopping recording on track:', recordingTrackId);
           recordingBlob = await recordingTrack.stopRecording();
           console.log('Successfully captured recording from track');
           
           // Clean up the temporary recording track since we'll create a new playback track
-          this.removeTrack(recordingTrackId);
+          const removed = this.removeTrack(recordingTrackId);
+          console.log('Removed recording track:', removed ? 'success' : 'failed');
         } catch (trackError) {
           console.error('Failed to get recording from track:', trackError);
         }
+      } else {
+        console.warn('Recording track not found:', recordingTrackId);
       }
       
       // Fallback to master recording if track recording failed
       if (!recordingBlob && this.recorder) {
         try {
+          console.log('Attempting to get recording from master recorder');
           recordingBlob = await this.recorder.stop();
-          console.log('Falling back to master recording');
+          console.log('Falling back to master recording, blob size:', recordingBlob?.size);
         } catch (masterError) {
           console.error('Failed to get master recording:', masterError);
+        } finally {
+          // Always disconnect and clean up
+          if (this.recorder) {
+            this.masterGain.disconnect(this.recorder);
+            this.recorder = null;
+          }
         }
-        
-        this.masterGain.disconnect(this.recorder);
-        this.recorder = null;
       }
       
       this.processingActive = false;
       return recordingBlob;
     } catch (error) {
       console.error('Error stopping recording:', error);
+      // Always clean up
       if (this.recorder) {
         this.masterGain.disconnect(this.recorder);
         this.recorder = null;
@@ -550,6 +642,32 @@ class AudioProcessor {
   }
 
   /**
+   * Apply AI voice enhancement to the selected audio track
+   * @param trackId The ID of the track to enhance
+   * @param enhancementType The type of enhancement to apply ('clarity', 'isolation', 'denoising')
+   * @param intensity The intensity of the effect (0-1)
+   */
+  applyAIVoiceEnhancement(trackId: number, enhancementType: string, intensity: number = 0.7): boolean {
+    try {
+      const track = this.getTrack(trackId);
+      if (!track) {
+        console.error(`Track ${trackId} not found for AI voice enhancement`);
+        return false;
+      }
+      
+      // Apply the appropriate voice enhancement effect
+      console.log(`Applying AI ${enhancementType} enhancement to track ${trackId} with intensity ${intensity}`);
+      
+      // Use track-level processing for targeted enhancements
+      track.applyVoiceEnhancement(enhancementType, intensity);
+      return true;
+    } catch (error) {
+      console.error('Failed to apply AI voice enhancement:', error);
+      return false;
+    }
+  }
+  
+  /**
    * Apply an AI mastering preset based on the genre
    */
   applyAIMasteringPreset(genre: string): void {
@@ -578,6 +696,32 @@ class AudioProcessor {
         });
         this.setLimiterThreshold(-0.5);
         this.setLufsTarget(-10);
+        break;
+        
+      case 'vocal':
+        // Optimized for vocal clarity and presence
+        this.setEQ(1, 0, 2);
+        this.setCompressor({ 
+          threshold: -24, 
+          ratio: 2.5,
+          attack: 0.02,
+          release: 0.3
+        });
+        this.setLimiterThreshold(-1.5);
+        this.setLufsTarget(-12);
+        break;
+        
+      case 'podcast':
+        // Settings optimized for speech clarity and consistency
+        this.setEQ(0, 1, 1);
+        this.setCompressor({ 
+          threshold: -20, 
+          ratio: 4,
+          attack: 0.01,
+          release: 0.2
+        });
+        this.setLimiterThreshold(-1.0);
+        this.setLufsTarget(-16); // Podcast standard loudness
         break;
         
       case 'r&b':
@@ -982,6 +1126,92 @@ class TrackProcessor {
     this.eq.mid.value = mid;
     this.eq.high.value = high;
   }
+  
+  /**
+   * Apply voice enhancement effects using advanced DSP techniques
+   * @param enhancementType Type of enhancement: 'clarity', 'isolation', 'denoising'
+   * @param intensity Strength of the effect (0-1)
+   */
+  applyVoiceEnhancement(enhancementType: string, intensity: number = 0.7): void {
+    // Ensure intensity is within valid range
+    intensity = Math.max(0, Math.min(1, intensity));
+    console.log(`Applying ${enhancementType} enhancement with intensity ${intensity}`);
+    
+    // Effects parameters based on enhancement type
+    switch (enhancementType.toLowerCase()) {
+      case 'clarity': {
+        // Voice clarity enhances midrange and adds subtle compression
+        // for better intelligibility
+        const highMidBoost = 3 * intensity;
+        const presenceBoost = 4 * intensity;
+        const compressionAmount = 3 + (4 * intensity);
+        
+        // Apply EQ settings optimized for voice clarity
+        this.eq.low.value = 0;  // Keep bass neutral
+        this.eq.mid.value = highMidBoost; // Boost mid frequencies for clarity
+        this.eq.high.value = presenceBoost; // Add presence/air
+        
+        // Configure compressor for consistent vocal levels
+        this.compressor.threshold.value = -24 - (intensity * 10);
+        this.compressor.ratio.value = compressionAmount;
+        this.compressor.attack.value = 0.02;
+        this.compressor.release.value = 0.2;
+        
+        console.log('Applied voice clarity enhancement');
+        break;
+      }
+      
+      case 'isolation': {
+        // Voice isolation uses EQ to separate voice from background
+        // by focusing on the vocal frequency range
+        
+        // Apply steep EQ cuts to reduce non-vocal frequencies
+        this.eq.low.value = -10 * intensity; // Reduce lows (rumble, background)
+        this.eq.mid.value = 5 * intensity;  // Boost mids (voice presence)
+        this.eq.high.value = -3 * intensity; // Slightly reduce highs (hiss)
+        
+        // Aggressive compression helps bring voice forward
+        this.compressor.threshold.value = -30 - (intensity * 10);
+        this.compressor.ratio.value = 4 + (3 * intensity);
+        this.compressor.attack.value = 0.01;
+        this.compressor.release.value = 0.3;
+        
+        console.log('Applied voice isolation enhancement');
+        break;
+      }
+      
+      case 'denoising': {
+        // Denoising optimizes for noise reduction while preserving vocal quality
+        // This is simulated with EQ and dynamics processing
+        
+        // Apply subtle high cut to reduce hiss
+        this.eq.low.value = 2 * intensity;  // Gentle boost to lows for warmth
+        this.eq.mid.value = 3 * intensity;  // Boost mids for voice presence
+        this.eq.high.value = -6 * intensity; // Cut highs to reduce noise/hiss
+        
+        // Gentle expansion/compression helps reduce noise between phrases
+        this.compressor.threshold.value = -20 - (intensity * 5);
+        this.compressor.ratio.value = 2 + (2 * intensity);
+        this.compressor.attack.value = 0.05;
+        this.compressor.release.value = 0.5;
+        
+        console.log('Applied denoising enhancement');
+        break;
+      }
+      
+      default:
+        console.warn(`Unknown enhancement type: ${enhancementType}`);
+        // Reset to neutral settings
+        this.eq.low.value = 0;
+        this.eq.mid.value = 0;
+        this.eq.high.value = 0;
+        
+        this.compressor.threshold.value = -24;
+        this.compressor.ratio.value = 3;
+        this.compressor.attack.value = 0.03;
+        this.compressor.release.value = 0.25;
+    }
+  }
 
   /**
    * Mute/unmute the track
@@ -1201,10 +1431,24 @@ class TrackProcessor {
    */
   private disposeRecorder(): void {
     if (this.recorder) {
-      this.recorder.close();
-      this.recorder.disconnect();
-      this.recorder.dispose();
-      this.recorder = null;
+      try {
+        // First close the microphone stream
+        this.recorder.close();
+        console.log('Closed recorder microphone stream');
+        
+        // Then disconnect from any downstream nodes
+        this.recorder.disconnect();
+        console.log('Disconnected recorder from audio chain');
+        
+        // Finally dispose of the recorder instance
+        this.recorder.dispose();
+        console.log('Disposed recorder resources');
+      } catch (error) {
+        console.error('Error while disposing recorder:', error);
+      } finally {
+        // Always set to null, even if the above steps fail
+        this.recorder = null;
+      }
     }
   }
 
