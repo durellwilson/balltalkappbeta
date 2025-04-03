@@ -1065,8 +1065,11 @@ interface GenParameters {
   model: string;
   genre: string;
   mood: string;
+  key?: string;
+  scale?: string;
   tempo: number;
   duration: number;
+  complexity?: number;
 }
 
 interface GenerationSettings {
@@ -1234,6 +1237,8 @@ export function AIGenerationPanel({
               model: musicModel,
               genre: musicGenre,
               mood: musicMood,
+              key: melodyKey,
+              scale: melodyScale,
               tempo: musicTempo,
               duration: musicDuration
             }
@@ -1248,9 +1253,11 @@ export function AIGenerationPanel({
             parameters: {
               model: 'standard',
               genre: drumsStyle,
+              key: melodyKey,
               mood: 'default',
               tempo: drumsTempo,
-              duration: drumsDuration
+              duration: drumsDuration,
+              complexity: drumsComplexity / 100
             }
           };
           generationDuration = drumsDuration;
@@ -1262,7 +1269,9 @@ export function AIGenerationPanel({
             prompt: melodyPrompt,
             parameters: {
               model: 'standard',
-              genre: melodyKey + melodyScale,
+              genre: 'melody',
+              key: melodyKey,
+              scale: melodyScale,
               mood: 'default',
               tempo: melodyTempo,
               duration: melodyDuration
@@ -1423,6 +1432,8 @@ export function AIGenerationPanel({
             model: musicModel,
             genre: musicGenre,
             mood: musicMood,
+            key: melodyKey,
+            scale: melodyScale,
             tempo: musicTempo,
             duration: musicDuration
           }
@@ -1437,9 +1448,11 @@ export function AIGenerationPanel({
           parameters: {
             model: 'standard',
             genre: drumsStyle,
+            key: melodyKey,
             mood: 'default',
             tempo: drumsTempo,
-            duration: drumsDuration
+            duration: drumsDuration,
+            complexity: drumsComplexity / 100
           }
         };
         duration = drumsDuration;
@@ -1451,7 +1464,9 @@ export function AIGenerationPanel({
           prompt: melodyPrompt,
           parameters: {
             model: 'standard',
-            genre: melodyKey + melodyScale,
+            genre: 'melody',
+            key: melodyKey,
+            scale: melodyScale,
             mood: 'default',
             tempo: melodyTempo,
             duration: melodyDuration
@@ -1558,6 +1573,13 @@ export function AIGenerationPanel({
         setMusicPrompt(item.prompt);
         setMusicGenre(item.parameters.genre);
         setMusicMood(item.parameters.mood);
+        // Get key and scale if available
+        if (item.parameters.key) {
+          setMelodyKey(item.parameters.key);
+        }
+        if (item.parameters.scale) {
+          setMelodyScale(item.parameters.scale);
+        }
         setMusicTempo(item.parameters.tempo);
         setMusicDuration(item.parameters.duration);
         setMusicModel(item.parameters.model);
@@ -1567,20 +1589,36 @@ export function AIGenerationPanel({
         setActiveTab('drums');
         setDrumsPrompt(item.prompt);
         setDrumsStyle(item.parameters.genre);
+        // Get key if available
+        if (item.parameters.key) {
+          setMelodyKey(item.parameters.key);
+        }
         setDrumsTempo(item.parameters.tempo);
         setDrumsDuration(item.parameters.duration);
+        // Set complexity if available
+        if (item.parameters.complexity !== undefined) {
+          setDrumsComplexity(item.parameters.complexity * 100);
+        }
         break;
         
       case 'melody':
         setActiveTab('melody');
         setMelodyPrompt(item.prompt);
-        // Extract key and scale from genre which is stored as a combined value
-        const keyScale = item.parameters.genre || 'Cmajor';
-        if (keyScale.length > 1) {
-          const key = keyScale.charAt(0);
-          const scale = keyScale.substring(1);
-          setMelodyKey(key);
-          setMelodyScale(scale);
+        // Get key and scale directly from parameters if available
+        if (item.parameters.key) {
+          setMelodyKey(item.parameters.key);
+        }
+        if (item.parameters.scale) {
+          setMelodyScale(item.parameters.scale);
+        } else {
+          // Legacy support: Extract key and scale from genre which was stored as a combined value
+          const keyScale = item.parameters.genre || 'Cmajor';
+          if (keyScale.length > 1) {
+            const key = keyScale.charAt(0);
+            const scale = keyScale.substring(1);
+            setMelodyKey(key);
+            setMelodyScale(scale);
+          }
         }
         setMelodyTempo(item.parameters.tempo);
         setMelodyDuration(item.parameters.duration);
@@ -1766,6 +1804,49 @@ export function AIGenerationPanel({
                 </div>
               </div>
               
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Key</Label>
+                  <Select defaultValue="C" onValueChange={setMelodyKey}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="C">C</SelectItem>
+                      <SelectItem value="C#">C#</SelectItem>
+                      <SelectItem value="D">D</SelectItem>
+                      <SelectItem value="D#">D#</SelectItem>
+                      <SelectItem value="E">E</SelectItem>
+                      <SelectItem value="F">F</SelectItem>
+                      <SelectItem value="F#">F#</SelectItem>
+                      <SelectItem value="G">G</SelectItem>
+                      <SelectItem value="G#">G#</SelectItem>
+                      <SelectItem value="A">A</SelectItem>
+                      <SelectItem value="A#">A#</SelectItem>
+                      <SelectItem value="B">B</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Scale</Label>
+                  <Select defaultValue="major" onValueChange={setMelodyScale}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="major">Major</SelectItem>
+                      <SelectItem value="minor">Minor</SelectItem>
+                      <SelectItem value="pentatonic">Pentatonic</SelectItem>
+                      <SelectItem value="blues">Blues</SelectItem>
+                      <SelectItem value="dorian">Dorian</SelectItem>
+                      <SelectItem value="mixolydian">Mixolydian</SelectItem>
+                      <SelectItem value="lydian">Lydian</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <Label>Tempo</Label>
@@ -1871,6 +1952,214 @@ export function AIGenerationPanel({
                   step={5}
                   value={[vocalDuration]}
                   onValueChange={values => setVocalDuration(values[0])}
+                />
+              </div>
+            </TabsContent>
+            
+            {/* Drums Generation Tab */}
+            <TabsContent value="drums" className="m-0 space-y-4">
+              <div className="space-y-2">
+                <Label>Describe the drums or beat you want</Label>
+                <Textarea 
+                  placeholder="A hard-hitting trap beat with punchy kicks and crisp hi-hats..."
+                  value={drumsPrompt}
+                  onChange={e => setDrumsPrompt(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === ' ') {
+                      e.stopPropagation();
+                    }
+                  }}
+                  className="bg-gray-800 border-gray-700 min-h-24"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Style</Label>
+                  <Select value={drumsStyle} onValueChange={setDrumsStyle}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="trap">Trap</SelectItem>
+                      <SelectItem value="hiphop">Hip Hop</SelectItem>
+                      <SelectItem value="rock">Rock</SelectItem>
+                      <SelectItem value="electronic">Electronic</SelectItem>
+                      <SelectItem value="jazz">Jazz</SelectItem>
+                      <SelectItem value="pop">Pop</SelectItem>
+                      <SelectItem value="lofi">Lo-Fi</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Key</Label>
+                  <Select defaultValue="C" onValueChange={setMelodyKey}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="C">C</SelectItem>
+                      <SelectItem value="C#">C#</SelectItem>
+                      <SelectItem value="D">D</SelectItem>
+                      <SelectItem value="D#">D#</SelectItem>
+                      <SelectItem value="E">E</SelectItem>
+                      <SelectItem value="F">F</SelectItem>
+                      <SelectItem value="F#">F#</SelectItem>
+                      <SelectItem value="G">G</SelectItem>
+                      <SelectItem value="G#">G#</SelectItem>
+                      <SelectItem value="A">A</SelectItem>
+                      <SelectItem value="A#">A#</SelectItem>
+                      <SelectItem value="B">B</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label>Tempo</Label>
+                  <span className="text-xs text-gray-400">{drumsTempo} BPM</span>
+                </div>
+                <Slider
+                  min={60}
+                  max={200}
+                  step={1}
+                  value={[drumsTempo]}
+                  onValueChange={values => setDrumsTempo(values[0])}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label>Complexity</Label>
+                  <span className="text-xs text-gray-400">{drumsComplexity}%</span>
+                </div>
+                <Slider
+                  min={20}
+                  max={100}
+                  step={5}
+                  value={[drumsComplexity]}
+                  onValueChange={values => setDrumsComplexity(values[0])}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label>Duration</Label>
+                  <span className="text-xs text-gray-400">{formatTime(drumsDuration)}</span>
+                </div>
+                <Slider
+                  min={4}
+                  max={32}
+                  step={4}
+                  value={[drumsDuration]}
+                  onValueChange={values => setDrumsDuration(values[0])}
+                />
+              </div>
+            </TabsContent>
+            
+            {/* Melody Generation Tab */}
+            <TabsContent value="melody" className="m-0 space-y-4">
+              <div className="space-y-2">
+                <Label>Describe the melody you want</Label>
+                <Textarea 
+                  placeholder="A catchy piano melody with a hopeful progression..."
+                  value={melodyPrompt}
+                  onChange={e => setMelodyPrompt(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === ' ') {
+                      e.stopPropagation();
+                    }
+                  }}
+                  className="bg-gray-800 border-gray-700 min-h-24"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Key</Label>
+                  <Select value={melodyKey} onValueChange={setMelodyKey}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="C">C</SelectItem>
+                      <SelectItem value="C#">C#</SelectItem>
+                      <SelectItem value="D">D</SelectItem>
+                      <SelectItem value="D#">D#</SelectItem>
+                      <SelectItem value="E">E</SelectItem>
+                      <SelectItem value="F">F</SelectItem>
+                      <SelectItem value="F#">F#</SelectItem>
+                      <SelectItem value="G">G</SelectItem>
+                      <SelectItem value="G#">G#</SelectItem>
+                      <SelectItem value="A">A</SelectItem>
+                      <SelectItem value="A#">A#</SelectItem>
+                      <SelectItem value="B">B</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Scale</Label>
+                  <Select value={melodyScale} onValueChange={setMelodyScale}>
+                    <SelectTrigger className="bg-gray-800 border-gray-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-700">
+                      <SelectItem value="major">Major</SelectItem>
+                      <SelectItem value="minor">Minor</SelectItem>
+                      <SelectItem value="pentatonic">Pentatonic</SelectItem>
+                      <SelectItem value="blues">Blues</SelectItem>
+                      <SelectItem value="dorian">Dorian</SelectItem>
+                      <SelectItem value="mixolydian">Mixolydian</SelectItem>
+                      <SelectItem value="lydian">Lydian</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label>Tempo</Label>
+                    <span className="text-xs text-gray-400">{melodyTempo} BPM</span>
+                  </div>
+                  <Slider
+                    min={60}
+                    max={200}
+                    step={1}
+                    value={[melodyTempo]}
+                    onValueChange={values => setMelodyTempo(values[0])}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <Label>Octave</Label>
+                    <span className="text-xs text-gray-400">{melodyOctave}</span>
+                  </div>
+                  <Slider
+                    min={2}
+                    max={6}
+                    step={1}
+                    value={[melodyOctave]}
+                    onValueChange={values => setMelodyOctave(values[0])}
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <Label>Duration</Label>
+                  <span className="text-xs text-gray-400">{formatTime(melodyDuration)}</span>
+                </div>
+                <Slider
+                  min={4}
+                  max={32}
+                  step={4}
+                  value={[melodyDuration]}
+                  onValueChange={values => setMelodyDuration(values[0])}
                 />
               </div>
             </TabsContent>
@@ -2166,6 +2455,8 @@ export function AIGenerationPanel({
                     <>
                       <Sparkles size={16} className="mr-2" />
                       Generate {activeTab === 'music' ? 'Music' : 
+                               activeTab === 'drums' ? 'Drums' :
+                               activeTab === 'melody' ? 'Melody' :
                                activeTab === 'vocal' ? 'Vocals' : 
                                activeTab === 'speech' ? 'Speech' : 'SFX'}
                     </>
@@ -2264,6 +2555,8 @@ export function AIGenerationPanel({
                         <div>
                           <div className="flex items-center space-x-2">
                             {item.type === 'music' && <Music size={14} className="text-blue-400" />}
+                            {item.type === 'drums' && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-400"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="8" x2="12" y2="4"/><line x1="16" y1="12" x2="20" y2="12"/><line x1="12" y1="16" x2="12" y2="20"/><line x1="8" y1="12" x2="4" y2="12"/></svg>}
+                            {item.type === 'melody' && <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-cyan-400"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>}
                             {item.type === 'vocal' && <Mic size={14} className="text-purple-400" />}
                             {item.type === 'speech' && <MessageSquare size={14} className="text-green-400" />}
                             {item.type === 'sfx' && <Wand2 size={14} className="text-yellow-400" />}
