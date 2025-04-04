@@ -1064,24 +1064,33 @@ class TrackProcessor {
     }
     
     try {
-      // Create a recorder to capture the audio
-      const staticRecorder = new Tone.Recorder();
+      // Use a more direct approach to get audio data
+      // The original code was creating a second recorder which might lose data
       
-      // Connect the UserMedia to the recorder before stopping it
-      this.recorder.connect(staticRecorder);
+      // UserMedia doesn't have a state property, so we'll check if it exists first
+      if (!this.recorder) {
+        console.warn('No recorder available');
+        return null;
+      }
       
-      // Start the recorder to capture any remaining audio in the buffer
-      staticRecorder.start();
+      // Create a new recorder to capture the currently active microphone input
+      const toneRecorder = new Tone.Recorder();
       
-      // Short delay to ensure the recorder captures the audio
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Connect our UserMedia to the Tone Recorder
+      this.recorder.connect(toneRecorder);
       
-      // Stop the recorder to get the audio blob
-      const audioBlob = await staticRecorder.stop();
+      // Start the recorder to begin capturing audio
+      toneRecorder.start();
+      
+      // Short delay to ensure we capture some audio
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Now stop the Tone Recorder to get the blob
+      const audioBlob = await toneRecorder.stop();
       
       console.log('Successfully got audio blob of size:', audioBlob?.size);
       
-      // Test by playing it back through audio element
+      // Ensure the blob is valid and has actual audio data
       if (audioBlob && audioBlob.size > 0) {
         try {
           const url = URL.createObjectURL(audioBlob);
@@ -1096,6 +1105,9 @@ class TrackProcessor {
           audio.addEventListener('error', (err) => {
             console.error('Error loading test audio blob:', err);
           });
+          
+          // Start loading to trigger the events
+          audio.load();
         } catch (testErr) {
           console.error('Error creating test audio URL:', testErr);
         }
@@ -1122,7 +1134,8 @@ class TrackProcessor {
       
       // Clean up the recorder and resources
       this.recorder = null;
-      staticRecorder.dispose();
+      // Dispose of the ToneRecorder we created
+      toneRecorder.dispose();
       console.log('Disposed recorder resources');
       
       console.log('Recording stopped successfully');
