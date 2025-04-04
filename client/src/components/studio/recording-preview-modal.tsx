@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { WaveformVisualizer } from '@/components/ui/waveform-visualizer';
-import { Check, Trash2, Play, Pause, Save, Undo } from 'lucide-react';
+import { Check, Trash2, Play, Pause, Save, Undo, Sparkles } from 'lucide-react';
 import { AudioProcessor } from '@/lib/audioProcessor';
 import { useToast } from '@/hooks/use-toast';
 
@@ -20,7 +21,14 @@ interface RecordingPreviewModalProps {
   waveform?: number[];
   duration: number;
   onDiscard: () => void;
-  onSave: (name: string, effects: { reverb: number; delay: number }) => void;
+  onSave: (name: string, effects: { 
+    reverb: number; 
+    delay: number;
+    aiEnhanced: boolean;
+    isolateVocals: boolean;
+    clarity: number;
+    noiseSuppression: boolean;
+  }) => void;
 }
 
 export function RecordingPreviewModal({
@@ -39,6 +47,11 @@ export function RecordingPreviewModal({
   const [playbackPosition, setPlaybackPosition] = useState(0);
   const [reverb, setReverb] = useState(0.3);
   const [delay, setDelay] = useState(0.2);
+  const [aiEnhanced, setAiEnhanced] = useState(false);
+  const [isolateVocals, setIsolateVocals] = useState(false);
+  const [clarity, setClarity] = useState(0.5);
+  const [noiseSuppression, setNoiseSuppression] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const playbackRef = useRef<number | null>(null);
   const { toast } = useToast();
 
@@ -294,7 +307,14 @@ export function RecordingPreviewModal({
   // Handle save
   const handleSave = () => {
     stopPlayback();
-    onSave(recordingName, { reverb, delay });
+    onSave(recordingName, { 
+      reverb, 
+      delay,
+      aiEnhanced,
+      isolateVocals,
+      clarity,
+      noiseSuppression
+    });
     toast({
       title: "Recording Saved",
       description: "Your recording has been added to the arrangement",
@@ -331,7 +351,7 @@ export function RecordingPreviewModal({
             playbackPosition={playbackPosition}
             responsive
             gain={1.5}
-            onPositionClick={(position) => {
+            onPositionClick={(position: number) => {
               setPlaybackPosition(position);
               // Restart playback from this position
               if (isPlaying) {
@@ -405,6 +425,101 @@ export function RecordingPreviewModal({
                 />
               </div>
             </div>
+            
+            {/* AI Enhancement Section */}
+            <div className="mt-4 border-t border-gray-800 pt-2">
+              <Label className="block mb-1 flex items-center">
+                <Sparkles className="w-4 h-4 text-purple-400 mr-1" />
+                <span className="text-purple-300">AI Enhancement</span>
+              </Label>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                <div className="flex items-center justify-between space-x-2 rounded-md bg-gray-800/50 p-2">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                    <Label htmlFor="ai-enhance" className="text-sm font-normal">
+                      AI Enhance
+                    </Label>
+                  </div>
+                  <Switch
+                    id="ai-enhance"
+                    checked={aiEnhanced}
+                    onCheckedChange={setAiEnhanced}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between space-x-2 rounded-md bg-gray-800/50 p-2">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                    </svg>
+                    <Label htmlFor="isolate-vocals" className="text-sm font-normal">
+                      Isolate Vocals
+                    </Label>
+                  </div>
+                  <Switch
+                    id="isolate-vocals"
+                    checked={isolateVocals}
+                    onCheckedChange={setIsolateVocals}
+                  />
+                </div>
+                
+                <div className="space-y-1">
+                  <Label htmlFor="clarity" className="flex justify-between text-sm">
+                    <span>Clarity</span>
+                    <span className="text-gray-400">{Math.round(clarity * 100)}%</span>
+                  </Label>
+                  <Slider
+                    id="clarity"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={[clarity]}
+                    onValueChange={(value) => setClarity(value[0])}
+                    className="w-full"
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between space-x-2 rounded-md bg-gray-800/50 p-2">
+                  <div className="flex items-center space-x-2">
+                    <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15.536a5 5 0 001.414-9.9m1.414 0a9 9 0 000 12.728" />
+                    </svg>
+                    <Label htmlFor="noise-suppression" className="text-sm font-normal">
+                      Noise Suppression
+                    </Label>
+                  </div>
+                  <Switch
+                    id="noise-suppression"
+                    checked={noiseSuppression}
+                    onCheckedChange={setNoiseSuppression}
+                  />
+                </div>
+              </div>
+              
+              {(aiEnhanced || isolateVocals) && !isProcessing && (
+                <div className="mt-2 p-2 rounded-md bg-purple-900/20 border border-purple-500/30 text-xs text-purple-200">
+                  <div className="flex items-center">
+                    <svg className="w-4 h-4 mr-1 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    AI enhancement will be applied when you add to track
+                  </div>
+                </div>
+              )}
+              
+              {isProcessing && (
+                <div className="mt-2 p-2 rounded-md bg-purple-900/20 border border-purple-500/30 text-purple-200 animate-pulse flex items-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-purple-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing audio with AI...
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -426,6 +541,10 @@ export function RecordingPreviewModal({
                 // Reset effects
                 setReverb(0.3);
                 setDelay(0.2);
+                setAiEnhanced(false);
+                setIsolateVocals(false);
+                setClarity(0.5);
+                setNoiseSuppression(false);
               }}
               className="w-full sm:w-auto"
             >
