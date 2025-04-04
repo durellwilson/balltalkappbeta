@@ -292,16 +292,11 @@ export function RecordingPreviewModal({
     setIsPlaying(false);
   };
 
-  // Handle discard with confirmation
+  // Handle discard without confirmation for better UX flow
   const handleDiscard = () => {
-    if (window.confirm('Are you sure you want to discard this recording? This action cannot be undone.')) {
-      stopPlayback();
-      onDiscard();
-      toast({
-        title: "Recording Discarded",
-        description: "Your recording has been deleted",
-      });
-    }
+    stopPlayback();
+    onDiscard();
+    // The toast is now shown in the parent component after modal is closed
   };
 
   // Handle save
@@ -315,10 +310,7 @@ export function RecordingPreviewModal({
       clarity,
       noiseSuppression
     });
-    toast({
-      title: "Recording Saved",
-      description: "Your recording has been added to the arrangement",
-    });
+    // Toast is now shown in the parent component after processing is complete
   };
 
   return (

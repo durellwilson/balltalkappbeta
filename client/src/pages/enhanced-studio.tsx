@@ -2629,10 +2629,17 @@ const EnhancedStudio: React.FC = () => {
             URL.revokeObjectURL(recordingPreviewData.audioUrl);
           }
           setRecordingPreviewData({duration: 0, waveform: []});
-          toast({
-            title: "Recording Discarded",
-            description: "Your recording has been deleted"
-          });
+          
+          // Close the modal first before showing the toast
+          setShowRecordingPreviewModal(false);
+          
+          // Show notification after modal is closed
+          setTimeout(() => {
+            toast({
+              title: "Recording Discarded",
+              description: "Your recording has been deleted"
+            });
+          }, 100);
         }}
         onSave={(name, effects) => {
           console.log("Saving recording with data:", {
@@ -2642,6 +2649,9 @@ const EnhancedStudio: React.FC = () => {
             duration: recordingPreviewData.duration,
             waveformLength: recordingPreviewData.waveform?.length || 0
           });
+          
+          // Close the modal first before processing
+          setShowRecordingPreviewModal(false);
           
           // Check if we have either a blob or buffer to work with
           if (!recordingPreviewData.buffer && !recordingPreviewData.audioBlob) {
