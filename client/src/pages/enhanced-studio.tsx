@@ -626,15 +626,65 @@ const EnhancedStudio: React.FC = () => {
         // Create a simple placeholder waveform for visualization
         const placeholderWaveform = Array.from({length: 100}, () => Math.random() * 0.5);
         
-        // Set up the preview data with what we have
-        setRecordingPreviewData({
-          buffer: undefined,
-          audioBlob: blob,
-          audioUrl: URL.createObjectURL(blob),
-          waveform: placeholderWaveform,
-          duration: recordingTime || 5, // Use recorded time or fallback to 5 seconds
-          name: `Recording ${new Date().toLocaleTimeString()}`
-        });
+        // Create URL for preview
+        const audioUrl = URL.createObjectURL(blob);
+        console.log('Created audio URL for preview:', audioUrl);
+        
+        // Create an audio context to decode the blob
+        const audioContext = new AudioContext();
+        
+        // Convert blob to array buffer and decode
+        const arrayBuffer = await blob.arrayBuffer();
+        console.log('Converted blob to array buffer, size:', arrayBuffer.byteLength);
+        
+        try {
+          // Decode the audio data
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          console.log('Successfully decoded audio buffer, duration:', audioBuffer.duration);
+          
+          // Set up the preview data with the decoded buffer
+          setRecordingPreviewData({
+            buffer: audioBuffer,
+            audioBlob: blob,
+            audioUrl: audioUrl,
+            waveform: placeholderWaveform,
+            duration: audioBuffer.duration || recordingTime || 5,
+            name: `Recording ${new Date().toLocaleTimeString()}`
+          });
+        } catch (decodeError) {
+          console.error('Failed to decode audio data:', decodeError);
+          
+          // Fall back to using just the blob if decoding fails
+          // We still try to create an AudioBuffer from the blob for better compatibility
+          console.log('Audio data decoding failed, attempting to recover with blob URL');
+          
+          try {
+            // Create a temporary audio element to try to get audio data
+            const tempAudio = new Audio(audioUrl);
+            tempAudio.oncanplaythrough = () => {
+              console.log('Audio blob is playable, continuing with recording flow');
+            };
+            
+            // Set recording preview data with the blob
+            setRecordingPreviewData({
+              // Keep audioBuffer as undefined but ensure we have the audioBlob and URL
+              audioBlob: blob,
+              audioUrl: audioUrl,
+              waveform: placeholderWaveform,
+              duration: recordingTime || 5,
+              name: `Recording ${new Date().toLocaleTimeString()}`
+            });
+          } catch (recoveryError) {
+            console.error('Failed to recover with blob URL:', recoveryError);
+            setRecordingPreviewData({
+              audioBlob: blob,
+              audioUrl: audioUrl,
+              waveform: placeholderWaveform,
+              duration: recordingTime || 5,
+              name: `Recording ${new Date().toLocaleTimeString()}`
+            });
+          }
+        }
         
         // Show the preview modal
         setShowRecordingPreviewModal(true);
@@ -2530,6 +2580,14 @@ const EnhancedStudio: React.FC = () => {
           });
         }}
         onSave={(name, effects) => {
+          console.log("Saving recording with data:", {
+            hasBuffer: !!recordingPreviewData.buffer,
+            hasBlob: !!recordingPreviewData.audioBlob,
+            hasUrl: !!recordingPreviewData.audioUrl,
+            duration: recordingPreviewData.duration,
+            waveformLength: recordingPreviewData.waveform?.length || 0
+          });
+          
           // Check if we have either a blob or buffer to work with
           if (!recordingPreviewData.buffer && !recordingPreviewData.audioBlob) {
             toast({

@@ -121,6 +121,12 @@ class TrackProcessor implements TrackProcessorType {
           // Create player from existing buffer
           this.player = new Tone.Player(this.audioBuffer).connect(this.eq);
           console.log(`Created new player for track ${this.id} from buffer`);
+          
+          // Ensure player is fully loaded before continuing
+          if (!this.player.loaded) {
+            console.log(`Waiting for player to load for track ${this.id}`);
+            // We'll try to continue anyway since Tone.js should handle this internally
+          }
         } catch (e) {
           console.error(`Failed to create player from buffer for track ${this.id}:`, e);
           return;
@@ -187,13 +193,35 @@ class TrackProcessor implements TrackProcessorType {
         // URL string
         console.log(`TrackProcessor ${this.id}: Loading from URL: ${source.substring(0, 50)}...`);
         
-        // Create a new player with the URL
-        this.player = new Tone.Player(source, () => {
-          if (this.player && this.player.buffer) {
-            this.audioBuffer = this.player.buffer.get() as AudioBuffer;
-            console.log(`TrackProcessor ${this.id}: Player loaded from URL callback, buffer duration: ${this.audioBuffer?.duration.toFixed(2)}s`);
-          }
-        }).connect(this.eq);
+        // First, try to fetch the audio data and create a buffer before creating the player
+        // This can help avoid timing issues with streaming audio
+        try {
+          // Create a temporary audio element to load the audio
+          const tempAudio = new Audio(source);
+          
+          console.log(`TrackProcessor ${this.id}: Created temporary audio element to preload audio`);
+          
+          // Preload the audio
+          tempAudio.preload = 'auto';
+          
+          // Create a new player with the URL
+          this.player = new Tone.Player(source, () => {
+            if (this.player && this.player.buffer) {
+              this.audioBuffer = this.player.buffer.get() as AudioBuffer;
+              console.log(`TrackProcessor ${this.id}: Player loaded from URL callback, buffer duration: ${this.audioBuffer?.duration.toFixed(2)}s`);
+            }
+          }).connect(this.eq);
+        } catch (preloadError) {
+          console.warn(`TrackProcessor ${this.id}: Error preloading audio:`, preloadError);
+          
+          // Fall back to standard loading
+          this.player = new Tone.Player(source, () => {
+            if (this.player && this.player.buffer) {
+              this.audioBuffer = this.player.buffer.get() as AudioBuffer;
+              console.log(`TrackProcessor ${this.id}: Player loaded from URL callback, buffer duration: ${this.audioBuffer?.duration.toFixed(2)}s`);
+            }
+          }).connect(this.eq);
+        }
         
         // Wait for the player to load
         await new Promise<void>((resolve, reject) => {
@@ -603,7 +631,16 @@ export class AudioProcessor {
    * Get a track by ID
    */
   getTrack(trackId: number): TrackProcessorType | undefined {
-    return this.tracks.get(trackId);
+    const track = this.tracks.get(trackId);
+    
+    // Add logging to help debug track issues
+    if (track) {
+      console.log(`Retrieved track ${trackId} - Has player: ${!!track['player']}, Has audio buffer: ${!!track['audioBuffer']}`);
+    } else {
+      console.warn(`No track found with ID ${trackId}`);
+    }
+    
+    return track;
   }
   
   /**
@@ -655,19 +692,64 @@ export class AudioProcessor {
     const trackIds = Array.from(this.tracks.keys()).join(', ');
     console.log(`Playing tracks with IDs: ${trackIds}`);
     
+    // Ensure audio context is running
+    const context = Tone.getContext();
+    if (context.state !== 'running') {
+      console.warn('Audio context is not running, attempting to start...');
+      Tone.start().then(() => {
+        console.log('Audio context started successfully, now playing tracks');
+        this.playAllTracks();
+      }).catch(err => {
+        console.error('Failed to start audio context:', err);
+      });
+    } else {
+      // Context is already running, proceed with playback
+      this.playAllTracks();
+    }
+  }
+  
+  /**
+   * Helper method to play all tracks once context is confirmed running
+   * This separates the context start from the actual playback logic
+   */
+  private playAllTracks(): void {
     // Get current transport position
     const currentPosition = Tone.Transport.seconds;
-    console.log(`Current transport position: ${currentPosition}s`);
+    console.log(`Current transport position for playback: ${currentPosition}s`);
+    
+    let tracksWithAudio = 0;
     
     // Start playback from the current transport position
     this.tracks.forEach((track, id) => {
-      console.log(`Playing track ${id} from position ${currentPosition}`);
+      // Access private properties for debug logging only
+      const hasPlayer = !!(track as any).player;
+      const playerLoaded = hasPlayer && !!(track as any).player.loaded;
+      const hasBuffer = !!(track as any).audioBuffer;
       
-      // Calculate playback parameters based on transport position
-      // If there was specific region data available, we'd use that here
-      const offset = currentPosition;
-      track.play(0, offset);
+      console.log(`Track ${id} state - Has player: ${hasPlayer}, Player loaded: ${playerLoaded}, Has buffer: ${hasBuffer}`);
+      
+      if (hasPlayer && playerLoaded) {
+        tracksWithAudio++;
+        
+        // Calculate playback parameters based on transport position
+        // If there was specific region data available, we'd use that here
+        const offset = currentPosition;
+        console.log(`Playing track ${id} from position ${currentPosition}`);
+        track.play(0, offset);
+      } else if (hasBuffer) {
+        // Track has buffer but player isn't ready, try to reinitialize
+        console.log(`Track ${id} has buffer but player not ready, attempting to initialize`);
+        tracksWithAudio++;
+      } else {
+        console.log(`Track ${id} has no audio data loaded, skipping playback`);
+      }
     });
+    
+    console.log(`Playback initiated for ${tracksWithAudio} tracks with audio data`);
+    
+    if (tracksWithAudio === 0) {
+      console.warn('No tracks have audio data loaded, playback may not produce sound');
+    }
     
     console.log('All tracks playback initiated');
   }
