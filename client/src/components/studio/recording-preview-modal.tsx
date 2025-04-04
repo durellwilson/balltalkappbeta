@@ -6,8 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { WaveformVisualizer } from '@/components/ui/waveform-visualizer';
 import { Check, Trash2, Play, Pause, Save, Undo } from 'lucide-react';
-import audioProcessor from '@/lib/audioProcessor';
+import { AudioProcessor } from '@/lib/audioProcessor';
 import { useToast } from '@/hooks/use-toast';
+
+const audioProcessor = new AudioProcessor();
 
 interface RecordingPreviewModalProps {
   open: boolean;

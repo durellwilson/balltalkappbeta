@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
-import audioProcessor from '@/lib/audioProcessor';
+import { AudioProcessor } from '@/lib/audioProcessor';
+const audioProcessor = new AudioProcessor();
 
 // Helper function to format time in MM:SS format
 const formatTime = (timeInSeconds: number): string => {
@@ -111,7 +112,7 @@ const WaveformVisualizer: React.FC<WaveformVisualizerProps> = ({
       } else if (trackId !== undefined) {
         const track = audioProcessor.getTrack(trackId);
         if (track) {
-          waveformData = track.getFullWaveform();
+          waveformData = track.getWaveform();
         }
       }
     }

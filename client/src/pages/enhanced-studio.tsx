@@ -97,7 +97,8 @@ import { ConfirmationDialog } from '@/components/studio/confirmation-dialog';
 
 // Hooks and Utils
 import { useToast } from '@/hooks/use-toast';
-import audioProcessor from '@/lib/audioProcessor';
+import { AudioProcessor } from '@/lib/audioProcessor';
+const audioProcessor = new AudioProcessor();
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { useStudioCollaboration } from '@/hooks/use-studio-collaboration';
@@ -939,7 +940,7 @@ const EnhancedStudio: React.FC = () => {
     // Update audio processor
     const track = audioProcessor.getTrack(id);
     if (track) {
-      track.setMuted(muted);
+      track.setMute(muted);
     }
   };
   
@@ -960,7 +961,7 @@ const EnhancedStudio: React.FC = () => {
         if (otherTrack.id !== id && !otherTrack.isSoloed) {
           const track = audioProcessor.getTrack(otherTrack.id);
           if (track) {
-            track.setMuted(true);
+            track.setMute(true);
           }
         }
       });
@@ -974,7 +975,7 @@ const EnhancedStudio: React.FC = () => {
           if (otherTrack.id !== id && !otherTrack.isMuted) {
             const track = audioProcessor.getTrack(otherTrack.id);
             if (track) {
-              track.setMuted(false);
+              track.setMute(false);
             }
           }
         });

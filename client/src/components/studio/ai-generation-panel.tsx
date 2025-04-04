@@ -1187,7 +1187,7 @@ export function AIGenerationPanel({
     // Ensure audio context is started from user interaction
     try {
       await import('@/lib/audioProcessor').then(module => {
-        const audioProcessor = module.default;
+        const audioProcessor = new module.AudioProcessor();
         return audioProcessor.ensureAudioContextRunning();
       });
     } catch (error) {
@@ -2560,7 +2560,7 @@ export function AIGenerationPanel({
                       // Ensure audio context is started from user interaction
                       try {
                         await import('@/lib/audioProcessor').then(module => {
-                          const audioProcessor = module.default;
+                          const audioProcessor = new module.AudioProcessor();
                           return audioProcessor.ensureAudioContextRunning();
                         });
                       } catch (error) {
@@ -2600,7 +2600,7 @@ export function AIGenerationPanel({
                       // Ensure audio context is started from user interaction
                       try {
                         await import('@/lib/audioProcessor').then(module => {
-                          const audioProcessor = module.default;
+                          const audioProcessor = new module.AudioProcessor();
                           return audioProcessor.ensureAudioContextRunning();
                         });
                       } catch (error) {
