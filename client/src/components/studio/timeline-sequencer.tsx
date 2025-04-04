@@ -217,18 +217,21 @@ export function TimelineSequencer({
     // Prevent any time jumps outside permissible bounds
     onTimeChange(Math.max(0, Math.min(duration, newTime)));
     
-    // Auto-scroll if the cursor is near the edges
+    // Auto-scroll if the cursor is near the edges - improved scrolling behavior
     const containerWidth = containerRef.current.clientWidth;
     const edgeThreshold = 50; // pixels from edge to trigger scroll
+    const scrollSpeed = 10; // pixels per step
     
     if (e.clientX - rect.left < edgeThreshold) {
-      // Near left edge, scroll left
-      containerRef.current.scrollLeft = Math.max(0, scrollOffset - 15);
+      // Near left edge, scroll left with smoother behavior
+      const scrollAmount = Math.ceil((edgeThreshold - (e.clientX - rect.left)) / 10) * scrollSpeed;
+      containerRef.current.scrollLeft = Math.max(0, scrollOffset - scrollAmount);
     } else if (rect.right - e.clientX < edgeThreshold) {
-      // Near right edge, scroll right
+      // Near right edge, scroll right with smoother behavior
+      const scrollAmount = Math.ceil((edgeThreshold - (rect.right - e.clientX)) / 10) * scrollSpeed;
       containerRef.current.scrollLeft = Math.min(
         timelineWidth - containerWidth,
-        scrollOffset + 15
+        scrollOffset + scrollAmount
       );
     }
   };

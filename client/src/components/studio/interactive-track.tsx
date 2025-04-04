@@ -9,8 +9,9 @@ import { WaveformVisualizer } from '@/components/ui/waveform-visualizer';
 import { SpectrumAnalyzer } from '@/components/ui/spectrum-analyzer';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import audioProcessor from '@/lib/audioProcessor';
+import { AudioProcessor } from '@/lib/audioProcessor';
 
+// Import necessary modules from lucide-react
 import {
   Volume2,
   VolumeX,
@@ -36,6 +37,9 @@ import {
   Sparkles,
   Palette
 } from 'lucide-react';
+
+// Create an instance of AudioProcessor to use in this component
+const audioProcessor = new AudioProcessor();
 
 interface InteractiveTrackProps {
   id: number;
@@ -106,7 +110,8 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
 
   // Effect to update processor settings when volume or pan changes
   useEffect(() => {
-    const track = audioProcessor.getTrack(id);
+    // Get track from the AudioProcessor instance
+    const track = audioProcessor?.getTrack?.(id);
     if (track) {
       track.setVolume(volume);
       track.setPan(pan);
@@ -121,9 +126,9 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
       const file = e.target.files[0];
       
       // Get track processor and load audio file
-      const track = audioProcessor.getTrack(id);
+      const track = audioProcessor?.getTrack?.(id);
       if (track) {
-        track.loadAudioFile(file);
+        track.loadAudio?.(file);
       }
       
       // Call parent handler if provided
@@ -137,18 +142,18 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
   const handleRecordToggle = () => {
     if (isRecording) {
       setIsRecording(false);
-      const track = audioProcessor.getTrack(id);
+      const track = audioProcessor?.getTrack?.(id);
       if (track) {
-        track.stopRecording();
+        track.stopRecording?.();
       }
       if (onRecordStop) {
         onRecordStop(id);
       }
     } else {
       setIsRecording(true);
-      const track = audioProcessor.getTrack(id);
+      const track = audioProcessor?.getTrack?.(id);
       if (track) {
-        track.startRecording();
+        track.startRecording?.();
       }
       if (onRecordStart) {
         onRecordStart(id);
@@ -160,18 +165,18 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
   const handlePlayToggle = () => {
     if (isPlaying) {
       setIsPlaying(false);
-      const track = audioProcessor.getTrack(id);
+      const track = audioProcessor?.getTrack?.(id);
       if (track) {
-        track.stop();
+        track.stop?.();
       }
       if (onStop) {
         onStop(id);
       }
     } else {
       setIsPlaying(true);
-      const track = audioProcessor.getTrack(id);
+      const track = audioProcessor?.getTrack?.(id);
       if (track) {
-        track.play();
+        track.play?.();
       }
       if (onPlay) {
         onPlay(id);
@@ -210,9 +215,9 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
 
   // Export track audio as WAV
   const handleExportTrack = async () => {
-    const track = audioProcessor.getTrack(id);
+    const track = audioProcessor?.getTrack?.(id);
     if (track) {
-      const blob = await track.exportAudio();
+      const blob = await track.exportAudio?.() || null;
       if (blob) {
         // Create download link
         const url = URL.createObjectURL(blob);
@@ -314,6 +319,7 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
                   isMuted ? "text-red-500" : "text-gray-400 hover:text-white"
                 )}
                 onClick={() => onMuteToggle && onMuteToggle(id, !isMuted)}
+                title={isMuted ? "Unmute Track" : "Mute Track"}
               >
                 {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </Button>
@@ -326,6 +332,7 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
                   isSoloed ? "text-yellow-500" : "text-gray-400 hover:text-white"
                 )}
                 onClick={() => onSoloToggle && onSoloToggle(id, !isSoloed)}
+                title={isSoloed ? "Unsolo Track" : "Solo This Track (mutes all others)"}
               >
                 <span className="text-xs font-bold">S</span>
               </Button>
@@ -337,7 +344,7 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
                   "h-7 w-7 text-purple-400 hover:text-purple-300"
                 )}
                 onClick={() => onAiEnhance && onAiEnhance(id)}
-                title="AI Enhance"
+                title="AI Enhance Track"
               >
                 <Sparkles size={16} />
               </Button>
@@ -347,13 +354,19 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
                 size="icon"
                 className="h-7 w-7"
                 onClick={() => setExpanded(!expanded)}
+                title={expanded ? "Collapse Track" : "Expand Track"}
               >
                 {expanded ? <Minimize size={16} /> : <Maximize size={16} />}
               </Button>
               
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-7 w-7"
+                    title="More Track Options"
+                  >
                     <MoreHorizontal size={16} />
                   </Button>
                 </PopoverTrigger>
@@ -364,6 +377,7 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
                       size="sm"
                       className="justify-start h-8"
                       onClick={() => fileInputRef.current?.click()}
+                      title="Upload an audio file to this track"
                     >
                       <Upload size={14} className="mr-2" />
                       <span>Load Audio</span>
@@ -374,6 +388,7 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
                       size="sm"
                       className="justify-start h-8"
                       onClick={handleRecordToggle}
+                      title={isRecording ? "Stop the current recording" : "Record new audio to this track"}
                     >
                       <Mic size={14} className="mr-2" />
                       <span>{isRecording ? 'Stop Recording' : 'Record'}</span>
@@ -384,6 +399,7 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
                       size="sm"
                       className="justify-start h-8"
                       onClick={handleExportTrack}
+                      title="Export this track as a WAV file"
                     >
                       <Download size={14} className="mr-2" />
                       <span>Export as WAV</span>
@@ -398,6 +414,7 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
                           visualizationType === 'waveform' ? 'spectrum' : 'waveform'
                         )
                       }}
+                      title={`Switch to ${visualizationType === 'waveform' ? 'spectrum' : 'waveform'} visualization`}
                     >
                       {visualizationType === 'waveform' ? 
                         <BarChart3 size={14} className="mr-2" /> : 
@@ -411,6 +428,7 @@ const InteractiveTrack: React.FC<InteractiveTrackProps> = ({
                       size="sm"
                       className="justify-start h-8 text-purple-400 hover:text-purple-300 hover:bg-purple-950"
                       onClick={() => onAiEnhance && onAiEnhance(id)}
+                      title="Open AI enhancement options for this track"
                     >
                       <Sparkles size={14} className="mr-2" />
                       <span>AI Enhance</span>

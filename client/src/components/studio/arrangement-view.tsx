@@ -212,16 +212,8 @@ export function ArrangementView({
       if (dragData.type === 'move') {
         let newStart = snapTime(dragData.initialStart + timeDelta);
         
-        // Find target track based on mouse position
-        const mouseY = e.clientY;
+        // Keep the track the same - disable vertical dragging as requested
         let targetTrackId = dragData.initialTrackId;
-        
-        trackElements.forEach((trackElement, index) => {
-          const rect = trackElement.getBoundingClientRect();
-          if (mouseY >= rect.top && mouseY <= rect.bottom) {
-            targetTrackId = tracks[index]?.id ?? targetTrackId;
-          }
-        });
         
         // Calculate duration and ensure we don't go negative
         const duration = dragData.initialEnd - dragData.initialStart;
@@ -229,7 +221,7 @@ export function ArrangementView({
         
         const selectedRegion = regions.find(r => r.id === dragData.regionId);
         if (selectedRegion) {
-          if (newStart !== selectedRegion.start || targetTrackId !== selectedRegion.trackId) {
+          if (newStart !== selectedRegion.start) {
             onRegionMove(dragData.regionId, targetTrackId, newStart);
           }
         }

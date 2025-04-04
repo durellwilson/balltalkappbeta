@@ -1,115 +1,148 @@
 /**
- * Collection of type definitions for audio processing functionality
+ * Type definitions for the audio processing system
  */
 
-// Audio engine types
-export interface AudioTrigger {
-  id: string;
-  label: string;
-  icon: string;
-  action: string;
-}
-
-export interface AudioTrackOptions {
-  volume?: number;
-  pan?: number;
-  muted?: boolean;
-  soloed?: boolean;
-  effects?: AudioEffect[];
-}
-
-export interface AudioEffect {
-  id: string;
-  type: string;
+/**
+ * Represents an audio track in the system
+ */
+export interface Track {
+  id: number;
   name: string;
-  enabled: boolean;
-  parameters: {
-    [key: string]: number | boolean | string;
-  };
+  type: 'audio' | 'instrument' | 'vocal' | 'drum' | 'mix';
+  volume: number;
+  pan: number;
+  isMuted: boolean;
+  isSoloed: boolean;
+  isArmed?: boolean;
+  color?: string;
+  createdBy?: string;
+  collaborator?: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
+  creationMethod?: 'recorded' | 'uploaded' | 'ai-generated';
 }
 
-export interface RecordingOptions {
-  countIn?: boolean;
-  countInBeats?: number;
-  monitoring?: boolean;
-  overdub?: boolean;
-  loop?: boolean;
-  metronome?: boolean;
-  autoStop?: boolean;
-  autoStopAfter?: number;
+/**
+ * Represents an audio processor track
+ */
+export interface TrackProcessor {
+  id: number;
+  setVolume: (volume: number) => void;
+  setPan: (pan: number) => void;
+  setMuted: (muted: boolean, storeState?: boolean) => void;
+  setSolo: (soloed: boolean) => void;
+  isMuted?: boolean;
+  isSoloed?: boolean;
+  play: (startTime?: number, offset?: number, duration?: number) => void;
+  stop: () => void;
+  pause: () => void;
+  startRecording: () => Promise<void>;
+  stopRecording: () => Promise<Blob | null>;
+  loadAudio: (source: string | File | AudioBuffer) => Promise<void>;
+  exportAudio: () => Promise<Blob | null>;
+  getWaveform: () => number[];
+  connectOutput: (node: any) => void;
+  disconnectFromMaster: () => void;
+  dispose: () => void;
+  getRecordingBuffer?: () => AudioBuffer | null;
+  resetMuteState?: () => void;
 }
 
+/**
+ * Represents an audio region in the timeline
+ */
 export interface AudioRegion {
   id: string;
   trackId: number;
-  start: number;
-  end: number;
-  offset: number;
+  startTime: number;  // in seconds
+  duration: number;   // in seconds
+  offset?: number;    // offset into original audio file, in seconds
+  color?: string;
   name: string;
-  waveform: number[];
-  buffer?: AudioBuffer;
-  file?: string | Blob;
-}
-
-export interface AudioProcessorOptions {
-  sampleRate?: number;
-  channels?: number;
-  bufferSize?: number;
-  latencyHint?: AudioContextLatencyCategory;
-}
-
-export interface TrackProcessorOptions {
-  volume?: number;
-  pan?: number;
+  waveformData?: number[];
   muted?: boolean;
-  soloed?: boolean;
+  loop?: boolean;
+  gain?: number;
+  selected?: boolean;
 }
 
-export interface AudioEnhancementOptions {
-  clarity?: number; // 0-1
-  noiseSuppression?: boolean;
-  bassBoost?: number; // 0-1
-  stereoWidening?: number; // 0-1
-  denoise?: boolean;
-  eq?: boolean;
-  compression?: boolean;
+/**
+ * Effect parameter types
+ */
+export type EffectType = 
+  | 'compressor' 
+  | 'equalizer' 
+  | 'reverb' 
+  | 'delay' 
+  | 'distortion'
+  | 'chorus'
+  | 'tremolo'
+  | 'phaser'
+  | 'limiter'
+  | 'noisegate';
+
+/**
+ * Effect parameter interface
+ */
+export interface EffectParameter {
+  name: string;
+  value: number | string | boolean;
+  min?: number;
+  max?: number;
+  step?: number;
+  options?: string[];
 }
 
-export interface MixerSettings {
-  masterVolume: number;
-  masterPan: number;
-  masterCompression: number;
-  masterLimiter: boolean;
-  masterEq: {
-    low: number;
-    mid: number;
-    high: number;
+/**
+ * Audio effect interface
+ */
+export interface Effect {
+  id: string;
+  type: EffectType;
+  name: string;
+  enabled: boolean;
+  parameters: EffectParameter[];
+}
+
+/**
+ * Project metadata
+ */
+export interface Project {
+  id: string;
+  name: string;
+  bpm: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Collaborator/User representation
+ */
+export interface User {
+  id: string;
+  name: string;
+  color?: string;
+}
+
+/**
+ * Options for file upload
+ */
+export interface FileUploadOptions {
+  targetTrackId?: number | null;
+  createNewTrack: boolean;
+  trackType: 'audio' | 'instrument' | 'vocal' | 'drum' | 'mix';
+  position: 'start' | 'playhead' | 'end';
+  aligned: boolean;
+  allowOverlap: boolean;
+  normalize: boolean;
+  normalizationLevel: number;
+  enhanceAudio?: boolean;
+  enhanceOptions?: {
+    clarity?: number;
+    noiseSuppression?: boolean;
+    bassBoost?: number;
+    stereoWidening?: number;
   };
-  masterReverb: number;
-}
-
-export enum RecordingState {
-  INACTIVE = 'inactive',
-  PREPARING = 'preparing',
-  COUNT_IN = 'countIn',
-  RECORDING = 'recording',
-  PAUSED = 'paused',
-  STOPPING = 'stopping',
-  PROCESSING = 'processing'
-}
-
-export enum PlaybackState {
-  STOPPED = 'stopped',
-  PLAYING = 'playing',
-  PAUSED = 'paused'
-}
-
-export interface AudioAnalyzerResult {
-  waveform: Float32Array;
-  spectrum: Float32Array;
-  rms: number;
-  peak: number;
-  db: number;
-  timeDomainData: Float32Array;
-  frequencyData: Uint8Array;
 }

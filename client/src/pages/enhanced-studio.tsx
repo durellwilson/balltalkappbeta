@@ -371,6 +371,24 @@ const EnhancedStudio: React.FC = () => {
     }
   }, [chatMessages]);
   
+  // Handle clicking on a specific time point in a region
+  useEffect(() => {
+    const handleRegionTimeClick = (e: CustomEvent) => {
+      if (e.detail && typeof e.detail.time === 'number') {
+        // Update current time when a region is clicked
+        handleTimeChange(e.detail.time);
+      }
+    };
+    
+    // Add event listener for region time clicks
+    window.addEventListener('region-time-clicked', handleRegionTimeClick as EventListener);
+    
+    // Cleanup
+    return () => {
+      window.removeEventListener('region-time-clicked', handleRegionTimeClick as EventListener);
+    };
+  }, []);
+  
   // Handle initial actions from URL parameters
   useEffect(() => {
     // Wait a bit to ensure audio engine is ready
@@ -940,7 +958,7 @@ const EnhancedStudio: React.FC = () => {
     // Update audio processor
     const track = audioProcessor.getTrack(id);
     if (track) {
-      track.setMute(muted);
+      track.setMuted(muted);
     }
   };
   
@@ -961,7 +979,7 @@ const EnhancedStudio: React.FC = () => {
         if (otherTrack.id !== id && !otherTrack.isSoloed) {
           const track = audioProcessor.getTrack(otherTrack.id);
           if (track) {
-            track.setMute(true);
+            track.setMuted(true);
           }
         }
       });
@@ -975,7 +993,7 @@ const EnhancedStudio: React.FC = () => {
           if (otherTrack.id !== id && !otherTrack.isMuted) {
             const track = audioProcessor.getTrack(otherTrack.id);
             if (track) {
-              track.setMute(false);
+              track.setMuted(false);
             }
           }
         });
@@ -1825,13 +1843,13 @@ const EnhancedStudio: React.FC = () => {
                                   const track = audioProcessor.getTrack(armedTrack.id);
                                   if (track) {
                                     // Get recording data and create waveform
-                                    const buffer = track.getRecordingBuffer();
+                                    const buffer = track.getRecordingBuffer ? track.getRecordingBuffer() : null;
                                     const duration = buffer ? buffer.duration : 0;
                                     const waveform = generateWaveform(buffer || null, 100);
                                     
                                     // Set recording preview data
                                     setRecordingPreviewData({
-                                      buffer,
+                                      buffer: buffer as AudioBuffer | undefined,
                                       duration,
                                       waveform: waveform || []
                                     });

@@ -141,7 +141,25 @@ export function TrackRegion({
       {/* Region content */}
       <div 
         className="h-full px-2 pt-1.5 pb-1 flex flex-col relative z-0"
-        onMouseDown={(e) => !region.locked && onMoveStart(region.id, e)}
+        onMouseDown={(e) => {
+          if (region.locked) return;
+          // Use right mouse button for dragging
+          if (e.button === 0) {
+            onMoveStart(region.id, e);
+          }
+        }}
+        onClick={(e) => {
+          // Calculate position within region for time setting
+          const rect = e.currentTarget.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const percentageIntoRegion = clickX / rect.width;
+          const timePointInRegion = region.start + (percentageIntoRegion * (region.end - region.start));
+          
+          // Dispatch custom event to notify that user clicked on a specific point in time
+          window.dispatchEvent(new CustomEvent('region-time-clicked', {
+            detail: { time: timePointInRegion }
+          }));
+        }}
       >
         {/* Pro-style region header with better typography */}
         <div className="flex items-center justify-between mb-1">
