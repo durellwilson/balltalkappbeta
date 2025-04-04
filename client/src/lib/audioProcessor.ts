@@ -737,9 +737,22 @@ export class AudioProcessor {
         console.log(`Playing track ${id} from position ${currentPosition}`);
         track.play(0, offset);
       } else if (hasBuffer) {
-        // Track has buffer but player isn't ready, try to reinitialize
+        // Track has buffer but player isn't ready, attempt to reinitialize the player
         console.log(`Track ${id} has buffer but player not ready, attempting to initialize`);
-        tracksWithAudio++;
+        try {
+          // Recreate the player from the buffer
+          (track as any).player = new Tone.Player((track as any).audioBuffer).connect((track as any).eq);
+          console.log(`Recreated player for track ${id}, attempting playback again`);
+          
+          // Attempt playback again with recreated player
+          setTimeout(() => {
+            track.play(0, currentPosition);
+          }, 100); // Small delay to ensure player is set up
+          
+          tracksWithAudio++;
+        } catch (error) {
+          console.error(`Failed to reinitialize player for track ${id}:`, error);
+        }
       } else {
         console.log(`Track ${id} has no audio data loaded, skipping playback`);
       }

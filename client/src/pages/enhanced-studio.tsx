@@ -520,6 +520,61 @@ const EnhancedStudio: React.FC = () => {
           audioProcessorTracks: audioProcessor.getTrackIds(),
           regions: regions.map(r => ({ id: r.id, trackId: r.trackId, file: r.file ? 'Has file' : 'No file' }))
         });
+        
+        // Ensure tracks are properly loaded before playback
+        const tracksWithNoAudio = [];
+        let regionsLoaded = false;
+        
+        // Check if we have any tracks with regions that should be played
+        if (regions.length > 0) {
+          for (const region of regions) {
+            const track = audioProcessor.getTrack(region.trackId);
+            
+            if (track) {
+              const hasAudioBuffer = (track as any)['audioBuffer'] !== undefined;
+              const hasPlayer = (track as any)['player'] !== undefined;
+              
+              if (!hasAudioBuffer && region.file) {
+                // If track exists in audio processor but has no audio data
+                // and we have region data, try to load it
+                tracksWithNoAudio.push({
+                  trackId: region.trackId,
+                  file: region.file
+                });
+              } else if (hasAudioBuffer) {
+                regionsLoaded = true;
+              }
+            }
+          }
+        }
+        
+        // If we found tracks that need loading, load them before playing
+        if (tracksWithNoAudio.length > 0) {
+          console.log(`Found ${tracksWithNoAudio.length} tracks without audio loaded, loading now...`);
+          
+          // Create a promise to load all the tracks
+          const loadPromises = tracksWithNoAudio.map(async (trackInfo) => {
+            try {
+              const track = audioProcessor.getTrack(trackInfo.trackId);
+              if (track) {
+                // Try to reload the audio
+                await (track as any).loadAudio(trackInfo.file);
+                console.log(`Reloaded audio for track ${trackInfo.trackId}`);
+                return true;
+              }
+            } catch (error) {
+              console.error(`Failed to load audio for track ${trackInfo.trackId}:`, error);
+            }
+            return false;
+          });
+          
+          // Wait for all tracks to load or timeout after 2 seconds
+          await Promise.race([
+            Promise.all(loadPromises),
+            new Promise(resolve => setTimeout(resolve, 2000))
+          ]);
+        }
+        
         audioProcessor.play();
         setIsPlaying(true);
       }

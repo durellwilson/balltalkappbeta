@@ -1130,6 +1130,7 @@ export function AIGenerationPanel({
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingMessage, setGeneratingMessage] = useState<string>('Generating...');
   const [generatedAudio, setGeneratedAudio] = useState<Blob | null>(null);
+  const [offlineBuffer, setOfflineBuffer] = useState<AudioBuffer | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -1379,6 +1380,9 @@ export function AIGenerationPanel({
           generationSettings.parameters
         );
         
+        // Store the original buffer for fallback use
+        setOfflineBuffer(audioBuffer);
+        
         // Convert AudioBuffer to WAV Blob
         const audioBlob = await audioBufferToWAV(audioBuffer);
         setGeneratedAudio(audioBlob);
@@ -1431,6 +1435,8 @@ export function AIGenerationPanel({
             const decodedBuffer = await audioContext.decodeAudioData(reader.result as ArrayBuffer);
             const waveformData = extractWaveformData(decodedBuffer);
             
+            console.log(`Created high-resolution waveform with ${waveformData.length} points for ${decodedBuffer.duration.toFixed(2)}s audio`);
+            
             // Pass to onGenerateTrack directly
             onGenerateTrack({
               buffer: reader.result as ArrayBuffer,
@@ -1446,10 +1452,64 @@ export function AIGenerationPanel({
             });
           } catch (error) {
             console.error("Error decoding audio data:", error);
+            
+            // Try fallback method with direct buffer
+            try {
+              // If we have the original audio buffer from generation, use it directly
+              if (offlineBuffer) {
+                console.log("Using fallback method with direct offline buffer");
+                const waveformData = extractWaveformData(offlineBuffer);
+                
+                // Re-create WAV blob directly from offline buffer
+                const wavBlob = await audioBufferToWAV(offlineBuffer);
+                const arrayBuffer = await wavBlob.arrayBuffer();
+                
+                onGenerateTrack({
+                  buffer: arrayBuffer,
+                  name: `Generated ${activeTab} - ${new Date().toLocaleTimeString()}`,
+                  type: activeTab === 'drums' ? 'drum' : 'audio',
+                  duration: generationSettings.parameters.duration,
+                  waveform: waveformData,
+                  creationMethod: 'ai-generated'
+                });
+              } else {
+                throw new Error("No offline buffer available for fallback");
+              }
+            } catch (fallbackError) {
+              console.error("Fallback method also failed:", fallbackError);
+              toast({
+                title: "Processing Error",
+                description: "Failed to process the generated audio. Please try again.",
+                variant: "destructive"
+              });
+            }
           }
         };
       } else {
         console.error("No generated audio blob available");
+        
+        // Try using the offline buffer directly if available
+        if (offlineBuffer) {
+          console.log("No blob available but have offline buffer, using it directly");
+          try {
+            const waveformData = extractWaveformData(offlineBuffer);
+            const wavBlob = await audioBufferToWAV(offlineBuffer);
+            const arrayBuffer = await wavBlob.arrayBuffer();
+            
+            onGenerateTrack({
+              buffer: arrayBuffer,
+              name: `Generated ${activeTab} - ${new Date().toLocaleTimeString()}`,
+              type: activeTab === 'drums' ? 'drum' : 'audio',
+              duration: generationSettings.parameters.duration,
+              waveform: waveformData,
+              creationMethod: 'ai-generated'
+            });
+            return;
+          } catch (directBufferError) {
+            console.error("Error using direct offline buffer:", directBufferError);
+          }
+        }
+        
         toast({
           title: "Processing Error",
           description: "There was an issue with the generated audio",
