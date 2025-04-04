@@ -136,25 +136,40 @@ export function RecordingPreviewModal({
 
   // Start playback with effects
   const startPlayback = () => {
-    // If we have an HTML audio element (created from blob), use that
-    if (audioElementRef.current && blobUrl) {
+    // Debug log current state
+    console.log('Starting playback with:', {
+      hasAudioElement: !!audioElementRef.current,
+      hasBlobUrl: !!blobUrl,
+      hasAudioBuffer: !!audioBuffer,
+      hasAudioBlob: !!audioBlob,
+      playbackPosition,
+      duration
+    });
+    
+    // Priority 1: Try to play using HTML Audio element with blob URL
+    if (blobUrl) {
       try {
+        // Create a new audio element if we don't have one
+        if (!audioElementRef.current) {
+          console.log('Creating new audio element with URL:', blobUrl);
+          audioElementRef.current = new Audio(blobUrl);
+        }
+        
         const audioEl = audioElementRef.current;
         
         // Set up event listeners for the audio element
         audioEl.onended = () => {
+          console.log('Audio playback ended');
           setPlaybackPosition(0);
           setIsPlaying(false);
         };
         
-        // Play the audio
+        // Set current time and play
         audioEl.currentTime = playbackPosition;
         audioEl.play()
           .then(() => {
             console.log('Audio playback started successfully');
-            // Apply FX
-            // Note: In a real implementation, we would connect this audio element
-            // to a Web Audio API context and apply effects, but for now we'll just play it
+            // Apply FX in the future by connecting to Web Audio API
           })
           .catch(err => {
             console.error('Error playing audio:', err);
@@ -179,34 +194,66 @@ export function RecordingPreviewModal({
       }
     }
     
-    // Fallback to AudioBuffer playback if we don't have a blob URL
-    if (!audioBuffer) {
-      toast({
-        title: "Playback Error",
-        description: "No audio data available",
-        variant: "destructive"
-      });
-      return;
+    // Priority 2: If we have a blob but no URL, create one and try again
+    else if (audioBlob) {
+      try {
+        const url = URL.createObjectURL(audioBlob);
+        console.log('Created new blob URL from audioBlob:', url);
+        setBlobUrl(url);
+        
+        // Create audio element with the new URL
+        const audioEl = new Audio(url);
+        audioElementRef.current = audioEl;
+        
+        // Set up event listener for when it's ready
+        audioEl.oncanplaythrough = () => {
+          console.log('Audio element can play through, starting playback');
+          startPlayback(); // Recursive call with the new URL set
+        };
+        
+        return;
+      } catch (error) {
+        console.error('Error creating blob URL from audioBlob:', error);
+      }
     }
     
-    // Play the buffer with effects
-    audioProcessor.playBuffer(audioBuffer);
-    
-    setIsPlaying(true);
-    
-    // Update playback position
-    const startTime = Date.now();
-    playbackRef.current = window.setInterval(() => {
-      const elapsed = (Date.now() - startTime) / 1000;
-      if (elapsed >= duration) {
-        // Playback finished
-        setPlaybackPosition(0);
-        setIsPlaying(false);
-        stopPlayback();
+    // Priority 3: Fallback to AudioBuffer playback
+    if (audioBuffer) {
+      console.log('Falling back to AudioBuffer playback');
+      
+      try {
+        // Play the buffer with effects
+        audioProcessor.playBuffer(audioBuffer);
+        
+        setIsPlaying(true);
+        
+        // Update playback position
+        const startTime = Date.now();
+        playbackRef.current = window.setInterval(() => {
+          const elapsed = (Date.now() - startTime) / 1000;
+          if (elapsed >= duration) {
+            // Playback finished
+            console.log('Buffer playback finished');
+            setPlaybackPosition(0);
+            setIsPlaying(false);
+            stopPlayback();
+            return;
+          }
+          setPlaybackPosition(elapsed);
+        }, 30);
+        
         return;
+      } catch (error) {
+        console.error('Error playing audio buffer:', error);
       }
-      setPlaybackPosition(elapsed);
-    }, 30);
+    }
+    
+    // If all methods fail, show error
+    toast({
+      title: "Playback Error",
+      description: "No audio data available for playback",
+      variant: "destructive"
+    });
   };
 
   // Stop playback

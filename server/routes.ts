@@ -1,4 +1,4 @@
-import express, { type Express, type Request, type Response } from "express";
+import express, { type Express, type Request, type Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, hashPassword } from "./auth";
@@ -10,6 +10,7 @@ import Stripe from "stripe";
 import { WebSocketServer } from 'ws';
 import * as Y from 'yjs';
 import { insertTrackSchema, insertMessageSchema, insertStudioSessionSchema } from "@shared/schema";
+import fetch from 'node-fetch';
 
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -699,6 +700,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(userWithoutPassword);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  // AI Generation routes
+  app.post("/api/ai/generate", async (req, res) => {
+    try {
+      // Check if AI API key is available
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(503).json({ message: "AI generation is currently unavailable. Missing API key." });
+      }
+
+      const { type, prompt, parameters } = req.body;
+
+      if (!type || !parameters) {
+        return res.status(400).json({ message: "Type and parameters are required" });
+      }
+
+      console.log(`AI Generation request: ${type}`, { prompt, parameters });
+
+      // Different handling based on generation type
+      let aiResponse;
+      let messageContent;
+
+      // Build OpenAI prompt based on generation type
+      switch (type) {
+        case 'music':
+          messageContent = `Generate a ${parameters.genre} music track with ${parameters.mood} mood, in the key of ${parameters.key} ${parameters.scale}. BPM: ${parameters.tempo}. Duration: ${parameters.duration} seconds. Prompt: ${prompt}`;
+          break;
+        case 'drums':
+          messageContent = `Generate a drum beat in ${parameters.genre} style with complexity level ${parameters.complexity}. BPM: ${parameters.tempo}. Duration: ${parameters.duration} seconds.`;
+          break;
+        case 'melody':
+          messageContent = `Generate a melody in the key of ${parameters.key} ${parameters.scale} with BPM: ${parameters.tempo}. Duration: ${parameters.duration} seconds. Prompt: ${prompt}`;
+          break;
+        case 'vocal':
+          messageContent = `Generate vocal audio in style ${parameters.genre}. Duration: ${parameters.duration} seconds. Prompt: ${prompt}`;
+          break;
+        case 'speech':
+          messageContent = `Generate speech audio using voice ${parameters.model}. Speed: ${parameters.tempo}. Content: ${prompt}`;
+          break;
+        case 'sfx':
+          messageContent = `Generate a sound effect in category ${parameters.genre}. Duration: ${parameters.duration} seconds. Description: ${prompt}`;
+          break;
+        default:
+          return res.status(400).json({ message: "Invalid generation type" });
+      }
+
+      // Call OpenAI API with the appropriate prompt
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: "gpt-4o", // Use the latest model that supports audio generation
+          messages: [
+            {
+              role: "system",
+              content: "You are an AI assistant that helps with audio generation. Provide detailed audio generation instructions."
+            },
+            {
+              role: "user",
+              content: messageContent
+            }
+          ],
+          max_tokens: 1000
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("OpenAI API error:", data);
+        return res.status(500).json({ message: "Error from AI service", error: data });
+      }
+
+      aiResponse = data.choices[0].message.content;
+      
+      // In a real implementation, we would use this response to generate actual audio
+      // For now, we'll just return the text description from OpenAI
+      
+      res.json({
+        success: true,
+        generationType: type,
+        description: aiResponse,
+        // In a real implementation, we'd include a URL to the generated audio file
+        // audioUrl: `/uploads/generated/${filename}.wav`,
+      });
+    } catch (error: any) {
+      console.error("AI generation error:", error);
+      res.status(500).json({ message: "Failed to generate AI content", error: error.message });
     }
   });
 

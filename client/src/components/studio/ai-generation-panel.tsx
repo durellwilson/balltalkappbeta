@@ -1128,6 +1128,7 @@ export function AIGenerationPanel({
   // State
   const [activeTab, setActiveTab] = useState<'music' | 'drums' | 'melody' | 'vocal' | 'speech' | 'sfx' | 'enhance'>('music');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generatingMessage, setGeneratingMessage] = useState<string>('Generating...');
   const [generatedAudio, setGeneratedAudio] = useState<Blob | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
@@ -1336,18 +1337,70 @@ export function AIGenerationPanel({
       }
       
       // Show loading state
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      setGeneratingMessage("Contacting AI service...");
       
-      // Create synthetic audio with Web Audio API based on type
-      const audioBuffer = await generateSyntheticAudio(
-        generationType, 
-        generationDuration, 
-        generationSettings.parameters
-      );
-      
-      // Convert AudioBuffer to MP3 Blob (simulated with WAV for demo)
-      const audioBlob = await audioBufferToWAV(audioBuffer);
-      setGeneratedAudio(audioBlob);
+      try {
+        // Call our backend API which will use OpenAI
+        const response = await fetch('/api/ai/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            type: generationType,
+            prompt: generationSettings.prompt,
+            parameters: generationSettings.parameters
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('AI generation failed:', errorData);
+          toast({
+            title: "AI Generation Failed",
+            description: errorData.message || "Unable to generate audio with AI",
+            variant: "destructive",
+            duration: 5000
+          });
+          setIsGenerating(false);
+          return;
+        }
+        
+        setGeneratingMessage("Processing AI response...");
+        const data = await response.json();
+        console.log('AI generation response:', data);
+        
+        // For now, since we're still building the full audio generation pipeline,
+        // we'll create a synthetic audio that at least gives us something to work with
+        setGeneratingMessage("Creating audio waveform...");
+        const audioBuffer = await generateSyntheticAudio(
+          generationType, 
+          generationDuration, 
+          generationSettings.parameters
+        );
+        
+        // Convert AudioBuffer to WAV Blob
+        const audioBlob = await audioBufferToWAV(audioBuffer);
+        setGeneratedAudio(audioBlob);
+        
+        // Display the AI response description
+        if (data.description) {
+          toast({
+            title: "AI Generation Complete",
+            description: `Generated ${generationType}: ${data.description.substring(0, 100)}...`,
+            duration: 5000
+          });
+        }
+      } catch (error) {
+        console.error('Error during AI generation:', error);
+        toast({
+          title: "AI Generation Error",
+          description: "An unexpected error occurred during AI generation. Please try again.",
+          variant: "destructive",
+          duration: 5000
+        });
+        setIsGenerating(false);
+      }
       
       // Add to history
       const historyItem: HistoryItem = {
@@ -1366,28 +1419,45 @@ export function AIGenerationPanel({
       
       setHistory(prev => [historyItem, ...prev.slice(0, 9)]);
       
-      // Extract waveform data for visualization
-      const waveformData = extractWaveformData(audioBuffer);
-      
-      // Create an ArrayBuffer from the Blob for the callback
+      // Extract waveform data for visualization - with the audioBuffer from the last known successful generation
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const reader = new FileReader();
-      reader.readAsArrayBuffer(audioBlob);
-      reader.onloadend = () => {
-        if (reader.result) {
-          onGenerateTrack({
-            buffer: reader.result as ArrayBuffer,
-            name: `Generated ${activeTab} - ${new Date().toLocaleTimeString()}`,
-            type: activeTab === 'music' ? 'audio' : 
-                 activeTab === 'vocal' ? 'vocal' : 
-                 activeTab === 'speech' ? 'vocal' : 
-                 activeTab === 'drums' ? 'drum' : 
-                 activeTab === 'melody' ? 'instrument' : 'audio',
-            duration: generationSettings.parameters.duration,
-            waveform: waveformData,
-            creationMethod: 'ai-generated'
-          });
-        }
-      };
+      
+      if (generatedAudio) {
+        reader.readAsArrayBuffer(generatedAudio);
+        reader.onload = async () => {
+          try {
+            // Decode the audio data to extract waveform
+            const decodedBuffer = await audioContext.decodeAudioData(reader.result as ArrayBuffer);
+            const waveformData = extractWaveformData(decodedBuffer);
+            
+            // Pass to onGenerateTrack directly
+            onGenerateTrack({
+              buffer: reader.result as ArrayBuffer,
+              name: `Generated ${activeTab} - ${new Date().toLocaleTimeString()}`,
+              type: activeTab === 'music' ? 'audio' : 
+                   activeTab === 'vocal' ? 'vocal' : 
+                   activeTab === 'speech' ? 'vocal' : 
+                   activeTab === 'drums' ? 'drum' : 
+                   activeTab === 'melody' ? 'instrument' : 'audio',
+              duration: generationSettings.parameters.duration,
+              waveform: waveformData,
+              creationMethod: 'ai-generated'
+            });
+          } catch (error) {
+            console.error("Error decoding audio data:", error);
+          }
+        };
+      } else {
+        console.error("No generated audio blob available");
+        toast({
+          title: "Processing Error",
+          description: "There was an issue with the generated audio",
+          variant: "destructive"
+        });
+      }
+      // We process the audio in the onload event above, so we don't need this handler anymore
+      // as it was causing a duplicate track issue and referencing undefined variables
       
       toast({
         title: 'Generation Complete',
@@ -1666,6 +1736,22 @@ export function AIGenerationPanel({
     
     toast({
       description: `Loaded settings from history.`
+    });
+  };
+  
+  // Process the generated track data
+  const processGeneratedTrack = (buffer: ArrayBuffer, duration: number, waveform: number[]) => {
+    onGenerateTrack({
+      buffer: buffer,
+      name: `Generated ${activeTab} - ${new Date().toLocaleTimeString()}`,
+      type: activeTab === 'music' ? 'audio' : 
+           activeTab === 'vocal' ? 'vocal' : 
+           activeTab === 'speech' ? 'vocal' : 
+           activeTab === 'drums' ? 'drum' : 
+           activeTab === 'melody' ? 'instrument' : 'audio',
+      duration: duration,
+      waveform: waveform,
+      creationMethod: 'ai-generated'
     });
   };
   
@@ -2449,7 +2535,7 @@ export function AIGenerationPanel({
                   {isGenerating ? (
                     <>
                       <RotateCw size={16} className="mr-2 animate-spin" />
-                      Generating...
+                      {generatingMessage}
                     </>
                   ) : (
                     <>

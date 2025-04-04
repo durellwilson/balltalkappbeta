@@ -1079,6 +1079,30 @@ class TrackProcessor {
       // Stop the recorder to get the audio blob
       const audioBlob = await staticRecorder.stop();
       
+      console.log('Successfully got audio blob of size:', audioBlob?.size);
+      
+      // Test by playing it back through audio element
+      if (audioBlob && audioBlob.size > 0) {
+        try {
+          const url = URL.createObjectURL(audioBlob);
+          const audio = new Audio(url);
+          
+          // Create a test audio element just to verify blob is valid
+          audio.addEventListener('canplaythrough', () => {
+            console.log('Audio blob is valid and can be played back');
+            // Don't auto-play, just validate
+          });
+          
+          audio.addEventListener('error', (err) => {
+            console.error('Error loading test audio blob:', err);
+          });
+        } catch (testErr) {
+          console.error('Error creating test audio URL:', testErr);
+        }
+      } else {
+        console.warn('Got empty audio blob from recorder');
+      }
+      
       // Close microphone access
       try {
         console.log('Closing microphone stream');
