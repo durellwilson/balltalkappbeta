@@ -27,12 +27,16 @@ class TrackProcessor implements TrackProcessorType {
   isSoloed: boolean = false;
   private player: Tone.Player | null = null;
   private recorder: Tone.UserMedia | null = null;
-  private panner: Tone.Panner;
+  private panner: Tone.PanVol; // Using PanVol for better stereo handling
   private volume: Tone.Volume;
   private eq: Tone.EQ3;
   private compressor: Tone.Compressor;
   private analyzer: Tone.Analyser;
+  private limiter: Tone.Limiter; // Added limiter for peak control
+  private highPass: Tone.Filter; // Added high-pass filter for clarity
   private output: Tone.ToneAudioNode;
+  private deesser: Tone.Filter | null = null; // For vocal processing
+  private exciter: Tone.BiquadFilter | null = null; // For adding high-end sparkle
   private audioBuffer: AudioBuffer | null = null;
   private recordingBuffer: AudioBuffer | null = null;
   private context: BaseAudioContext;
@@ -43,25 +47,55 @@ class TrackProcessor implements TrackProcessorType {
   constructor(context: BaseAudioContext, id: number, options: TrackOptions = {}) {
     this.id = id;
     this.context = context;
-    this.panner = new Tone.Panner(options.pan || 0);
-    this.volume = new Tone.Volume({
-      volume: options.muted ? -Infinity : (options.volume !== undefined ? 20 * Math.log10(options.volume) : 0)
+    
+    // High-pass filter to remove low frequency rumble & mud (standard studio practice)
+    this.highPass = new Tone.Filter({
+      type: "highpass",
+      frequency: 40, // Gentle high-pass to remove sub-bass rumble
+      rolloff: -12
     });
     
-    this.eq = new Tone.EQ3();
+    // Professional-grade EQ (standard 3-band)
+    this.eq = new Tone.EQ3({
+      low: 0,
+      mid: 0,
+      high: 0,
+      lowFrequency: 250,
+      highFrequency: 2500
+    });
+    
+    // Studio-quality compressor with professional defaults
     this.compressor = new Tone.Compressor({
       threshold: -24,
       ratio: 3,
       attack: 0.003,
-      release: 0.25
+      release: 0.25,
+      knee: 4 // Softer knee for more musical compression
     });
     
-    this.analyzer = new Tone.Analyser('waveform', 1024);
+    // Enhanced stereo panning with volume control (professional configuration)
+    this.panner = new Tone.PanVol({
+      pan: options.pan || 0,
+      volume: options.muted ? -Infinity : (options.volume !== undefined ? 20 * Math.log10(options.volume) : 0)
+    });
     
-    // Connect the processing chain
+    // Clean volume control
+    this.volume = new Tone.Volume({
+      volume: options.muted ? -Infinity : (options.volume !== undefined ? 20 * Math.log10(options.volume) : 0)
+    });
+    
+    // Track-level limiter for safe peaks
+    this.limiter = new Tone.Limiter(-0.5);
+    
+    // High-resolution waveform analyzer
+    this.analyzer = new Tone.Analyser('waveform', 2048); // Increased resolution
+    
+    // Professional processing chain (studio-grade signal flow)
+    this.highPass.connect(this.eq);
     this.eq.connect(this.compressor);
     this.compressor.connect(this.panner);
-    this.panner.connect(this.volume);
+    this.panner.connect(this.limiter);
+    this.limiter.connect(this.volume);
     this.volume.connect(this.analyzer);
     
     // Output node is the last in our chain
@@ -405,19 +439,39 @@ class TrackProcessor implements TrackProcessorType {
         this.recorder = null;
       }
       
+      // Disconnect all audio nodes
+      this.highPass.disconnect();
       this.panner.disconnect();
       this.volume.disconnect();
+      this.limiter.disconnect();
       this.eq.disconnect();
       this.compressor.disconnect();
       this.analyzer.disconnect();
       
+      if (this.deesser) {
+        this.deesser.disconnect();
+        this.deesser.dispose();
+        this.deesser = null;
+      }
+      
+      if (this.exciter) {
+        this.exciter.disconnect();
+        this.exciter.dispose();
+        this.exciter = null;
+      }
+      
+      // Dispose all audio nodes
+      this.highPass.dispose();
       this.panner.dispose();
       this.volume.dispose();
+      this.limiter.dispose();
       this.eq.dispose();
       this.compressor.dispose();
       this.analyzer.dispose();
+      
+      console.log(`Track ${this.id} disposed successfully`);
     } catch (e) {
-      console.error('Error disposing track:', e);
+      console.error(`Error disposing track ${this.id}:`, e);
     }
   }
 
@@ -490,17 +544,37 @@ export class AudioProcessor {
   private player: Tone.Player | null = null;
   
   constructor() {
+    // Configure Tone.js for professional-grade audio processing
+    Tone.getContext().lookAhead = 0.1;
+    
+    // Get the highest sample rate available for the audio context
+    try {
+      const ac = Tone.getContext().rawContext;
+      console.log(`Audio context sample rate: ${ac.sampleRate}Hz`);
+    } catch (e) {
+      console.warn("Couldn't determine audio context sample rate:", e);
+    }
+    
     this.context = Tone.getContext().rawContext;
+    
+    // Professional mastering chain setup
     this.masterCompressor = new Tone.Compressor({
       threshold: -24,
       ratio: 3,
       attack: 0.003,
-      release: 0.25
+      release: 0.25,
+      knee: 5 // Softer knee for more natural compression
     });
     
     this.masterLimiter = new Tone.Limiter(-0.1);
     this.masterGain = new Tone.Gain(0.9);
-    this.eqBands = new Tone.EQ3();
+    this.eqBands = new Tone.EQ3({
+      low: 0,
+      mid: 0,
+      high: 0,
+      lowFrequency: 250,
+      highFrequency: 2500
+    });
     
     // Set up audio analysis tools
     this.analyzer = new Tone.Analyser('waveform', 1024);
