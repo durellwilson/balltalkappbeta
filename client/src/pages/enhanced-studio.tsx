@@ -182,7 +182,7 @@ const EnhancedStudio: React.FC = () => {
   const [newChatMessage, setNewChatMessage] = useState<string>('');
   const [sidebarTab, setSidebarTab] = useState<'tracks' | 'mixer' | 'collab' | 'cloud' | 'effects' | 'master' | 'ai'>('tracks');
   const [projectTime, setProjectTime] = useState<number>(0);
-  const [zoomLevel, setZoomLevel] = useState<number>(0.5); // Start with a more zoomed-out view
+  const [zoomLevel, setZoomLevel] = useState<number>(0.3); // Start with a more zoomed-out view to show more content
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [showRecordingPreviewModal, setShowRecordingPreviewModal] = useState<boolean>(false);
   const [recordingBuffer, setRecordingBuffer] = useState<AudioBuffer | null>(null);
@@ -491,8 +491,16 @@ const EnhancedStudio: React.FC = () => {
   // Handle playback controls
   const handlePlayPause = async () => {
     try {
+      console.log('Play/Pause button clicked', { 
+        isPlaying, 
+        tracksLength: tracks.length,
+        regionsLength: regions.length,
+        processorReady: audioProcessor.isReady()
+      });
+      
       // Check if audio processor is ready - if not, we show the overlay prompt now
       if (!audioProcessor.isReady()) {
+        console.log('Audio processor not ready, showing toast');
         toast({
           title: "Audio Not Initialized",
           description: "Please enable the audio engine first using the 'Enable Audio Engine' button.",
@@ -503,9 +511,15 @@ const EnhancedStudio: React.FC = () => {
       
       // Toggle play state
       if (isPlaying) {
+        console.log('Pausing playback');
         audioProcessor.pause();
         setIsPlaying(false);
       } else {
+        console.log('Starting playback with processor', { 
+          tracksCount: tracks.length,
+          audioProcessorTracks: audioProcessor.getTrackIds(),
+          regions: regions.map(r => ({ id: r.id, trackId: r.trackId, file: r.file ? 'Has file' : 'No file' }))
+        });
         audioProcessor.play();
         setIsPlaying(true);
       }
@@ -1494,7 +1508,21 @@ const EnhancedStudio: React.FC = () => {
               variant="outline"
               size="sm"
               className="bg-gray-800 border-gray-700"
+              onClick={() => {
+                // Return to start position without stopping playback
+                handleTimeChange(0);
+              }}
+              title="Return to Start"
+            >
+              <SkipBack size={14} />
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-gray-800 border-gray-700"
               onClick={handleStop}
+              title="Stop"
             >
               <Square size={14} />
             </Button>
@@ -1504,6 +1532,7 @@ const EnhancedStudio: React.FC = () => {
               size="sm"
               className="bg-gray-800 border-gray-700"
               onClick={handlePlayPause}
+              title={isPlaying ? "Pause" : "Play"}
             >
               {isPlaying ? <Pause size={14} /> : <Play size={14} />}
             </Button>

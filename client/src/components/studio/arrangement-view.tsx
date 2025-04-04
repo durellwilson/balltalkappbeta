@@ -693,7 +693,7 @@ export function ArrangementView({
                           region={region}
                           selected={!!region.selected}
                           pixelsPerSecond={pixelsPerSecond}
-                          height={90}  // Slightly shorter than the track height for padding
+                          height={110}  // Increased height for better waveform visualization
                           onSelect={onRegionSelect}
                           onMoveStart={(regionId, e) => handleRegionMouseDown(e, region, 'move')}
                           onResizeLeftStart={(regionId, e) => handleRegionMouseDown(e, region, 'resizeLeft')}

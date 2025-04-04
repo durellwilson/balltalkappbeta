@@ -109,19 +109,38 @@ class TrackProcessor implements TrackProcessorType {
   }
 
   play(startTime: number = 0, offset: number = 0, duration?: number): void {
+    console.log(`TrackProcessor.play called for track ${this.id} - Has player: ${!!this.player}, Loaded: ${this.player?.loaded}`);
+    
     if (!this.player || !this.player.loaded) {
-      console.warn('Cannot play track: no player available');
-      return;
+      console.warn(`Cannot play track ${this.id}: no player available or not loaded yet`);
+      
+      // Critical issue: Check if we can recover by attempting to reload audio
+      if (this.audioBuffer) {
+        console.log(`Track ${this.id} has audioBuffer but no player, attempting to create player`);
+        try {
+          // Create player from existing buffer
+          this.player = new Tone.Player(this.audioBuffer).connect(this.eq);
+          console.log(`Created new player for track ${this.id} from buffer`);
+        } catch (e) {
+          console.error(`Failed to create player from buffer for track ${this.id}:`, e);
+          return;
+        }
+      } else {
+        console.error(`Track ${this.id} has no audio buffer, cannot play`);
+        return;
+      }
     }
     
     try {
       // Stop playback if already playing
       if (this.isPlaying) {
+        console.log(`Track ${this.id} is already playing, stopping first`);
         this.player.stop();
       }
       
       // Calculate actual start time including any offset
       const actualStartTime = startTime + offset;
+      console.log(`Playing track ${this.id} at time ${Tone.now()}, offset ${actualStartTime}${duration ? `, duration ${duration}` : ''}`);
       
       // Start playback with the specified parameters
       if (duration) {
@@ -131,8 +150,9 @@ class TrackProcessor implements TrackProcessorType {
       }
       
       this.isPlaying = true;
+      console.log(`Track ${this.id} playback started successfully`);
     } catch (error) {
-      console.error('Error playing track:', error);
+      console.error(`Error playing track ${this.id}:`, error);
     }
   }
 
@@ -152,7 +172,10 @@ class TrackProcessor implements TrackProcessorType {
 
   async loadAudio(source: string | File | AudioBuffer): Promise<void> {
     try {
+      console.log(`TrackProcessor ${this.id}: Loading audio from`, typeof source === 'string' ? 'URL' : (source instanceof File ? 'File' : 'AudioBuffer'));
+      
       if (this.player) {
+        console.log(`TrackProcessor ${this.id}: Disposing existing player`);
         this.player.stop();
         this.player.disconnect();
         this.player.dispose();
@@ -162,10 +185,13 @@ class TrackProcessor implements TrackProcessorType {
       // Handle different source types
       if (typeof source === 'string') {
         // URL string
+        console.log(`TrackProcessor ${this.id}: Loading from URL: ${source.substring(0, 50)}...`);
+        
         // Create a new player with the URL
         this.player = new Tone.Player(source, () => {
           if (this.player && this.player.buffer) {
             this.audioBuffer = this.player.buffer.get() as AudioBuffer;
+            console.log(`TrackProcessor ${this.id}: Player loaded from URL callback, buffer duration: ${this.audioBuffer?.duration.toFixed(2)}s`);
           }
         }).connect(this.eq);
         
@@ -185,15 +211,19 @@ class TrackProcessor implements TrackProcessorType {
             clearTimeout(timeout);
             if (this.player.buffer) {
               this.audioBuffer = this.player.buffer.get() as AudioBuffer;
+              console.log(`TrackProcessor ${this.id}: Player already loaded, buffer duration: ${this.audioBuffer?.duration.toFixed(2)}s`);
             }
             resolve();
           } else {
+            console.log(`TrackProcessor ${this.id}: Waiting for player to load...`);
+            
             // Handle loading manually
             const checkLoaded = () => {
               if (this.player && this.player.loaded) {
                 clearTimeout(timeout);
                 if (this.player.buffer) {
                   this.audioBuffer = this.player.buffer.get() as AudioBuffer;
+                  console.log(`TrackProcessor ${this.id}: Player loaded after waiting, buffer duration: ${this.audioBuffer?.duration.toFixed(2)}s`);
                 }
                 resolve();
               } else {
@@ -207,19 +237,27 @@ class TrackProcessor implements TrackProcessorType {
         });
       } else if (source instanceof File) {
         // File object
+        console.log(`TrackProcessor ${this.id}: Loading from File: ${source.name}, size: ${source.size} bytes`);
         const arrayBuffer = await source.arrayBuffer();
+        console.log(`TrackProcessor ${this.id}: File converted to ArrayBuffer, size: ${arrayBuffer.byteLength} bytes`);
+        
         const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
+        console.log(`TrackProcessor ${this.id}: File decoded to AudioBuffer, duration: ${audioBuffer.duration.toFixed(2)}s`);
+        
         this.audioBuffer = audioBuffer;
         this.player = new Tone.Player(audioBuffer).connect(this.eq);
+        console.log(`TrackProcessor ${this.id}: Player created from file`);
       } else if (source instanceof AudioBuffer) {
         // AudioBuffer object
+        console.log(`TrackProcessor ${this.id}: Loading from AudioBuffer, duration: ${source.duration.toFixed(2)}s`);
         this.audioBuffer = source;
         this.player = new Tone.Player(source).connect(this.eq);
+        console.log(`TrackProcessor ${this.id}: Player created from audio buffer`);
       } else {
         throw new Error('Unsupported audio source type');
       }
     } catch (error) {
-      console.error('Error loading audio:', error);
+      console.error(`TrackProcessor ${this.id}: Error loading audio:`, error);
       throw error;
     }
   }
@@ -607,9 +645,31 @@ export class AudioProcessor {
    * Start playing all tracks
    */
   play(): void {
-    this.tracks.forEach(track => {
-      track.play();
+    console.log(`AudioProcessor.play called - number of tracks: ${this.tracks.size}`);
+    
+    if (this.tracks.size === 0) {
+      console.warn('No tracks available to play');
+      return;
+    }
+    
+    const trackIds = Array.from(this.tracks.keys()).join(', ');
+    console.log(`Playing tracks with IDs: ${trackIds}`);
+    
+    // Get current transport position
+    const currentPosition = Tone.Transport.seconds;
+    console.log(`Current transport position: ${currentPosition}s`);
+    
+    // Start playback from the current transport position
+    this.tracks.forEach((track, id) => {
+      console.log(`Playing track ${id} from position ${currentPosition}`);
+      
+      // Calculate playback parameters based on transport position
+      // If there was specific region data available, we'd use that here
+      const offset = currentPosition;
+      track.play(0, offset);
     });
+    
+    console.log('All tracks playback initiated');
   }
   
   /**

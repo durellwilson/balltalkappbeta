@@ -197,7 +197,7 @@ export function TrackRegion({
               {/* Main waveform display */}
               <WaveformDisplay 
                 waveform={region.waveform} 
-                color="rgba(255, 255, 255, 0.85)" 
+                color="rgba(255, 255, 255, 0.95)" 
                 backgroundColor="rgba(0, 0, 0, 0)"
               />
               

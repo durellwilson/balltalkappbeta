@@ -16,7 +16,7 @@ export function WaveformDisplay({
   backgroundColor = 'rgba(0, 0, 0, 0.1)',
   width,
   height,
-  lineWidth = 2,
+  lineWidth = 3, // Increased for better visibility
   animated = false
 }: WaveformDisplayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -67,6 +67,8 @@ export function WaveformDisplay({
       }
       
       // Convert value to Y coordinate (centered in the middle)
+      // Amplify the values slightly to make waveforms more visible
+      value = Math.min(1, value * 1.5); // Amplify by 1.5x but cap at 1.0
       const y = (0.5 + value / -2) * canvasHeight;
       
       if (i === 0) {
