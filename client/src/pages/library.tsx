@@ -1,65 +1,192 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { Link } from 'wouter';
-import { Button } from '@/components/ui/button';
+import { AppLayout } from '@/components/layout/app-layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MoreHorizontal, Play, Plus, HeartIcon } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AppLayout } from '@/components/layout/app-layout';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Search, Music, Clock, Star, Trash2, Plus, Share2, Download } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-interface AudioTrackProps {
-  title: string;
-  artist: string;
-  imageUrl?: string;
-  isLiked?: boolean;
-}
+// Sample data for library tracks
+const sampleTracks = [
+  {
+    id: 1,
+    title: 'Pre-Game Hype',
+    artistName: 'You',
+    duration: '2:45',
+    plays: 1250,
+    dateAdded: '2023-04-01',
+    isFavorite: true,
+    coverArt: null
+  },
+  {
+    id: 2,
+    title: 'Victory Anthem',
+    artistName: 'You',
+    duration: '3:12',
+    plays: 840,
+    dateAdded: '2023-03-25',
+    isFavorite: true,
+    coverArt: null
+  },
+  {
+    id: 3,
+    title: 'Workout Flow',
+    artistName: 'You',
+    duration: '4:20',
+    plays: 2100,
+    dateAdded: '2023-03-15',
+    isFavorite: false,
+    coverArt: null
+  },
+  {
+    id: 4,
+    title: 'Game Day Energy',
+    artistName: 'You',
+    duration: '3:05',
+    plays: 1870,
+    dateAdded: '2023-03-10',
+    isFavorite: false,
+    coverArt: null
+  },
+  {
+    id: 5,
+    title: 'Post-Game Reflection',
+    artistName: 'You',
+    duration: '5:30',
+    plays: 650,
+    dateAdded: '2023-03-05',
+    isFavorite: false,
+    coverArt: null
+  }
+];
 
-// Audio Track Card Component
-const AudioTrackCard = ({ title, artist, imageUrl, isLiked = false }: AudioTrackProps) => {
-  const [liked, setLiked] = useState(isLiked);
+// Sample data for saved tracks
+const savedTracks = [
+  {
+    id: 101,
+    title: 'Champion Mindset',
+    artistName: 'Marcus Thompson',
+    duration: '3:44',
+    plays: 1.5e6,
+    dateAdded: '2023-04-10',
+    isFavorite: true,
+    coverArt: null
+  },
+  {
+    id: 102,
+    title: 'Court Vision',
+    artistName: 'Sarah Williams',
+    duration: '2:55',
+    plays: 890000,
+    dateAdded: '2023-04-05',
+    isFavorite: true,
+    coverArt: null
+  },
+  {
+    id: 103,
+    title: 'Game Day',
+    artistName: 'Jordan Davis',
+    duration: '3:23',
+    plays: 2.2e6,
+    dateAdded: '2023-03-30',
+    isFavorite: false,
+    coverArt: null
+  }
+];
+
+// Sample playlists
+const playlists = [
+  {
+    id: 1,
+    name: 'Pregame Ritual',
+    description: 'Tracks to get focused before the game',
+    trackCount: 12,
+    coverArt: null
+  },
+  {
+    id: 2,
+    name: 'Workout Mix',
+    description: 'High energy tracks for training sessions',
+    trackCount: 18,
+    coverArt: null
+  },
+  {
+    id: 3,
+    name: 'Recovery Vibes',
+    description: 'Chill tracks for post-game recovery',
+    trackCount: 8,
+    coverArt: null
+  }
+];
+
+// Format play count in K/M format
+const formatPlayCount = (count: number) => {
+  if (count >= 1e6) return `${(count / 1e6).toFixed(1)}M`;
+  if (count >= 1e3) return `${(count / 1e3).toFixed(1)}K`;
+  return count.toString();
+};
+
+export default function LibraryPage() {
+  const { user } = useAuth();
+  const [searchQuery, setSearchQuery] = useState('');
   
-  return (
-    <div className="bg-card rounded-lg overflow-hidden transition-all duration-300 hover:bg-accent group">
-      <div className="aspect-square relative bg-muted">
-        {imageUrl ? (
-          <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
+  // Track component
+  const TrackItem = ({ track, isInMyTracks = false }: { track: any, isInMyTracks?: boolean }) => (
+    <div className="group flex items-center p-2 hover:bg-accent/50 rounded-md transition-colors">
+      <div className="w-10 h-10 bg-zinc-800 rounded mr-3 flex-shrink-0 flex items-center justify-center">
+        {track.coverArt ? (
+          <img src={track.coverArt} alt={track.title} className="w-full h-full object-cover rounded" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-950">
-            <span className="text-4xl font-bold text-zinc-700">{title[0]}</span>
-          </div>
+          <Music className="h-5 w-5 text-muted-foreground" />
         )}
-        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
-          <Button size="icon" variant="default" className="rounded-full h-12 w-12">
-            <Play className="h-6 w-6" />
-          </Button>
-        </div>
       </div>
-      <div className="p-3">
-        <div className="flex items-center justify-between">
-          <div className="truncate flex-1">
-            <h3 className="font-medium text-base line-clamp-1">{title}</h3>
-            <p className="text-sm text-muted-foreground line-clamp-1">{artist}</p>
+      
+      <div className="flex-grow min-w-0 flex items-center">
+        <div className="flex-grow min-w-0">
+          <div className="flex items-center">
+            <h3 className="font-medium text-sm truncate">{track.title}</h3>
+            {track.isFavorite && (
+              <Star className="h-3.5 w-3.5 text-amber-500 ml-2" fill="currentColor" />
+            )}
           </div>
-          <div className="flex items-center gap-1">
-            <Button 
-              size="icon" 
-              variant="ghost" 
-              className="h-8 w-8" 
-              onClick={() => setLiked(!liked)}
-            >
-              <HeartIcon className={`h-4 w-4 ${liked ? 'fill-primary text-primary' : 'text-muted-foreground'}`} />
+          <div className="flex items-center text-xs text-muted-foreground">
+            <span className="truncate">{track.artistName}</span>
+          </div>
+        </div>
+        
+        <div className="flex items-center ml-auto gap-3 text-xs text-muted-foreground">
+          <span>{formatPlayCount(track.plays)} plays</span>
+          <span>{track.duration}</span>
+          
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Share2 className="h-4 w-4" />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost" className="h-8 w-8">
-                  <MoreHorizontal className="h-4 w-4" />
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                    <path d="M10 3.75a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5zM10 11.75a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5zM10 19.75a1.25 1.25 0 100-2.5 1.25 1.25 0 000 2.5z" />
+                  </svg>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem>Add to playlist</DropdownMenuItem>
+                <DropdownMenuItem>Edit details</DropdownMenuItem>
                 <DropdownMenuItem>Share</DropdownMenuItem>
-                <DropdownMenuItem>Download</DropdownMenuItem>
+                {isInMyTracks && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="text-destructive">Delete track</DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -67,165 +194,133 @@ const AudioTrackCard = ({ title, artist, imageUrl, isLiked = false }: AudioTrack
       </div>
     </div>
   );
-};
-
-interface PlaylistCardProps {
-  title: string;
-  description: string;
-  tracksCount: number;
-  imageUrl?: string;
-}
-
-// Playlist Card Component
-const PlaylistCard = ({ title, description, tracksCount, imageUrl }: PlaylistCardProps) => {
-  return (
-    <Card className="transition-all duration-300 hover:bg-accent/50 h-full flex flex-col">
-      <CardHeader className="p-4 pb-2">
-        <div className="aspect-square relative w-full bg-muted rounded-md overflow-hidden">
-          {imageUrl ? (
-            <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
+  
+  // Playlist component
+  const PlaylistItem = ({ playlist }: { playlist: any }) => (
+    <Card className="group">
+      <CardContent className="p-4">
+        <div className="w-full aspect-square bg-zinc-800 rounded-md mb-3 flex items-center justify-center overflow-hidden">
+          {playlist.coverArt ? (
+            <img src={playlist.coverArt} alt={playlist.name} className="w-full h-full object-cover" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/30 to-primary/10">
-              <span className="text-4xl font-bold text-primary/40">{title[0]}</span>
+            <div className="flex flex-col items-center justify-center">
+              <Music className="h-12 w-12 text-muted-foreground mb-2" />
+              <span className="text-xs text-muted-foreground">{playlist.trackCount} tracks</span>
             </div>
           )}
-          <div className="absolute right-2 bottom-2">
-            <Button size="icon" variant="default" className="rounded-full h-10 w-10 shadow-lg">
-              <Play className="h-5 w-5" />
+          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <Button 
+              size="sm" 
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              Play
             </Button>
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="p-4 pt-0 flex-grow">
-        <CardTitle className="text-base mt-2 truncate">{title}</CardTitle>
-        <CardDescription className="line-clamp-2 text-xs mt-1">{description}</CardDescription>
+        <h3 className="font-medium text-sm">{playlist.name}</h3>
+        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{playlist.description}</p>
       </CardContent>
-      <CardFooter className="p-4 pt-0 text-xs text-muted-foreground">
-        {tracksCount} tracks
-      </CardFooter>
     </Card>
   );
-};
-
-// Main Library Component
-export default function LibraryPage() {
-  const { user } = useAuth();
-  
-  // Sample data for the library page
-  const recentlyPlayed: AudioTrackProps[] = [
-    { title: "Game Day Motivation", artist: "Marcus Thompson", isLiked: true, imageUrl: undefined },
-    { title: "Championship Flow", artist: "Sarah Williams", imageUrl: undefined },
-    { title: "Victory Anthem", artist: "DK Metcalf", imageUrl: undefined },
-    { title: "Pre-Game Ritual", artist: "LeBron James", isLiked: true, imageUrl: undefined },
-  ];
-  
-  const favoriteAlbums: PlaylistCardProps[] = [
-    { title: "Stadium Energy Mix", description: "Perfect for game day preparation", tracksCount: 12, imageUrl: undefined },
-    { title: "Workout Sessions Vol.3", description: "High intensity training soundtrack", tracksCount: 15, imageUrl: undefined },
-    { title: "Post-Game Relaxation", description: "Chill beats to unwind after the game", tracksCount: 8, imageUrl: undefined },
-    { title: "Motivational Speeches", description: "Inspirational words from sporting legends", tracksCount: 10, imageUrl: undefined },
-  ];
-
-  const favoriteArtists: PlaylistCardProps[] = [
-    { title: "Marcus Thompson", description: "Basketball", tracksCount: 24, imageUrl: undefined },
-    { title: "Sarah Williams", description: "Soccer", tracksCount: 16, imageUrl: undefined },
-    { title: "DK Metcalf", description: "Football", tracksCount: 8, imageUrl: undefined },
-    { title: "LeBron James", description: "Basketball", tracksCount: 32, imageUrl: undefined },
-  ];
   
   return (
     <AppLayout>
       <div className="container mx-auto py-6 space-y-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">My Library</h1>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Playlist
-          </Button>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">Your Library</h1>
+            <p className="text-muted-foreground">Manage your music collection</p>
+          </div>
+          
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              type="search" 
+              placeholder="Search library..." 
+              className="pl-9" 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
         
-        <Tabs defaultValue="all" className="w-full">
+        <Tabs defaultValue="my-tracks">
           <TabsList className="mb-6">
-            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="my-tracks">My Tracks</TabsTrigger>
+            <TabsTrigger value="saved">Saved</TabsTrigger>
             <TabsTrigger value="playlists">Playlists</TabsTrigger>
-            <TabsTrigger value="athletes">Athletes</TabsTrigger>
-            <TabsTrigger value="tracks">Tracks</TabsTrigger>
-            <TabsTrigger value="downloads">Downloads</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="all" className="space-y-8">
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Recently Played</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {recentlyPlayed.map((track, index) => (
-                  <AudioTrackCard key={index} {...track} />
-                ))}
-              </div>
-            </section>
+          {/* My Tracks Tab */}
+          <TabsContent value="my-tracks">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-center">
+                  <CardTitle>Your Tracks</CardTitle>
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create New
+                  </Button>
+                </div>
+                <CardDescription>Tracks you've created in the studio</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <ScrollArea className="h-[450px]">
+                  <div className="divide-y divide-border">
+                    {sampleTracks.filter(track => 
+                      !searchQuery || 
+                      track.title.toLowerCase().includes(searchQuery.toLowerCase())
+                    ).map(track => (
+                      <TrackItem key={track.id} track={track} isInMyTracks={true} />
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Saved Tab */}
+          <TabsContent value="saved">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle>Saved Tracks</CardTitle>
+                <CardDescription>Tracks you've saved from other artists</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <ScrollArea className="h-[450px]">
+                  <div className="divide-y divide-border">
+                    {savedTracks.filter(track => 
+                      !searchQuery || 
+                      track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      track.artistName.toLowerCase().includes(searchQuery.toLowerCase())
+                    ).map(track => (
+                      <TrackItem key={track.id} track={track} />
+                    ))}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {/* Playlists Tab */}
+          <TabsContent value="playlists">
+            <div className="mb-6 flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Your Playlists</h2>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                New Playlist
+              </Button>
+            </div>
             
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Your Playlists</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {favoriteAlbums.map((album, index) => (
-                  <PlaylistCard key={index} {...album} />
-                ))}
-              </div>
-            </section>
-            
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Favorite Athletes</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {favoriteArtists.map((artist, index) => (
-                  <PlaylistCard key={index} {...artist} />
-                ))}
-              </div>
-            </section>
-          </TabsContent>
-          
-          <TabsContent value="playlists" className="space-y-8">
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Your Playlists</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {favoriteAlbums.map((album, index) => (
-                  <PlaylistCard key={index} {...album} />
-                ))}
-              </div>
-            </section>
-          </TabsContent>
-          
-          <TabsContent value="athletes" className="space-y-8">
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Favorite Athletes</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {favoriteArtists.map((artist, index) => (
-                  <PlaylistCard key={index} {...artist} />
-                ))}
-              </div>
-            </section>
-          </TabsContent>
-          
-          <TabsContent value="tracks" className="space-y-8">
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Your Tracks</h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {recentlyPlayed.map((track, index) => (
-                  <AudioTrackCard key={index} {...track} />
-                ))}
-              </div>
-            </section>
-          </TabsContent>
-          
-          <TabsContent value="downloads" className="space-y-8">
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Downloaded Content</h2>
-              <div className="py-12 text-center">
-                <h3 className="text-xl font-medium mb-2">No downloads yet</h3>
-                <p className="text-muted-foreground mb-6">Download your favorite content to listen offline</p>
-                <Button asChild>
-                  <Link href="/discover">Browse Content</Link>
-                </Button>
-              </div>
-            </section>
+            <div className="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
+              {playlists.filter(playlist => 
+                !searchQuery || 
+                playlist.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                playlist.description.toLowerCase().includes(searchQuery.toLowerCase())
+              ).map(playlist => (
+                <PlaylistItem key={playlist.id} playlist={playlist} />
+              ))}
+            </div>
           </TabsContent>
         </Tabs>
       </div>

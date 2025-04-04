@@ -26,6 +26,9 @@ import EnhancedStudio from "@/pages/enhanced-studio";
 import DiscoverPage from "@/pages/discover-page";
 import ProfilePage from "@/pages/profile-page";
 import DashboardPage from "@/pages/dashboard";
+import LibraryPage from "@/pages/library";
+import EarningsPage from "@/pages/earnings";
+import SubscriptionsPage from "@/pages/subscriptions";
 
 // Create a query client
 const queryClient = new QueryClient();
@@ -494,6 +497,27 @@ function App() {
             <Route path="/discover">
               <ProtectedRoute>
                 <DiscoverPage />
+              </ProtectedRoute>
+            </Route>
+            
+            {/* Library */}
+            <Route path="/library">
+              <ProtectedRoute>
+                <LibraryPage />
+              </ProtectedRoute>
+            </Route>
+            
+            {/* Earnings */}
+            <Route path="/earnings">
+              <ProtectedRoute>
+                <EarningsPage />
+              </ProtectedRoute>
+            </Route>
+            
+            {/* Subscriptions */}
+            <Route path="/subscriptions">
+              <ProtectedRoute>
+                <SubscriptionsPage />
               </ProtectedRoute>
             </Route>
             

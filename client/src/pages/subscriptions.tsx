@@ -12,7 +12,7 @@ export default function SubscriptionsPage() {
   const { user } = useAuth();
   
   // Determine if user has an active subscription
-  const hasSubscription = user?.subscription?.status === 'active';
+  const hasSubscription = user?.subscriptionTier === 'gold';
   
   // Current plan details for subscribed users
   const currentPlan = {
