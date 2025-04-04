@@ -1,209 +1,234 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import MainLayout from '@/components/layout/MainLayout';
-import TrackList from '@/components/ui/track-list';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import React, { useState } from 'react';
+import { useAuth } from '@/hooks/use-auth';
+import { Link } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Search, LayoutGrid, List, Music, Heart, Clock, Download, Copy } from 'lucide-react';
-import { Track } from '@shared/schema';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { MoreHorizontal, Play, Plus, HeartIcon } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AppLayout } from '@/components/layout/app-layout';
 
-export default function Library() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  
-  // Fetch user's tracks
-  const { data: tracks, isLoading } = useQuery<Track[]>({
-    queryKey: ['/api/tracks'],
-    queryFn: async () => {
-      const res = await fetch('/api/tracks');
-      if (!res.ok) throw new Error('Failed to fetch tracks');
-      return res.json();
-    },
-  });
-  
-  // Filter tracks by search query
-  const filteredTracks = tracks?.filter(track =>
-    searchQuery === '' || 
-    track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    track.genre.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-  
-  // Mock playlists (would come from API in real app)
-  const playlists = [
-    { id: 1, name: 'Workout Mix', trackCount: 12 },
-    { id: 2, name: 'Pre-Game Hype', trackCount: 8 },
-    { id: 3, name: 'Recovery Vibes', trackCount: 15 },
-    { id: 4, name: 'Focus Mode', trackCount: 10 },
-  ];
+interface AudioTrackProps {
+  title: string;
+  artist: string;
+  imageUrl?: string;
+  isLiked?: boolean;
+}
+
+// Audio Track Card Component
+const AudioTrackCard = ({ title, artist, imageUrl, isLiked = false }: AudioTrackProps) => {
+  const [liked, setLiked] = useState(isLiked);
   
   return (
-    <MainLayout title="Your Library" description="Access your favorite tracks, playlists, and downloads">
-      {/* Search Bar and View Toggle */}
-      <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center">
-        <div className="relative flex-grow">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <Input
-            className="pl-10"
-            placeholder="Search your library"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant={viewMode === 'list' ? 'default' : 'outline'}
-            size="icon"
-            onClick={() => setViewMode('list')}
-            title="List view"
-          >
-            <List className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={viewMode === 'grid' ? 'default' : 'outline'}
-            size="icon"
-            onClick={() => setViewMode('grid')}
-            title="Grid view"
-          >
-            <LayoutGrid className="h-4 w-4" />
+    <div className="bg-card rounded-lg overflow-hidden transition-all duration-300 hover:bg-accent group">
+      <div className="aspect-square relative bg-muted">
+        {imageUrl ? (
+          <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-950">
+            <span className="text-4xl font-bold text-zinc-700">{title[0]}</span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center opacity-0 group-hover:opacity-100">
+          <Button size="icon" variant="default" className="rounded-full h-12 w-12">
+            <Play className="h-6 w-6" />
           </Button>
         </div>
       </div>
-      
-      {/* Tabs */}
-      <Tabs defaultValue="all" className="w-full">
-        <TabsList className="mb-8">
-          <TabsTrigger value="all">All Tracks</TabsTrigger>
-          <TabsTrigger value="liked">Liked</TabsTrigger>
-          <TabsTrigger value="playlists">Playlists</TabsTrigger>
-          <TabsTrigger value="downloads">Downloads</TabsTrigger>
-        </TabsList>
-        
-        {/* All Tracks Tab */}
-        <TabsContent value="all">
-          {isLoading ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="animate-spin w-12 h-12 border-4 border-primary border-t-transparent rounded-full"></div>
-            </div>
-          ) : filteredTracks && filteredTracks.length > 0 ? (
-            viewMode === 'list' ? (
-              <TrackList tracks={filteredTracks} />
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                {filteredTracks.map(track => (
-                  <div key={track.id} className="bg-white dark:bg-gray-900 rounded-lg shadow overflow-hidden">
-                    <div className="aspect-square bg-gray-200 dark:bg-gray-700 relative group">
-                      {track.coverArt ? (
-                        <img src={track.coverArt} alt={track.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary">
-                          <Music className="h-12 w-12" />
-                        </div>
-                      )}
-                      <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button size="icon" className="rounded-full bg-white text-black hover:bg-white/90">
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6">
-                            <path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clipRule="evenodd" />
-                          </svg>
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold truncate">{track.title}</h3>
-                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 capitalize">
-                        {track.genre.replace('-', ' ')}
-                      </p>
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {track.plays} plays
-                        </span>
-                        <Button variant="ghost" size="sm" className="p-1 h-auto">
-                          <Heart className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
+      <div className="p-3">
+        <div className="flex items-center justify-between">
+          <div className="truncate flex-1">
+            <h3 className="font-medium text-base line-clamp-1">{title}</h3>
+            <p className="text-sm text-muted-foreground line-clamp-1">{artist}</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button 
+              size="icon" 
+              variant="ghost" 
+              className="h-8 w-8" 
+              onClick={() => setLiked(!liked)}
+            >
+              <HeartIcon className={`h-4 w-4 ${liked ? 'fill-primary text-primary' : 'text-muted-foreground'}`} />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-8 w-8">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem>Add to playlist</DropdownMenuItem>
+                <DropdownMenuItem>Share</DropdownMenuItem>
+                <DropdownMenuItem>Download</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface PlaylistCardProps {
+  title: string;
+  description: string;
+  tracksCount: number;
+  imageUrl?: string;
+}
+
+// Playlist Card Component
+const PlaylistCard = ({ title, description, tracksCount, imageUrl }: PlaylistCardProps) => {
+  return (
+    <Card className="transition-all duration-300 hover:bg-accent/50 h-full flex flex-col">
+      <CardHeader className="p-4 pb-2">
+        <div className="aspect-square relative w-full bg-muted rounded-md overflow-hidden">
+          {imageUrl ? (
+            <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
           ) : (
-            <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-lg shadow">
-              <Music className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">No tracks in your library</h3>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                Browse the Discover page to find and add tracks to your library.
-              </p>
-              <Button className="mt-8" onClick={() => window.location.href = '/discover'}>
-                Discover Music
-              </Button>
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/30 to-primary/10">
+              <span className="text-4xl font-bold text-primary/40">{title[0]}</span>
             </div>
           )}
-        </TabsContent>
-        
-        {/* Liked Tab */}
-        <TabsContent value="liked">
-          <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-lg shadow">
-            <Heart className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">No liked tracks yet</h3>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Press the heart icon on any track to add it to your liked tracks.
-            </p>
-            <Button className="mt-8" onClick={() => window.location.href = '/discover'}>
-              Discover Music
+          <div className="absolute right-2 bottom-2">
+            <Button size="icon" variant="default" className="rounded-full h-10 w-10 shadow-lg">
+              <Play className="h-5 w-5" />
             </Button>
           </div>
-        </TabsContent>
+        </div>
+      </CardHeader>
+      <CardContent className="p-4 pt-0 flex-grow">
+        <CardTitle className="text-base mt-2 truncate">{title}</CardTitle>
+        <CardDescription className="line-clamp-2 text-xs mt-1">{description}</CardDescription>
+      </CardContent>
+      <CardFooter className="p-4 pt-0 text-xs text-muted-foreground">
+        {tracksCount} tracks
+      </CardFooter>
+    </Card>
+  );
+};
+
+// Main Library Component
+export default function LibraryPage() {
+  const { user } = useAuth();
+  
+  // Sample data for the library page
+  const recentlyPlayed: AudioTrackProps[] = [
+    { title: "Game Day Motivation", artist: "Marcus Thompson", isLiked: true, imageUrl: undefined },
+    { title: "Championship Flow", artist: "Sarah Williams", imageUrl: undefined },
+    { title: "Victory Anthem", artist: "DK Metcalf", imageUrl: undefined },
+    { title: "Pre-Game Ritual", artist: "LeBron James", isLiked: true, imageUrl: undefined },
+  ];
+  
+  const favoriteAlbums: PlaylistCardProps[] = [
+    { title: "Stadium Energy Mix", description: "Perfect for game day preparation", tracksCount: 12, imageUrl: undefined },
+    { title: "Workout Sessions Vol.3", description: "High intensity training soundtrack", tracksCount: 15, imageUrl: undefined },
+    { title: "Post-Game Relaxation", description: "Chill beats to unwind after the game", tracksCount: 8, imageUrl: undefined },
+    { title: "Motivational Speeches", description: "Inspirational words from sporting legends", tracksCount: 10, imageUrl: undefined },
+  ];
+
+  const favoriteArtists: PlaylistCardProps[] = [
+    { title: "Marcus Thompson", description: "Basketball", tracksCount: 24, imageUrl: undefined },
+    { title: "Sarah Williams", description: "Soccer", tracksCount: 16, imageUrl: undefined },
+    { title: "DK Metcalf", description: "Football", tracksCount: 8, imageUrl: undefined },
+    { title: "LeBron James", description: "Basketball", tracksCount: 32, imageUrl: undefined },
+  ];
+  
+  return (
+    <AppLayout>
+      <div className="container mx-auto py-6 space-y-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold">My Library</h1>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Playlist
+          </Button>
+        </div>
         
-        {/* Playlists Tab */}
-        <TabsContent value="playlists">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {/* Create Playlist Card */}
-            <div className="bg-white dark:bg-gray-900 rounded-lg shadow overflow-hidden border-2 border-dashed border-gray-300 dark:border-gray-700 flex flex-col items-center justify-center p-8 h-60">
-              <Button variant="ghost" size="icon" className="rounded-full bg-gray-100 dark:bg-gray-800 h-16 w-16 mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                </svg>
-              </Button>
-              <h3 className="font-medium">Create Playlist</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 text-center">
-                Organize your favorite tracks
-              </p>
-            </div>
-            
-            {/* Playlist Cards */}
-            {playlists.map(playlist => (
-              <div key={playlist.id} className="bg-white dark:bg-gray-900 rounded-lg shadow overflow-hidden">
-                <div className="h-40 bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                  <Copy className="h-12 w-12 text-gray-400" />
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold">{playlist.name}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {playlist.trackCount} {playlist.trackCount === 1 ? 'track' : 'tracks'}
-                  </p>
-                  <Button className="w-full mt-4" size="sm">
-                    Play
-                  </Button>
-                </div>
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="playlists">Playlists</TabsTrigger>
+            <TabsTrigger value="athletes">Athletes</TabsTrigger>
+            <TabsTrigger value="tracks">Tracks</TabsTrigger>
+            <TabsTrigger value="downloads">Downloads</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="all" className="space-y-8">
+            <section>
+              <h2 className="text-xl font-semibold mb-4">Recently Played</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {recentlyPlayed.map((track, index) => (
+                  <AudioTrackCard key={index} {...track} />
+                ))}
               </div>
-            ))}
-          </div>
-        </TabsContent>
-        
-        {/* Downloads Tab */}
-        <TabsContent value="downloads">
-          <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-lg shadow">
-            <Download className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">No downloads yet</h3>
-            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Available with Gold tier subscription for offline listening.
-            </p>
-            <Button className="mt-8" onClick={() => window.location.href = '/subscriptions'}>
-              Upgrade Subscription
-            </Button>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </MainLayout>
+            </section>
+            
+            <section>
+              <h2 className="text-xl font-semibold mb-4">Your Playlists</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {favoriteAlbums.map((album, index) => (
+                  <PlaylistCard key={index} {...album} />
+                ))}
+              </div>
+            </section>
+            
+            <section>
+              <h2 className="text-xl font-semibold mb-4">Favorite Athletes</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {favoriteArtists.map((artist, index) => (
+                  <PlaylistCard key={index} {...artist} />
+                ))}
+              </div>
+            </section>
+          </TabsContent>
+          
+          <TabsContent value="playlists" className="space-y-8">
+            <section>
+              <h2 className="text-xl font-semibold mb-4">Your Playlists</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {favoriteAlbums.map((album, index) => (
+                  <PlaylistCard key={index} {...album} />
+                ))}
+              </div>
+            </section>
+          </TabsContent>
+          
+          <TabsContent value="athletes" className="space-y-8">
+            <section>
+              <h2 className="text-xl font-semibold mb-4">Favorite Athletes</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {favoriteArtists.map((artist, index) => (
+                  <PlaylistCard key={index} {...artist} />
+                ))}
+              </div>
+            </section>
+          </TabsContent>
+          
+          <TabsContent value="tracks" className="space-y-8">
+            <section>
+              <h2 className="text-xl font-semibold mb-4">Your Tracks</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {recentlyPlayed.map((track, index) => (
+                  <AudioTrackCard key={index} {...track} />
+                ))}
+              </div>
+            </section>
+          </TabsContent>
+          
+          <TabsContent value="downloads" className="space-y-8">
+            <section>
+              <h2 className="text-xl font-semibold mb-4">Downloaded Content</h2>
+              <div className="py-12 text-center">
+                <h3 className="text-xl font-medium mb-2">No downloads yet</h3>
+                <p className="text-muted-foreground mb-6">Download your favorite content to listen offline</p>
+                <Button asChild>
+                  <Link href="/discover">Browse Content</Link>
+                </Button>
+              </div>
+            </section>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </AppLayout>
   );
 }
