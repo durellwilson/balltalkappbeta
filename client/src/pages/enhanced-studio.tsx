@@ -2068,118 +2068,86 @@ const EnhancedStudio: React.FC = () => {
                           className={`${isRecording ? 'animate-pulse' : ''}`}
                           onClick={async () => {
                             try {
+                              // Always ensure audio processor is initialized first
+                              if (!audioProcessor.isReady()) {
+                                await audioProcessor.initialize();
+                                if (!audioProcessor.isReady()) {
+                                  throw new Error('Failed to initialize audio processor');
+                                }
+                              }
+
                               if (isRecording) {
                                 // Stop recording
                                 setIsRecording(false);
-                                
-                                // Ensure audio processor is ready before stopping
-                                if (!audioProcessor.isReady()) {
-                                  await audioProcessor.initialize();
-                                }
-                                
                                 const recordingBlob = await audioProcessor.stopRecording();
-                                if (recordingBlob) {
-                                  // Convert blob to buffer
-                                  const arrayBuffer = await recordingBlob.arrayBuffer();
-                                  const audioContext = new AudioContext();
-                                  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                                  
-                                  // Generate waveform
-                                  const waveform = generateWaveform(audioBuffer, 100);
-                                  
-                                  // Set recording preview data
-                                  setRecordingPreviewData({
-                                    buffer: audioBuffer,
-                                    audioBlob: recordingBlob,
-                                    audioUrl: URL.createObjectURL(recordingBlob),
-                                    duration: audioBuffer.duration,
-                                    waveform: waveform,
-                                    name: `Recording ${new Date().toLocaleTimeString()}`
-                                  });
-                                  
-                                  // Show the preview modal
-                                  setShowRecordingPreviewModal(true);
-                                }
                                 
+                                if (!recordingBlob) {
+                                  throw new Error('No recording data received');
+                                }
+
+                                // Create audio context and decode blob
+                                const arrayBuffer = await recordingBlob.arrayBuffer();
+                                const audioContext = new AudioContext();
+                                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                                const waveform = generateWaveform(audioBuffer, 100);
+
+                                // Set preview data
+                                setRecordingPreviewData({
+                                  buffer: audioBuffer,
+                                  audioBlob: recordingBlob,
+                                  audioUrl: URL.createObjectURL(recordingBlob),
+                                  duration: audioBuffer.duration,
+                                  waveform: waveform,
+                                  name: `Recording ${new Date().toLocaleTimeString()}`
+                                });
+
+                                setShowRecordingPreviewModal(true);
                                 toast({ 
                                   title: 'Recording Stopped',
                                   description: 'Your recording is ready for preview'
                                 });
                               } else {
-                                // Initialize audio context if needed
-                                if (!audioProcessor.isReady()) {
-                                  audioProcessor.init();
+                                // Request microphone permission first
+                                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                                
+                                // Create a new track if needed
+                                const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
+                                
+                                const newTrack: Track = {
+                                  id: newTrackId,
+                                  name: `Recording ${newTrackId}`,
+                                  type: 'vocal',
+                                  volume: 0.8,
+                                  pan: 0,
+                                  isMuted: false,
+                                  isSoloed: false,
+                                  isArmed: true,
+                                  creationMethod: 'recorded',
+                                  color: '#ef4444'
+                                };
+
+                                // Create track in audio processor
+                                const processorTrack = audioProcessor.createTrack(newTrackId, {
+                                  volume: newTrack.volume,
+                                  pan: newTrack.pan
+                                });
+
+                                if (!processorTrack) {
+                                  throw new Error('Failed to create audio processor track');
                                 }
-                                
-                                // Wait for audio context to be ready
-                                await audioProcessor.ensureAudioContextRunning();
-                                
-                                // Create a temporary track if no track exists or none are armed
-                                if (tracks.length === 0 || !tracks.some(t => t.isArmed)) {
-                                  // Create a new track for instant recording
-                                  const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
-                                  
-                                  // Create track in audio processor first
-                                  const processorTrack = audioProcessor.createTrack(newTrackId, {
-                                    volume: 0.8,
-                                    pan: 0
-                                  });
-                                  
-                                  if (!processorTrack) {
-                                    throw new Error('Failed to create audio processor track');
-                                  }
-                                  
-                                  const newTrack: Track = {
-                                    id: newTrackId,
-                                    name: `Recording ${newTrackId}`,
-                                    type: 'vocal',
-                                    volume: 0.8,
-                                    pan: 0,
-                                    isMuted: false,
-                                    isSoloed: false,
-                                    isArmed: true,
-                                    creationMethod: 'recorded',
-                                    color: '#ef4444' // Red color for recording
-                                  };
-                                  
-                                  // Create track processor
-                                  audioProcessor.createTrack(newTrackId, {
-                                    volume: newTrack.volume,
-                                    pan: newTrack.pan
-                                  });
-                                  
-                                  // Add to tracks list
-                                  setTracks(prev => [...prev, newTrack]);
-                                  setActiveTrackId(newTrackId);
-                                  
-                                  // Start recording immediately
-                                  setTimeout(() => {
-                                    // Short timeout to ensure the track is created first
-                                    const track = audioProcessor.getTrack(newTrackId);
-                                    if (track) {
-                                      track.startRecording();
-                                      console.log('Started recording on new track:', newTrackId);
-                                    }
-                                  }, 100);
-                                } else {
-                                  // Use the existing armed track
-                                  const armedTrack = tracks.find(t => t.isArmed);
-                                  if (armedTrack) {
-                                    const track = audioProcessor.getTrack(armedTrack.id);
-                                    if (track) {
-                                      track.startRecording();
-                                      console.log('Started recording on existing track:', armedTrack.id);
-                                    }
-                                    setActiveTrackId(armedTrack.id);
-                                  }
-                                }
-                                
-                                // Start recording state
+
+                                // Add track to state
+                                setTracks(prev => [...prev, newTrack]);
+                                setActiveTrackId(newTrackId);
+
+                                // Start recording with waveform visualization
+                                audioProcessor.startRecording((waveformData) => {
+                                  setRecordingWaveform(waveformData);
+                                });
+
                                 setIsRecording(true);
-                                
-                                // Update zoom level for better visibility
                                 setZoomLevel(Math.min(zoomLevel * 1.5, 2));
-                                
+
                                 toast({ 
                                   title: 'Recording Started',
                                   description: 'Speak or play now - recording in progress...'
