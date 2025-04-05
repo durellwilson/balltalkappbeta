@@ -2072,29 +2072,33 @@ const EnhancedStudio: React.FC = () => {
                                 // Stop recording
                                 setIsRecording(false);
                                 
-                                // Get the recorded audio data
-                                const armedTrack = tracks.find(t => t.isArmed);
-                                if (armedTrack) {
-                                  const track = audioProcessor.getTrack(armedTrack.id);
-                                  if (track) {
-                                    // Get recording data and create waveform
-                                    const buffer = track.getRecordingBuffer ? track.getRecordingBuffer() : null;
-                                    const duration = buffer ? buffer.duration : 0;
-                                    const waveform = generateWaveform(buffer || null, 100);
-                                    
-                                    // Set recording preview data
-                                    setRecordingPreviewData({
-                                      buffer: buffer as AudioBuffer | undefined,
-                                      duration,
-                                      waveform: waveform || []
-                                    });
-                                    
-                                    // Show the preview modal
-                                    setShowRecordingPreviewModal(true);
-                                    
-                                    // Set the active track to the one we just recorded to
-                                    setActiveTrackId(armedTrack.id);
-                                  }
+                                // Ensure audio processor is ready before stopping
+                                if (!audioProcessor.isReady()) {
+                                  await audioProcessor.initialize();
+                                }
+                                
+                                const recordingBlob = await audioProcessor.stopRecording();
+                                if (recordingBlob) {
+                                  // Convert blob to buffer
+                                  const arrayBuffer = await recordingBlob.arrayBuffer();
+                                  const audioContext = new AudioContext();
+                                  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                                  
+                                  // Generate waveform
+                                  const waveform = generateWaveform(audioBuffer, 100);
+                                  
+                                  // Set recording preview data
+                                  setRecordingPreviewData({
+                                    buffer: audioBuffer,
+                                    audioBlob: recordingBlob,
+                                    audioUrl: URL.createObjectURL(recordingBlob),
+                                    duration: audioBuffer.duration,
+                                    waveform: waveform,
+                                    name: `Recording ${new Date().toLocaleTimeString()}`
+                                  });
+                                  
+                                  // Show the preview modal
+                                  setShowRecordingPreviewModal(true);
                                 }
                                 
                                 toast({ 
@@ -2107,10 +2111,24 @@ const EnhancedStudio: React.FC = () => {
                                   audioProcessor.init();
                                 }
                                 
+                                // Wait for audio context to be ready
+                                await audioProcessor.ensureAudioContextRunning();
+                                
                                 // Create a temporary track if no track exists or none are armed
                                 if (tracks.length === 0 || !tracks.some(t => t.isArmed)) {
                                   // Create a new track for instant recording
                                   const newTrackId = Math.max(...tracks.map(t => t.id), 0) + 1;
+                                  
+                                  // Create track in audio processor first
+                                  const processorTrack = audioProcessor.createTrack(newTrackId, {
+                                    volume: 0.8,
+                                    pan: 0
+                                  });
+                                  
+                                  if (!processorTrack) {
+                                    throw new Error('Failed to create audio processor track');
+                                  }
+                                  
                                   const newTrack: Track = {
                                     id: newTrackId,
                                     name: `Recording ${newTrackId}`,
