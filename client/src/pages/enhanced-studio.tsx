@@ -2066,7 +2066,7 @@ const EnhancedStudio: React.FC = () => {
                           variant="destructive" 
                           size="sm"
                           className={`${isRecording ? 'animate-pulse' : ''}`}
-                          onClick={() => {
+                          onClick={async () => {
                             try {
                               if (isRecording) {
                                 // Stop recording
