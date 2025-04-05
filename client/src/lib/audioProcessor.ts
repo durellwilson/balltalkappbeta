@@ -426,48 +426,78 @@ class TrackProcessor implements TrackProcessorType {
 
   dispose(): void {
     try {
+      // Stop any active playback or recording
       if (this.player) {
-        this.player.stop();
-        this.player.disconnect();
-        this.player.dispose();
-        this.player = null;
+        try {
+          this.player.stop();
+          this.player.disconnect();
+          this.player.dispose();
+        } catch (playerError) {
+          console.warn(`Error disposing player for track ${this.id}:`, playerError);
+        } finally {
+          this.player = null;
+        }
       }
       
       if (this.recorder) {
-        this.recorder.close();
-        this.recorder.dispose();
-        this.recorder = null;
+        try {
+          this.recorder.close();
+          this.recorder.dispose();
+        } catch (recorderError) {
+          console.warn(`Error disposing recorder for track ${this.id}:`, recorderError);
+        } finally {
+          this.recorder = null;
+        }
       }
       
-      // Disconnect all audio nodes
-      this.highPass.disconnect();
-      this.panner.disconnect();
-      this.volume.disconnect();
-      this.limiter.disconnect();
-      this.eq.disconnect();
-      this.compressor.disconnect();
-      this.analyzer.disconnect();
+      // Safely disconnect and dispose audio nodes
+      const safeDisconnect = (node: any, name: string) => {
+        if (!node) return;
+        try {
+          node.disconnect();
+        } catch (disconnectError) {
+          console.warn(`Error disconnecting ${name} for track ${this.id}:`, disconnectError);
+        }
+      };
       
-      if (this.deesser) {
-        this.deesser.disconnect();
-        this.deesser.dispose();
-        this.deesser = null;
-      }
+      const safeDispose = (node: any, name: string) => {
+        if (!node) return;
+        try {
+          node.dispose();
+        } catch (disposeError) {
+          console.warn(`Error disposing ${name} for track ${this.id}:`, disposeError);
+        }
+      };
       
-      if (this.exciter) {
-        this.exciter.disconnect();
-        this.exciter.dispose();
-        this.exciter = null;
-      }
+      // Disconnect everything first
+      safeDisconnect(this.highPass, 'highPass');
+      safeDisconnect(this.panner, 'panner');
+      safeDisconnect(this.volume, 'volume');
+      safeDisconnect(this.limiter, 'limiter');
+      safeDisconnect(this.eq, 'eq');
+      safeDisconnect(this.compressor, 'compressor');
+      safeDisconnect(this.analyzer, 'analyzer');
+      safeDisconnect(this.deesser, 'deesser');
+      safeDisconnect(this.exciter, 'exciter');
       
-      // Dispose all audio nodes
-      this.highPass.dispose();
-      this.panner.dispose();
-      this.volume.dispose();
-      this.limiter.dispose();
-      this.eq.dispose();
-      this.compressor.dispose();
-      this.analyzer.dispose();
+      // Then dispose everything
+      safeDispose(this.deesser, 'deesser');
+      this.deesser = null;
+      
+      safeDispose(this.exciter, 'exciter');
+      this.exciter = null;
+      
+      safeDispose(this.highPass, 'highPass');
+      safeDispose(this.panner, 'panner');
+      safeDispose(this.volume, 'volume');
+      safeDispose(this.limiter, 'limiter');
+      safeDispose(this.eq, 'eq');
+      safeDispose(this.compressor, 'compressor');
+      safeDispose(this.analyzer, 'analyzer');
+      
+      // Clear any stored buffers
+      this.audioBuffer = null;
+      this.recordingBuffer = null;
       
       console.log(`Track ${this.id} disposed successfully`);
     } catch (e) {
@@ -692,29 +722,61 @@ export class AudioProcessor {
       return false;
     }
     
-    // Disconnect and clean up
-    track.disconnectFromMaster();
-    track.dispose();
-    this.tracks.delete(trackId);
-    
-    console.log(`Removed track with ID: ${trackId}`);
-    return true;
+    try {
+      // Disconnect and clean up
+      track.disconnectFromMaster();
+      track.dispose();
+      
+      // Remove track from the map
+      this.tracks.delete(trackId);
+      
+      console.log(`Removed track with ID: ${trackId}`);
+      return true;
+    } catch (error) {
+      console.error(`Error removing track ${trackId}:`, error);
+      
+      // Force remove from map even if disposal failed
+      this.tracks.delete(trackId);
+      return false;
+    }
   }
   
   /**
    * Get a track by ID
    */
   getTrack(trackId: number): TrackProcessorType | undefined {
-    const track = this.tracks.get(trackId);
-    
-    // Add logging to help debug track issues
-    if (track) {
-      console.log(`Retrieved track ${trackId} - Has player: ${!!track['player']}, Has audio buffer: ${!!track['audioBuffer']}`);
-    } else {
-      console.warn(`No track found with ID ${trackId}`);
+    try {
+      // Check if track exists in our map
+      if (!this.tracks.has(trackId)) {
+        console.warn(`No track found with ID ${trackId}`);
+        return undefined;
+      }
+      
+      const track = this.tracks.get(trackId);
+      
+      // Additional validation to ensure track is valid
+      if (!track) {
+        console.warn(`Track ${trackId} exists in map but is null or undefined`);
+        // Remove invalid track entry
+        this.tracks.delete(trackId);
+        return undefined;
+      }
+      
+      // Verify track has necessary properties
+      try {
+        // Log track state for debugging
+        const hasPlayer = !!(track as any).player;
+        const hasAudioBuffer = !!(track as any).audioBuffer;
+        console.log(`Retrieved track ${trackId} - Has player: ${hasPlayer}, Has audio buffer: ${hasAudioBuffer}`);
+      } catch (error) {
+        console.warn(`Error inspecting track ${trackId}:`, error);
+      }
+      
+      return track;
+    } catch (error) {
+      console.error(`Unexpected error accessing track ${trackId}:`, error);
+      return undefined;
     }
-    
-    return track;
   }
   
   /**

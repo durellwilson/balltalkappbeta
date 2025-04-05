@@ -1057,90 +1057,191 @@ const EnhancedStudio: React.FC = () => {
   };
   
   const handleDeleteTrack = (id: number) => {
-    // Remove from audio processor
-    audioProcessor.removeTrack(id);
-    
-    // Remove from state
-    setTracks(prev => prev.filter(track => track.id !== id));
-    
-    // If active track was deleted, clear selection
-    if (activeTrackId === id) {
-      setActiveTrackId(null);
-    }
-  };
-  
-  const handleTrackMuteToggle = (id: number, muted: boolean) => {
-    setTracks(prev => prev.map(track => 
-      track.id === id ? { ...track, isMuted: muted } : track
-    ));
-    
-    // Update audio processor
-    const track = audioProcessor.getTrack(id);
-    if (track) {
-      track.setMuted(muted);
-    }
-  };
-  
-  const handleTrackSoloToggle = (id: number, soloed: boolean) => {
-    setTracks(prev => prev.map(track => 
-      track.id === id ? { ...track, isSoloed: soloed } : track
-    ));
-    
-    // Update audio processor
-    const track = audioProcessor.getTrack(id);
-    if (track) {
-      track.setSolo(soloed);
-    }
-    
-    // When a track is soloed, mute all other tracks
-    if (soloed) {
-      tracks.forEach(otherTrack => {
-        if (otherTrack.id !== id && !otherTrack.isSoloed) {
-          const track = audioProcessor.getTrack(otherTrack.id);
-          if (track) {
-            track.setMuted(true);
-          }
-        }
-      });
-    } else {
-      // When unsolo-ing, check if any other tracks are soloed
-      const anyTracksSoloed = tracks.some(t => t.id !== id && t.isSoloed);
-      
-      if (!anyTracksSoloed) {
-        // If no other tracks are soloed, unmute all tracks
-        tracks.forEach(otherTrack => {
-          if (otherTrack.id !== id && !otherTrack.isMuted) {
-            const track = audioProcessor.getTrack(otherTrack.id);
-            if (track) {
-              track.setMuted(false);
-            }
-          }
+    try {
+      // First check if track exists to provide better error messages
+      const trackExists = audioProcessor.getTrack(id);
+      if (!trackExists) {
+        console.warn(`Attempted to delete non-existent track ${id}`);
+        toast({
+          title: "Track Not Found",
+          description: `The track you're trying to delete (ID: ${id}) could not be found. It may have been already removed.`,
+          variant: "destructive"
         });
+        
+        // Clean up state anyway to ensure UI and state are in sync
+        setTracks(prev => prev.filter(track => track.id !== id));
+        if (activeTrackId === id) {
+          setActiveTrackId(null);
+        }
+        return;
+      }
+      
+      // Track exists, attempt to remove it
+      const result = audioProcessor.removeTrack(id);
+      
+      if (result) {
+        // Success - remove from state
+        setTracks(prev => prev.filter(track => track.id !== id));
+        
+        // If active track was deleted, clear selection
+        if (activeTrackId === id) {
+          setActiveTrackId(null);
+        }
+        
+        toast({
+          title: "Track Deleted",
+          description: `Track ${id} has been successfully removed.`,
+          variant: "default"
+        });
+      } else {
+        // Audio processor failed to remove track
+        console.error(`Failed to delete track ${id} from audio processor`);
+        toast({
+          title: "Delete Failed",
+          description: `There was a problem removing track ${id}. The track might still be processing audio.`,
+          variant: "destructive"
+        });
+        
+        // Force remove from UI anyway to prevent further errors
+        setTracks(prev => prev.filter(track => track.id !== id));
+        if (activeTrackId === id) {
+          setActiveTrackId(null);
+        }
+      }
+    } catch (error) {
+      // Unexpected error
+      console.error(`Error deleting track ${id}:`, error);
+      toast({
+        title: "Error",
+        description: `An unexpected error occurred while deleting track ${id}. The UI has been updated but you may need to reload if you experience issues.`,
+        variant: "destructive"
+      });
+      
+      // Force UI cleanup to prevent inconsistent state
+      setTracks(prev => prev.filter(track => track.id !== id));
+      if (activeTrackId === id) {
+        setActiveTrackId(null);
       }
     }
   };
   
+  const handleTrackMuteToggle = (id: number, muted: boolean) => {
+    try {
+      setTracks(prev => prev.map(track => 
+        track.id === id ? { ...track, isMuted: muted } : track
+      ));
+      
+      // Update audio processor
+      const track = audioProcessor.getTrack(id);
+      if (track) {
+        track.setMuted(muted);
+        console.log(`Track ${id} mute state set to ${muted}`);
+      } else {
+        console.warn(`Attempted to set mute state on non-existent track ${id}`);
+        // Don't show an error toast to the user as this is a non-critical issue
+        // and can happen during normal UI interactions with deleted tracks
+      }
+    } catch (error) {
+      console.error(`Error toggling mute state for track ${id}:`, error);
+      // Silent failure - the UI state is already updated, and this is non-critical
+    }
+  };
+  
+  const handleTrackSoloToggle = (id: number, soloed: boolean) => {
+    try {
+      // Update UI state
+      setTracks(prev => prev.map(track => 
+        track.id === id ? { ...track, isSoloed: soloed } : track
+      ));
+      
+      // Update audio processor
+      const track = audioProcessor.getTrack(id);
+      if (!track) {
+        console.warn(`Attempted to set solo state on non-existent track ${id}`);
+        return; // Exit early if track doesn't exist
+      }
+      
+      // Apply solo state to this track
+      track.setSolo(soloed);
+      console.log(`Track ${id} solo state set to ${soloed}`);
+      
+      // Handle muting/unmuting other tracks based on solo state
+      try {
+        // When a track is soloed, mute all other tracks
+        if (soloed) {
+          tracks.forEach(otherTrack => {
+            if (otherTrack.id !== id && !otherTrack.isSoloed) {
+              const track = audioProcessor.getTrack(otherTrack.id);
+              if (track) {
+                track.setMuted(true);
+              }
+            }
+          });
+        } else {
+          // When unsolo-ing, check if any other tracks are soloed
+          const anyTracksSoloed = tracks.some(t => t.id !== id && t.isSoloed);
+          
+          if (!anyTracksSoloed) {
+            // If no other tracks are soloed, unmute all tracks
+            tracks.forEach(otherTrack => {
+              if (otherTrack.id !== id && !otherTrack.isMuted) {
+                const track = audioProcessor.getTrack(otherTrack.id);
+                if (track) {
+                  track.setMuted(false);
+                }
+              }
+            });
+          }
+        }
+      } catch (soloError) {
+        console.error("Error handling solo state side effects:", soloError);
+        // No need for a user-facing error, as the primary solo operation succeeded
+      }
+    } catch (error) {
+      console.error(`Error toggling solo state for track ${id}:`, error);
+      // Silent failure - the UI state is already updated
+    }
+  };
+  
   const handleTrackVolumeChange = (id: number, volume: number) => {
-    setTracks(prev => prev.map(track => 
-      track.id === id ? { ...track, volume } : track
-    ));
-    
-    // Update audio processor
-    const track = audioProcessor.getTrack(id);
-    if (track) {
-      track.setVolume(volume);
+    try {
+      // Update UI state first
+      setTracks(prev => prev.map(track => 
+        track.id === id ? { ...track, volume } : track
+      ));
+      
+      // Update audio processor
+      const track = audioProcessor.getTrack(id);
+      if (track) {
+        track.setVolume(volume);
+        console.log(`Track ${id} volume set to ${volume}`);
+      } else {
+        console.warn(`Attempted to set volume on non-existent track ${id}`);
+      }
+    } catch (error) {
+      console.error(`Error setting volume for track ${id}:`, error);
+      // Silent failure - user experience is still maintained as UI has been updated
     }
   };
   
   const handleTrackPanChange = (id: number, pan: number) => {
-    setTracks(prev => prev.map(track => 
-      track.id === id ? { ...track, pan } : track
-    ));
-    
-    // Update audio processor
-    const track = audioProcessor.getTrack(id);
-    if (track) {
-      track.setPan(pan);
+    try {
+      // Update UI state first
+      setTracks(prev => prev.map(track => 
+        track.id === id ? { ...track, pan } : track
+      ));
+      
+      // Update audio processor
+      const track = audioProcessor.getTrack(id);
+      if (track) {
+        track.setPan(pan);
+        console.log(`Track ${id} pan set to ${pan}`);
+      } else {
+        console.warn(`Attempted to set pan on non-existent track ${id}`);
+      }
+    } catch (error) {
+      console.error(`Error setting pan for track ${id}:`, error);
+      // Silent failure - user experience is still maintained as UI has been updated
     }
   };
   
